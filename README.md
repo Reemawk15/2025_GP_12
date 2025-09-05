@@ -1,7 +1,7 @@
 Qabas Arabic Audiobook Generator
 
 Introduction:
-Qabas is an Arabic audiobook mobile application that allows users to convert Arabic books whether digital or scanned into expressive, natural sounding audio .
+- Qabas is an Arabic audiobook mobile application that allows users to convert Arabic books whether digital or scanned into expressive, natural sounding audio .
 
 Technology Used:
 - Python (Backend)
