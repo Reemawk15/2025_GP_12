@@ -13,9 +13,9 @@ Technology Used:
 - Jira (Task Management)
 
 Launch Instructions (Brief):
--start by cloning the repository using `git clone https://github.com/your-username/2025_GP_12.git`
--navigate to the `backend` directory with `cd backend`. 
--Install all the required dependencies using `pip install -r requirements.txt`
--run the server by executing `python app.py`
--open your browser and go to `http://localhost:5000` to access the application.
+- start by cloning the repository using `git clone https://github.com/your-username/2025_GP_12.git`
+- navigate to the `backend` directory with `cd backend`. 
+- Install all the required dependencies using `pip install -r requirements.txt`
+- run the server by executing `python app.py`
+- open your browser and go to `http://localhost:5000` to access the application.
 
