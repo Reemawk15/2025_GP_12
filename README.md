@@ -1,6 +1,6 @@
 # Qabas
 <p align="center">
-  <img src="https://github.com/Reemawk15/2025_GP_12/blob/main/assets/Qabas%20Logo.png?raw=true" alt="Qabas Logo" width="300">
+  <img src="https://github.com/Reemawk15/2025_GP_12/blob/main/assets/Qabas%20Logoo.png?raw=true" alt="Qabas Logo" width="300">
 </p>
 
 
