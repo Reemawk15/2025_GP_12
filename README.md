@@ -11,7 +11,7 @@
 هو تطبيق عربي يتيح للمستخدمين تحويل الكتب العربية سواء كانت رقمية أو ممسوحة ضوئيًا إلى ملفات صوتية طبيعية ومعبرة باستخدام تقنيات الذكاء الاصطناعي ومعالجة اللغة العربية.  
 كما يهدف التطبيق إلى تسهيل الوصول إلى المحتوى العربي السمعي وتخصيص تجربة الاستماع للمستخدمين.
 
-Qabas is an Arabic audiobook mobile application that allows users to convert Arabic books—whether digital or scanned into expressive, natural sounding audio.
+Qabas is an Arabic audiobook mobile application that allows users to convert Arabic books whether digital or scanned into expressive, natural sounding audio.
 
 ---
 
