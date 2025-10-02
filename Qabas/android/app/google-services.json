@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "593229990673",
+    "project_id": "qabas-95e06",
+    "storage_bucket": "qabas-95e06.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:593229990673:android:3fb230d94c1b00aad05ab0",
+        "android_client_info": {
+          "package_name": "sa.qabas.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDbt4vPm988p31Bn-Xh2s9PpjSPPBt9QZk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
