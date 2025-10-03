@@ -29,7 +29,6 @@ environment:
 # versions available, run `flutter pub outdated`.
 dependencies:
   flutter:
-
     sdk: flutter
 
   flutter_localizations:
@@ -65,8 +64,13 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
   assets:
-  - assets/images/qabas_logo.png
+    - assets/images/qabas_logo.png
+    - assets/images/new_bg.png   # الخلفية الجديدة (تأكدي إنها موجودة بنفس الاسم)
+    - assets/images/signin_bg.png
+    - assets/images/qabas_mark.png
+    - assets/images/CopyLogo.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:

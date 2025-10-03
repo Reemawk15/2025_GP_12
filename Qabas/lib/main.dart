@@ -5,6 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'sign_up_page.dart';
 import 'sign_in_page.dart';
+import 'splash_logo_page.dart'; // ← أضفنا هذا
 
 /// درجات ألوان قَبَس
 class QabasColors {
@@ -76,7 +77,7 @@ class QabasApp extends StatelessWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       theme: theme,
-      home: const HomePage(),
+      home: const SplashLogoPage(), // ← نشغّل السبلاتش أولاً
     );
   }
 }
@@ -87,62 +88,63 @@ class HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // اللوجو
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 48),
-                    child: Image.asset(
-                      'assets/images/qabas_logo.png',
-                      height: 500, // غيّري المقاس إذا حبيتي
-                      fit: BoxFit.contain,
-                    ),
-                  ),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // الخلفية الجديدة
+          Image.asset(
+            'assets/images/new_bg.png', // << هنا غيري الاسم حسب صورتك
+            fit: BoxFit.cover,
+          ),
 
-                  // زر حساب جديد (الأخضر المتوسط)
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: QabasColors.primaryMid,
-                        foregroundColor: Colors.white,
+          // الأزرار فوق الخلفية
+          SafeArea(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                  child: Column(
+                    children: [
+                      // زر حساب جديد
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: QabasColors.primaryMid,
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const SignUpPage()),
+                          ),
+                          child: const Text('حساب جديد'),
+                        ),
                       ),
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const SignUpPage()),
-                      ),
-                      child: const Text('حساب جديد'),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
+                      const SizedBox(height: 16),
 
-                  // زر تسجيل الدخول (الأخضر الأغمق)
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: QabasColors.primaryDark,
-                        foregroundColor: Colors.white,
+                      // زر تسجيل الدخول
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: QabasColors.primaryDark,
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const SignInPage()),
+                          ),
+                          child: const Text('تسجيل الدخول'),
+                        ),
                       ),
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const SignInPage()),
-                      ),
-                      child: const Text('تسجيل الدخول'),
-                    ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-        ),
+        ],
       ),
     );
   }

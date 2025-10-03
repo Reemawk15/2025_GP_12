@@ -5,6 +5,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'home_screen.dart';
 
+/// ألوان محلية للصفحة
+class _SigninColors {
+  static const primary     = Color(0xFF0E3A2C); // أخضر رئيسي (سهم/نصوص)
+  static const primaryDark = Color(0xFF06261C); // الأخضر الغامق للخلفية
+}
 
 class SignInPage extends StatefulWidget {
   const SignInPage({super.key});
@@ -14,9 +19,10 @@ class SignInPage extends StatefulWidget {
 
 class _SignInPageState extends State<SignInPage> {
   final _form = GlobalKey<FormState>();
-  final _identifier = TextEditingController(); // إيميل أو اسم مستخدم
+  final _identifier = TextEditingController();
   final _pass = TextEditingController();
   bool _loading = false;
+  bool _obscure = true;
 
   @override
   void dispose() {
@@ -31,42 +37,27 @@ class _SignInPageState extends State<SignInPage> {
     );
   }
 
-  /// يحوّل الإدخال (إيميل أو اسم مستخدم) إلى إيميل
   Future<String?> _resolveEmail(String input) async {
     final id = input.trim();
     if (id.isEmpty) return null;
-
-    if (id.contains('@')) return id; // إيميل مباشر
+    if (id.contains('@')) return id;
 
     try {
       final col = FirebaseFirestore.instance.collection('users');
-
-      // المحاولة 1: usernameLower (مستحسن)
-      var q = await col
-          .where('usernameLower', isEqualTo: id.toLowerCase())
-          .limit(1)
-          .get();
-
-      // المحاولة 2: username كما هو (لدعم بيانات قديمة)
+      var q = await col.where('usernameLower', isEqualTo: id.toLowerCase()).limit(1).get();
       if (q.docs.isEmpty) {
         q = await col.where('username', isEqualTo: id).limit(1).get();
       }
-
       if (q.docs.isEmpty) return null;
       final data = q.docs.first.data();
-      final email = (data['email'] as String?)?.trim();
-      return email;
-    } on FirebaseException catch (e) {
-      if (e.code == 'permission-denied') {
-        _toast('لا يمكن قراءة بيانات المستخدم من Firestore (قواعد الحماية تمنع ذلك أثناء التطوير).');
-      }
+      return (data['email'] as String?)?.trim();
+    } on FirebaseException {
       return null;
     }
   }
 
   Future<void> _signIn() async {
     if (!_form.currentState!.validate()) return;
-
     setState(() => _loading = true);
     try {
       final email = await _resolveEmail(_identifier.text);
@@ -74,12 +65,10 @@ class _SignInPageState extends State<SignInPage> {
         _toast('لا يوجد حساب بهذا البريد الإلكتروني/الاسم.', color: Colors.red);
         return;
       }
-
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email,
         password: _pass.text,
       );
-
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
         context,
@@ -110,11 +99,28 @@ class _SignInPageState extends State<SignInPage> {
       }
       await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
       _toast('أرسلنا رابط إعادة التعيين إلى $email');
-    } on FirebaseAuthException {
-      _toast('تعذّر إرسال الرابط. تأكّد من صحة البريد.', color: Colors.red);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  InputDecoration _decoration(String hint, {Widget? suffix}) {
+    const radius = 24.0;
+    return InputDecoration(
+      hintText: hint,
+      filled: true,
+      fillColor: Colors.white.withOpacity(0.78),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      suffixIcon: suffix,
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(radius),
+        borderSide: BorderSide(color: _SigninColors.primary.withOpacity(0.28)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(radius),
+        borderSide: const BorderSide(color: _SigninColors.primary, width: 1.2),
+      ),
+    );
   }
 
   @override
@@ -122,73 +128,108 @@ class _SignInPageState extends State<SignInPage> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(title: const Text('تسجيل الدخول')),
-        body: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Form(
-                key: _form,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextFormField(
-                      controller: _identifier,
-                      decoration: const InputDecoration(
-                        labelText: 'البريد الإلكتروني أو اسم المستخدم',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'أدخل البريد الإلكتروني أو اسم المستخدم' : null,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _pass,
-                      decoration: const InputDecoration(
-                        labelText: 'كلمة المرور',
-                        border: OutlineInputBorder(),
-                      ),
-                      obscureText: true,
-                      validator: (v) => (v ?? '').isEmpty ? 'أدخل كلمة المرور' : null,
-                      onFieldSubmitted: (_) => _signIn(),
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        onPressed: _loading ? null : _signIn,
-                        child: _loading
-                            ? const SizedBox(
-                          height: 22, width: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                            : const Text('دخول'),
-                      ),
-                    ),
+        extendBodyBehindAppBar: true,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          foregroundColor: _SigninColors.primary,
+        ),
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.asset(
+              'assets/images/signin_bg.png',
+              fit: BoxFit.cover,
+            ),
 
-                    // اختر واحد:
-                    // (1) ريسِت داخل نفس الصفحة:
-                    TextButton(
-                      onPressed: _loading ? null : _resetPasswordInline,
-                      child: const Text('نسيت كلمة المرور؟'),
-                    ),
+            SafeArea(
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 420),
+                    child: Form(
+                      key: _form,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // البريد
+                          FractionallySizedBox(
+                            widthFactor: 0.8, // أقصر
+                            child: TextFormField(
+                              controller: _identifier,
+                              keyboardType: TextInputType.emailAddress,
+                              validator: (v) => (v == null || v.trim().isEmpty)
+                                  ? 'أدخل البريد الإلكتروني أو اسم المستخدم'
+                                  : null,
+                              decoration: _decoration('البريد الإلكتروني أو اسم المستخدم'),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
 
-                    // أو (2) افتح صفحة الريسِت المستقلة:
-                    // TextButton(
-                    //   onPressed: _loading
-                    //       ? null
-                    //       : () => Navigator.push(
-                    //             context,
-                    //             MaterialPageRoute(builder: (_) => const ResetPasswordPage()),
-                    //           ),
-                    //   child: const Text('نسيت كلمة المرور؟'),
-                    // ),
-                  ],
+                          // كلمة المرور
+                          FractionallySizedBox(
+                            widthFactor: 0.8,
+                            child: TextFormField(
+                              controller: _pass,
+                              obscureText: _obscure,
+                              validator: (v) =>
+                              (v == null || v.isEmpty) ? 'أدخل كلمة المرور' : null,
+                              onFieldSubmitted: (_) => _signIn(),
+                              decoration: _decoration(
+                                'كلمة المرور',
+                                suffix: IconButton(
+                                  onPressed: () => setState(() => _obscure = !_obscure),
+                                  icon: Icon(
+                                    _obscure ? Icons.visibility : Icons.visibility_off,
+                                    color: _SigninColors.primary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+
+                          // زر تسجيل الدخول
+                          FractionallySizedBox(
+                            widthFactor: 0.7, // أقصر أكثر
+                            child: FilledButton(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: _SigninColors.primaryDark, // نفس الخلفية
+                                foregroundColor: Colors.white,
+                                minimumSize: const Size.fromHeight(56),
+                                shape: const StadiumBorder(),
+                                side: const BorderSide(color: Colors.white, width: 1.4),
+                                elevation: 2,
+                              ),
+                              onPressed: _loading ? null : _signIn,
+                              child: _loading
+                                  ? const SizedBox(
+                                height: 22,
+                                width: 22,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                                  : const Text('تسجيل دخول'),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+
+                          TextButton(
+                            onPressed: _loading ? null : _resetPasswordInline,
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.white,
+                            ),
+                            child: const Text('نسيتِ كلمة المرور؟'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
+          ],
         ),
       ),
     );
