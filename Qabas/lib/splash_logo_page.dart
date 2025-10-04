@@ -26,7 +26,7 @@ class _SplashLogoPageState extends State<SplashLogoPage>
 
     _c.forward();
 
-    // مدّة إجمالية بسيطة ثم الانتقال
+    // بعد 1.8 ثانية ننتقل إلى HomePage
     Timer(const Duration(milliseconds: 1800), () {
       if (!mounted) return;
       Navigator.pushReplacement(
@@ -44,27 +44,26 @@ class _SplashLogoPageState extends State<SplashLogoPage>
 
   @override
   Widget build(BuildContext context) {
-    return const _LogoOnWhite();
+    return const _LogoOnGreen();
   }
 }
 
-class _LogoOnWhite extends StatelessWidget {
-  const _LogoOnWhite();
+class _LogoOnGreen extends StatelessWidget {
+  const _LogoOnGreen();
 
   @override
   Widget build(BuildContext context) {
-    // استخدم AnimatedBuilder لربط الأنيميشن
     final state = context.findAncestorStateOfType<_SplashLogoPageState>();
     final scale = state?._scale ?? const AlwaysStoppedAnimation(1.0);
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFF06261C), // أخضر غامق
       body: Center(
         child: ScaleTransition(
           scale: scale,
           child: Image.asset(
-            'assets/images/qabas_mark.png', // ← شعارك
-            width: MediaQuery.of(context).size.width * 0.38, // حجم واضح
+            'assets/images/CopyLogo.png', // ← شعارك الأبيض
+            width: MediaQuery.of(context).size.width * 0.38,
             fit: BoxFit.contain,
           ),
         ),
