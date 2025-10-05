@@ -20,14 +20,14 @@ class _SplashLogoPageState extends State<SplashLogoPage>
 
     _c = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 800),
     );
     _scale = CurvedAnimation(parent: _c, curve: Curves.easeOutBack);
 
     _c.forward();
 
-    // بعد 1.8 ثانية ننتقل إلى HomePage
-    Timer(const Duration(milliseconds: 1800), () {
+    // بعد 2 ثانية ننتقل إلى HomePage
+    Timer(const Duration(milliseconds: 2000), () {
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
