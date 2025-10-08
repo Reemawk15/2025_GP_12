@@ -5,15 +5,17 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'sign_up_page.dart';
 import 'sign_in_page.dart';
-import 'splash_logo_page.dart'; // ← أضفنا هذا
+import 'splash_logo_page.dart';
 
 /// درجات ألوان قَبَس
 class QabasColors {
-  static const primary     = Color(0xFF0E3A2C); // أخضر داكن
-  static const primaryMid  = Color(0xFF2F5145); // أخضر متوسط (لزر حساب جديد)
-  static const primaryDark = Color(0xFF06261C); // أغمق (لزر تسجيل الدخول)
-  static const surface     = Colors.white;
-  static const background  = Color(0xFFF7F8F7); // خلفية لطيفة
+  static const primary     = Color(0xFF0E3A2C); // أخضر داكن للنصوص
+  static const background  = Color(0xFFC6DABA); // ← خلفية البداية الجديدة (#c6daba)
+
+  // ألوان الأزرار بنفس روح الصورة:
+  static const btnSolid    = Color(0xFFDDE9C6); // الزر العلوي
+  static const btnLight    = Color(0xFFF0F7DF); // الزر السفلي
+  static const btnText     = primary;           // نص أخضر داكن
 }
 
 Future<void> main() async {
@@ -34,13 +36,12 @@ class QabasApp extends StatelessWidget {
         brightness: Brightness.light,
       ).copyWith(
         primary: QabasColors.primary,
-        surface: QabasColors.surface,
         background: QabasColors.background,
       ),
-      scaffoldBackgroundColor: QabasColors.background,
+      scaffoldBackgroundColor: QabasColors.background, // ← يضمن خلفية الشاشة الافتتاحية
       appBarTheme: const AppBarTheme(
         centerTitle: true,
-        backgroundColor: QabasColors.surface,
+        backgroundColor: Colors.white,
         foregroundColor: QabasColors.primary,
         elevation: 0,
       ),
@@ -53,6 +54,7 @@ class QabasApp extends StatelessWidget {
           minimumSize: const Size.fromHeight(56),
           shape: const StadiumBorder(),
           textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          elevation: 0,
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -77,11 +79,12 @@ class QabasApp extends StatelessWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       theme: theme,
-      home: const SplashLogoPage(), // ← نشغّل السبلاتش أولاً
+      home: const SplashLogoPage(), // شاشة الشعار الأولى
     );
   }
 }
 
+/// صفحة البداية (تسجيل الدخول / إنشاء حساب)
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
@@ -91,57 +94,58 @@ class HomePage extends StatelessWidget {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // الخلفية الجديدة
+          // الخلفية: الصورة الجديدة
           Image.asset(
-            'assets/images/new_bg.png', // << هنا غيري الاسم حسب صورتك
+            'assets/images/firstPage.png', // ← اسم الصورة
             fit: BoxFit.cover,
           ),
 
           // الأزرار فوق الخلفية
           SafeArea(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-                  child: Column(
-                    children: [
-                      // زر حساب جديد
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: QabasColors.primaryMid,
-                            foregroundColor: Colors.white,
-                          ),
-                          onPressed: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const SignUpPage()),
-                          ),
-                          child: const Text('حساب جديد'),
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // زر "تسجيل الدخول" (العلوي) – لون أغمق قليلًا مثل المثال
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: QabasColors.btnSolid,
+                          foregroundColor: QabasColors.btnText,
+                          shape: const StadiumBorder(),
                         ),
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const SignInPage()),
+                        ),
+                        child: const Text('تسجيل الدخول'),
                       ),
-                      const SizedBox(height: 16),
+                    ),
+                    const SizedBox(height: 16),
 
-                      // زر تسجيل الدخول
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: QabasColors.primaryDark,
-                            foregroundColor: Colors.white,
-                          ),
-                          onPressed: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const SignInPage()),
-                          ),
-                          child: const Text('تسجيل الدخول'),
+                    // زر "إنشاء حساب جديد" (السفلي) – أفتح
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: QabasColors.btnLight,
+                          foregroundColor: QabasColors.btnText,
+                          shape: const StadiumBorder(),
                         ),
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const SignUpPage()),
+                        ),
+                        child: const Text('إنشاء حساب جديد'),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ],
@@ -149,5 +153,3 @@ class HomePage extends StatelessWidget {
     );
   }
 }
-
-REe

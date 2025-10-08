@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'main.dart'; // علشان نستخدم HomePage مباشرة
+import 'package:flutter/services.dart';
+import 'main.dart'; // لاستخدام HomePage و QabasColors إن وُجدت
 
 class SplashLogoPage extends StatefulWidget {
   const SplashLogoPage({super.key});
@@ -23,7 +24,6 @@ class _SplashLogoPageState extends State<SplashLogoPage>
       duration: const Duration(milliseconds: 800),
     );
     _scale = CurvedAnimation(parent: _c, curve: Curves.easeOutBack);
-
     _c.forward();
 
     // بعد 2 ثانية ننتقل إلى HomePage
@@ -44,7 +44,7 @@ class _SplashLogoPageState extends State<SplashLogoPage>
 
   @override
   Widget build(BuildContext context) {
-    return const _LogoOnGreen();
+    return const _LogoOnGreen(); // نفس الاسم القديم
   }
 }
 
@@ -56,15 +56,27 @@ class _LogoOnGreen extends StatelessWidget {
     final state = context.findAncestorStateOfType<_SplashLogoPageState>();
     final scale = state?._scale ?? const AlwaysStoppedAnimation(1.0);
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF06261C), // أخضر غامق
-      body: Center(
-        child: ScaleTransition(
-          scale: scale,
-          child: Image.asset(
-            'assets/images/CopyLogo.png', // ← شعارك الأبيض
-            width: MediaQuery.of(context).size.width * 0.38,
-            fit: BoxFit.contain,
+    // لون الخلفية #C6DABA (لو عندك QabasColors.background استخدمناه؛ وإلا استبدلي بالسطر المعلّق)
+    const splashBg = QabasColors.background;
+    // const splashBg = Color(0xFFC6DABA);
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        systemNavigationBarColor: Colors.white,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
+      child: Scaffold(
+        backgroundColor: splashBg,
+        body: Center(
+          child: ScaleTransition(
+            scale: scale,
+            child: Image.asset(
+              'assets/images/CopyLogo.png', // شعارك
+              width: MediaQuery.of(context).size.width * 0.38,
+              fit: BoxFit.contain,
+            ),
           ),
         ),
       ),

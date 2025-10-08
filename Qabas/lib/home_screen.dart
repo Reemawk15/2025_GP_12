@@ -1,18 +1,18 @@
 // lib/home_screen.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'main.dart';
 
-// ⬅️ هذا للاستفادة من HomePage (صفحة الاختيار حساب جديد / تسجيل الدخول)
-import 'main.dart'; // تأكد أن فيه كلاس HomePage وما يستورد هذا الملف عشان ما يصير تعارض دوّري
+class _HomeColors {
+  // أخضر الهوية (عدّليه لو تبين درجة ثانية)
+  static const confirm = Color(0xFF6F8E63); // الأخضر الغامق
+}
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   Future<void> _logout(BuildContext context) async {
-    // تسجيل خروج فعلي من Firebase
     await FirebaseAuth.instance.signOut();
-
-    // الذهاب لصفحة الاختيار ومسح سجل التنقل
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (_) => const HomePage()),
@@ -26,18 +26,37 @@ class HomeScreen extends StatelessWidget {
       builder: (ctx) => Directionality(
         textDirection: TextDirection.rtl,
         child: AlertDialog(
-          title: const Text('تأكيد تسجيل الخروج'),
-          content: const Text('هل تريد تسجيل الخروج؟'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('إلغاء'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('تأكيد'),
-            ),
-          ],
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: const Text('  متأكد من تسجيل الخروج؟    '),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 4),
+
+              const SizedBox(height: 16),
+              // زر التأكيد (بالأخضر)
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _HomeColors.confirm,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('تأكيد'),
+                ),
+              ),
+              // زر الإلغاء تحت التأكيد
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('إلغاء'),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -72,17 +91,8 @@ class HomeScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               const Text('تم تسجيل الدخول بنجاح ✨'),
-              const SizedBox(height: 32),
-
-              // زر واضح لتسجيل الخروج أيضًا داخل المحتوى
-              SizedBox(
-                width: 220,
-                child: OutlinedButton.icon(
-                  icon: const Icon(Icons.logout),
-                  label: const Text('تسجيل الخروج'),
-                  onPressed: () => _confirmLogout(context),
-                ),
-              ),
+              const SizedBox(height: 8),
+              // (تم إزالة زر تسجيل الخروج السفلي كما طلبت)
             ],
           ),
         ),
