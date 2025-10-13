@@ -73,7 +73,7 @@ class _LogoOnGreen extends StatelessWidget {
           child: ScaleTransition(
             scale: scale,
             child: Image.asset(
-              'assets/images/CopyLogo.png', // شعارك
+              'assets/images/qabas_mark.png', // شعارك
               width: MediaQuery.of(context).size.width * 0.38,
               fit: BoxFit.contain,
             ),

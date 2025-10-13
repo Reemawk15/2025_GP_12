@@ -74,6 +74,8 @@ flutter:
     - assets/images/signup_bg.png
     - assets/images/firstPage.png
     - assets/images/signup.png
+    - assets/images/back.png
+
     - assets/images/
 
   # To add assets to your application, add an assets section, like this:

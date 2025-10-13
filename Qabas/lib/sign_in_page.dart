@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'home_screen.dart';
 import 'sign_up_page.dart';
+import 'admin_home_screen.dart'; //
 
 /// ======== تحكم سريع بالتموضع/الألوان ========
 const double kSigninProgressTop      = 170;   // موضع الشريط من الأعلى
@@ -94,18 +95,53 @@ class _SignInPageState extends State<SignInPage> {
 
   Future<void> _signIn() async {
     if (!_form.currentState!.validate()) return;
+
+    final idInput = _identifier.text.trim();
+    final passInput = _pass.text;
+
+    // ✅ مسار أدمن ثابت بالاسم Admin والباس Admin1234_
+    if (idInput.toLowerCase() == 'admin' && passInput == 'Admin1234_') {
+      if (!mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const AdminHomeScreen()),
+            (_) => false,
+      );
+      return;
+    }
+
+    // 👇 غير كذا: نستمر لمسار Firebase
     setState(() => _loading = true);
     try {
-      final email = await _resolveEmail(_identifier.text);
+      final email = await _resolveEmail(idInput);
       if (email == null) {
         _toast('لا يوجد حساب يطابق البريد الإلكتروني/اسم المستخدم المدخل.', color: Colors.red);
         return;
       }
 
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      final cred = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email,
-        password: _pass.text,
+        password: passInput,
       );
+
+      // بعد تسجيل دخول Firebase نتحقق من دوره في Firestore
+      final uid = cred.user?.uid;
+      if (uid != null) {
+        final snap = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+        final data = snap.data() ?? {};
+        final role = (data['role'] as String?)?.toLowerCase();
+        final isAdmin = (data['isAdmin'] == true);
+
+        if (!mounted) return;
+        if (role == 'admin' || isAdmin) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (_) => const AdminHomeScreen()),
+                (_) => false,
+          );
+          return;
+        }
+      }
 
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(

@@ -351,7 +351,7 @@ class _SignUpPageState extends State<SignUpPage> {
                             children: [
                               Icon(
                                 _notifsEnabled ? Icons.check_circle : Icons.radio_button_unchecked,
-                                color: _SignupTheme.primary, size: 24,
+                                color: _SignupTheme.inputBorder, size: 24,
                               ),
                               const SizedBox(width: 8),
                               const Expanded(
@@ -361,7 +361,7 @@ class _SignUpPageState extends State<SignUpPage> {
                               Switch(
                                 value: _notifsEnabled,
                                 onChanged: (v) => setState(() => _notifsEnabled = v),
-                                activeColor: _SignupTheme.primary,
+                                activeColor: _SignupTheme.inputBorder,
                               ),
                             ],
                           ),
