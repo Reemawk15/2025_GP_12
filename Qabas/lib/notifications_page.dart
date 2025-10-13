@@ -147,7 +147,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
                           const SizedBox(height: 16),
                           const Text(
-                            'فعّلي الإشعارات عشان نذكّرك وتحقّقين هدفك القرائي بسهولة.',
+                            'فعّل الإشعارات عشان نذكّرك وتحقّق هدفك القرائي بسهولة.',
                             textAlign: TextAlign.center,
                             style: TextStyle(color: Colors.black54),
                           ),

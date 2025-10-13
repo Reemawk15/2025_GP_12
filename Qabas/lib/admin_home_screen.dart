@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'admin_community_tab.dart';
+import 'admin_book_manager.dart'; // ← إضافة الاستيراد لشاشة إدارة الكتب
 
 class _HomeColors {
   static const confirm    = Color(0xFF6F8E63);
@@ -178,8 +179,42 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         ),
         body: ListView(
           padding: const EdgeInsets.all(16),
-          children: const [
-            Text('مرحبًا بك في صفحة الأدمن 👋', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+          children: [
+            const Text('مرحبًا بك في صفحة الأدمن 👋', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 16),
+
+            // بطاقة إدارة الكتب الصوتية (إضافة/حذف)
+            Card(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'إدارة الكتب الصوتية',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      textDirection: TextDirection.rtl,
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'من هنا تقدر تضيف كتب (PDF + غلاف) مع التفاصيل المطلوبة، أو تحذف الكتب من المكتبة العامة.',
+                      textDirection: TextDirection.rtl,
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      icon: const Icon(Icons.library_add),
+                      label: const Text('إضافة/حذف الكتب'),
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const AdminBookManagerScreen()),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),

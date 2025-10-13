@@ -188,14 +188,14 @@ class ProfileTab extends StatelessWidget {
                               );
                             },
                           ),
-                      _ProfileButton(
-                        title: 'الإشعارات',
-                        icon: Icons.notifications_none_outlined,
-                        onTap: () {
-                          Navigator.of(context, rootNavigator: true).push(
-                            MaterialPageRoute(builder: (_) => const NotificationsPage()),
-                          );
-                        },
+                          _ProfileButton(
+                            title: 'الإشعارات',
+                            icon: Icons.notifications_none_outlined,
+                            onTap: () {
+                              Navigator.of(context, rootNavigator: true).push(
+                                MaterialPageRoute(builder: (_) => const NotificationsPage()),
+                              );
+                            },
                           ),
                           _ProfileButton(
                             title: 'تسجيل خروج',
