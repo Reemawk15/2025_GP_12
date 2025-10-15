@@ -1,85 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+
+import 'admin_book_manager.dart';
 import 'admin_community_tab.dart';
-import 'admin_book_manager.dart'; // ← إضافة الاستيراد لشاشة إدارة الكتب
 
 class _HomeColors {
   static const confirm    = Color(0xFF6F8E63);
   static const navBg      = Color(0xFFC9DABF);
   static const selected   = Color(0xFF0E3A2C);
   static const unselected = Color(0xFF2F5145);
-}
-
-class BottomNavItem {
-  final IconData icon;
-  final String label;
-  const BottomNavItem(this.icon, this.label);
-}
-
-class _NavButton extends StatelessWidget {
-  final BottomNavItem item;
-  final bool selected;
-  final VoidCallback onPressed;
-  const _NavButton({required this.item, required this.selected, required this.onPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    final color = selected ? _HomeColors.selected : _HomeColors.unselected.withOpacity(0.55);
-    return Expanded(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(24),
-        onTap: onPressed,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(height: 28, child: Icon(item.icon, size: 24, color: color)),
-            const SizedBox(height: 8),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              height: selected ? 10 : 0,
-              width: selected ? 26 : 0,
-              decoration: BoxDecoration(
-                color: _HomeColors.selected,
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class AdminBottomNav extends StatelessWidget {
-  final List<BottomNavItem> items;
-  final int currentIndex;
-  final ValueChanged<int> onTap;
-  const AdminBottomNav({super.key, required this.items, required this.currentIndex, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
-          decoration: BoxDecoration(
-            color: _HomeColors.navBg,
-            borderRadius: BorderRadius.circular(40),
-            boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 18, offset: Offset(0, 10))],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: List.generate(items.length, (i) {
-              final isSelected = i == currentIndex;
-              return _NavButton(item: items[i], selected: isSelected, onPressed: () => onTap(i));
-            }),
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class AdminHomeScreen extends StatefulWidget {
@@ -89,13 +18,6 @@ class AdminHomeScreen extends StatefulWidget {
 }
 
 class _AdminHomeScreenState extends State<AdminHomeScreen> {
-  int _index = 0;
-
-  final _items = const [
-    BottomNavItem(Icons.home, 'الرئيسية'),
-    BottomNavItem(Icons.group, 'المجتمع'),
-  ];
-
   Future<void> _confirmLogout(BuildContext context) async {
     showDialog(
       context: context,
@@ -107,21 +29,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'تأكيد تسجيل الخروج',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: _HomeColors.selected,
-                ),
-              ),
+              const Text('تأكيد تسجيل الخروج',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _HomeColors.selected)),
               const SizedBox(height: 10),
-              const Text(
-                'هل أنت متأكد أنك تريد تسجيل الخروج؟',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 15, color: _HomeColors.unselected),
-              ),
+              const Text('هل أنت متأكد أنك تريد تسجيل الخروج؟',
+                  textAlign: TextAlign.center, style: TextStyle(fontSize: 15, color: _HomeColors.unselected)),
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
@@ -149,10 +62,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                   onPressed: () => Navigator.pop(ctx),
-                  child: const Text(
-                    'إلغاء',
-                    style: TextStyle(fontSize: 16, color: _HomeColors.selected),
-                  ),
+                  child: const Text('إلغاء', style: TextStyle(fontSize: 16, color: _HomeColors.selected)),
                 ),
               ),
             ],
@@ -162,52 +72,101 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-  Widget _adminHome() {
+  @override
+  Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: Scaffold(
-        backgroundColor: Colors.white,
-        appBar: AppBar(
-          title: const Text('لوحة التحكم'),
-          actions: [
-            IconButton(
-              tooltip: 'تسجيل الخروج',
-              icon: const Icon(Icons.logout),
-              onPressed: () => _confirmLogout(context),
+      child: Stack(
+        children: [
+          // ✅ نفس أسلوب البروفايل: الخلفية تغطي الشاشة كاملة
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/back.png', // عدّلي المسار حسب مشروعك
+              fit: BoxFit.cover,
             ),
-          ],
-        ),
-        body: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            const Text('مرحبًا بك في صفحة الأدمن 👋', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 16),
+          ),
 
-            // بطاقة إدارة الكتب الصوتية (إضافة/حذف)
-            Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          // ✅ Scaffold شفاف فوق الخلفية
+          Scaffold(
+            backgroundColor: Colors.transparent,
+            extendBody: true,
+            extendBodyBehindAppBar: true,
+// ⬇️ هذا ينزل العنوان وزر الخروج لتحت شوي
+            appBar: PreferredSize(
+              preferredSize: const Size.fromHeight(190), // ارتفاع أكبر
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.only(top: 150), // ← عدلي الرقم تنزل أكثر أو أقل
+                child: AppBar(
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                  title: const Text(
+                    'لوحة التحكم',
+                    style: TextStyle(
+                      color: _HomeColors.selected,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  actions: [
+                    IconButton(
+                      tooltip: 'تسجيل الخروج',
+                      icon: const Icon(Icons.logout, color: _HomeColors.selected),
+                      onPressed: () => _confirmLogout(context),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            body: SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 50, 16, 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text(
-                      'إدارة الكتب الصوتية',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      textDirection: TextDirection.rtl,
-                    ),
                     const SizedBox(height: 8),
                     const Text(
-                      'من هنا تقدر تضيف كتب (PDF + غلاف) مع التفاصيل المطلوبة، أو تحذف الكتب من المكتبة العامة.',
-                      textDirection: TextDirection.rtl,
+                      'مرحبًا بك في لوحة إدارة قَبَس، يمكنك إدارة الكتب والطلبات والإحصائيات من هنا.',
+                      style: TextStyle(fontSize: 14, color: _HomeColors.unselected),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // كرت 1: إدارة الكتب الصوتية
+                    _ActionCard(
+                      title: 'إدارة الكتب الصوتية',
+                      subtitle: 'يمكنك إثراء مكتبة قَبَس بإضافة الكتب الصوتية بالضغط على الزر أدناه.',
+                      buttonText: 'أضف كتاب جديد',
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const AdminBookManagerScreen()),
+                        );
+                      },
                     ),
                     const SizedBox(height: 12),
-                    FilledButton.icon(
-                      icon: const Icon(Icons.library_add),
-                      label: const Text('إضافة/حذف الكتب'),
+
+                    // كرت 2: إدارة الطلبات
+                    _ActionCard(
+                      title: 'إدارة الطلبات',
+                      subtitle: 'يمكنك متابعة طلبات إنشاء الكتب بالضغط على الزر أدناه.',
+                      buttonText: 'عرض الطلبات',
                       onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const AdminBookManagerScreen()),
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const AdminCommunityTab()),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 12),
+
+                    // كرت 3: احصائيات قَبَس
+                    _ActionCard(
+                      title: 'احصائيات قَبَس',
+                      subtitle: 'يمكنك متابعة نشاط قَبَس بالضغط على الزر أدناه.',
+                      buttonText: 'عرض الإحصائيات',
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const AdminStatsPage()),
                         );
                       },
                     ),
@@ -215,49 +174,111 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
+}
 
-  final _adminCommunity = const AdminCommunityTab();
+// كرت قابل للنقر بالكامل + زر
+class _ActionCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final String buttonText;
+  final VoidCallback onPressed;
+
+  const _ActionCard({
+    required this.title,
+    required this.subtitle,
+    required this.buttonText,
+    required this.onPressed,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final pages = <Widget>[
-      _adminHome(),
-      _adminCommunity,
-    ];
-
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        backgroundColor: Colors.white,
-        extendBody: true,
-        body: IndexedStack(index: _index, children: pages),
-        bottomNavigationBar: AdminBottomNav(
-          items: _items,
-          currentIndex: _index,
-          onTap: (i) => setState(() => _index = i),
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: onPressed,
+      child: Container(
+        decoration: BoxDecoration(
+          color: _HomeColors.navBg,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 12, offset: Offset(0, 6))],
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title,
+                style: const TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.bold, color: _HomeColors.selected)),
+            const SizedBox(height: 6),
+            Text(subtitle, style: const TextStyle(fontSize: 13, color: _HomeColors.unselected)),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: _HomeColors.confirm,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  elevation: 0,
+                ),
+                onPressed: onPressed,
+                child: Text(buttonText, style: const TextStyle(fontSize: 14, color: Colors.white)),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _StatTile extends StatelessWidget {
-  final String title;
-  final String value;
-  const _StatTile({required this.title, required this.value});
+// صفحة الإحصائيات (قالب)
+class AdminStatsPage extends StatelessWidget {
+  const AdminStatsPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: ListTile(
-        title: Text(title, textDirection: TextDirection.rtl),
-        trailing: Text(value, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: Image.asset('assets/images/back.png', fit: BoxFit.cover),
+          ),
+          Scaffold(
+            backgroundColor: Colors.transparent,
+            // 👇 هذا يخلي العنوان وسهم الرجوع ينزلون شوي لتحت
+            appBar: PreferredSize(
+              preferredSize: const Size.fromHeight(190), // ← ترفع ارتفاع الـAppBar
+              child: Padding(
+                padding: const EdgeInsets.only(top: 150), // ← عدلي الرقم تنزل أكثر أو أقل
+                child: AppBar(
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                  title: const Text(
+                    'احصائيات قَبَس',
+                    style: TextStyle(
+                      color: _HomeColors.selected,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  iconTheme: const IconThemeData(color: _HomeColors.selected),
+                ),
+              ),
+            ),
+            body: const Center(
+              child: Text(
+                'هنا ستُعرض الإحصائيات',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 16, color: _HomeColors.selected),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

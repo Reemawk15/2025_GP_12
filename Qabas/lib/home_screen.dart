@@ -227,7 +227,7 @@ class _HomeScreenState extends State<HomeScreen> {
           // خلفيتك
           Positioned.fill(
             child: Image.asset(
-              'assets/images/home_bg.png', // عدّل المسار إذا لزم
+              'assets/images/back.png', // عدّل المسار إذا لزم
               fit: BoxFit.cover,
               alignment: Alignment.topCenter,
             ),
@@ -245,7 +245,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 'مساؤك سعيد، ${_displayName ?? 'صديقي'}',
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: _HomeColors.selected),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 26),
 
               // البحث (شكل)
               Container(

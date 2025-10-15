@@ -12,18 +12,30 @@ class AdminBookManagerScreen extends StatefulWidget {
   State<AdminBookManagerScreen> createState() => _AdminBookManagerScreenState();
 }
 
-class _AdminBookManagerScreenState extends State<AdminBookManagerScreen> with SingleTickerProviderStateMixin {
+class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
 
-  // ألوان حوار التأكيد مطابقة لصفحة الأدمن
-  static const _confirmColor = Color(0xFF6F8E63);
-  static const _titleColor   = Color(0xFF0E3A2C);
+  // ألوان ثابتة
+  static const _confirmColor = Color(0xFF6F8E63); // زر حفظ وتأكيد
+  static const _titleColor   = Color(0xFF0E3A2C); // أخضر داكن للنصوص
+  static const _fillGreen    = Color(0xFFC9DABF); // أخضر فاتح لحقول الإدخال
+
+  // أبعاد
+  static const double _kFieldH = 56;
+  static const double _kGap    = 14;
+  static const double _kDescH  = 120;
 
   // حقول الكتاب
-  final _titleCtrl = TextEditingController();
+  final _titleCtrl  = TextEditingController();
   final _authorCtrl = TextEditingController();
   String? _category;
-  final _descCtrl = TextEditingController();
+  final _descCtrl   = TextEditingController();
+
+  // FocusNodes (لو حبيتي ترجعي للنقاط لاحقًا)
+  final _titleF  = FocusNode();
+  final _authorF = FocusNode();
+  final _descF   = FocusNode();
 
   // الملفات
   File? _pdfFile;
@@ -31,7 +43,7 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen> with Si
 
   bool _saving = false;
 
-  // لعرض أقسام مسبقة في الدروب داون (قابلة للتعديل)
+  // أقسام
   final _categories = const [
     'تطوير ذات',
     'روايات',
@@ -49,6 +61,9 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen> with Si
     _titleCtrl.dispose();
     _authorCtrl.dispose();
     _descCtrl.dispose();
+    _titleF.dispose();
+    _authorF.dispose();
+    _descF.dispose();
     super.dispose();
   }
 
@@ -72,7 +87,6 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen> with Si
   }
 
   Future<void> _saveBook() async {
-    // تحقّق من الحقول الإلزامية
     if (!_formKey.currentState!.validate()) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('فضلاً أكمل الحقول المطلوبة')),
@@ -95,21 +109,17 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen> with Si
     try {
       setState(() => _saving = true);
 
-      // 1) أنشئ وثيقة مبدئية للحصول على docId
       final docRef = FirebaseFirestore.instance.collection('audiobooks').doc();
-
-      // 2) ارفع الملفات إلى Storage بمسارات مرتبة
-      final storage = FirebaseStorage.instance;
+      final storage  = FirebaseStorage.instance;
       final pdfRef   = storage.ref('audiobooks/${docRef.id}/book.pdf');
       final coverRef = storage.ref('audiobooks/${docRef.id}/cover.jpg');
 
-      final pdfTask = await pdfRef.putFile(_pdfFile!);
+      final pdfTask   = await pdfRef.putFile(_pdfFile!);
       final coverTask = await coverRef.putFile(_coverFile!);
 
-      final pdfUrl = await pdfTask.ref.getDownloadURL();
+      final pdfUrl   = await pdfTask.ref.getDownloadURL();
       final coverUrl = await coverTask.ref.getDownloadURL();
 
-      // 3) خزّن البيانات في Firestore
       await docRef.set({
         'title': _titleCtrl.text.trim(),
         'author': _authorCtrl.text.trim(),
@@ -118,10 +128,9 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen> with Si
         'pdfUrl': pdfUrl,
         'coverUrl': coverUrl,
         'createdAt': FieldValue.serverTimestamp(),
-        'published': true, // منشور لعرضه مباشرة في المكتبة العامة
+        'published': true,
       });
 
-      // 4) نظّف الحقول + رسالة نجاح
       _formKey.currentState!.reset();
       setState(() {
         _pdfFile = null;
@@ -146,7 +155,6 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen> with Si
   }
 
   Future<void> _deleteBook(DocumentSnapshot doc) async {
-    // نافذة تأكيد بنفس شكل "تأكيد تسجيل الخروج"
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => Dialog(
@@ -197,10 +205,7 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen> with Si
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                     onPressed: () => Navigator.pop(ctx, false),
-                    child: const Text(
-                      'إلغاء',
-                      style: TextStyle(fontSize: 16, color: _titleColor),
-                    ),
+                    child: const Text('إلغاء', style: TextStyle(fontSize: 16, color: _titleColor)),
                   ),
                 ),
               ],
@@ -213,8 +218,7 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen> with Si
     if (ok != true) return;
 
     try {
-      // احذف الملفات من Storage إن وجدت
-      final storage = FirebaseStorage.instance;
+      final storage  = FirebaseStorage.instance;
       final pdfRef   = storage.ref('audiobooks/${doc.id}/book.pdf');
       final coverRef = storage.ref('audiobooks/${doc.id}/cover.jpg');
 
@@ -223,7 +227,6 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen> with Si
         coverRef.delete().catchError((_) {}),
       ]);
 
-      // احذف الوثيقة من Firestore
       await doc.reference.delete();
 
       if (mounted) {
@@ -240,101 +243,151 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen> with Si
     }
   }
 
+  // ================== واجهات التبويبات ==================
+
   Widget _buildAddTab() {
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: AbsorbPointer(
-          absorbing: _saving,
-          child: Opacity(
-            opacity: _saving ? 0.65 : 1,
-            child: Form(
-              key: _formKey,
-              child: Column(
-                children: [
-                  // العنوان
-                  TextFormField(
-                    controller: _titleCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'اسم الكتاب *',
-                      hintText: 'مثال: الخيميائي',
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'العنوان مطلوب' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  // المؤلف
-                  TextFormField(
-                    controller: _authorCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'اسم المؤلف *',
-                      hintText: 'مثال: باولو كويلو',
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'اسم المؤلف مطلوب' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  // التصنيف (اختياري)
-                  DropdownButtonFormField<String>(
-                    value: _category,
-                    decoration: const InputDecoration(
-                      labelText: 'التصنيف (اختياري)',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                    onChanged: (v) => setState(() => _category = v),
-                  ),
-                  const SizedBox(height: 12),
-                  // وصف مختصر (اختياري)
-                  TextFormField(
-                    controller: _descCtrl,
-                    maxLines: 3,
-                    decoration: const InputDecoration(
-                      labelText: 'وصف مختصر (اختياري)',
-                      hintText: 'نبذة قصيرة عن الكتاب',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  // اختيار الملفات
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _pickPdf,
-                          icon: const Icon(Icons.picture_as_pdf),
-                          label: Text(_pdfFile == null ? 'اختيار ملف PDF' : 'تم اختيار: ${_pdfFile!.path.split('/').last}'),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: Image.asset('assets/images/back1.png', fit: BoxFit.cover),
+          ),
+          SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              child: AbsorbPointer(
+                absorbing: _saving,
+                child: Opacity(
+                  opacity: _saving ? 0.6 : 1,
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 8),
+                        // اسم الكتاب
+                        _sizedField(
+                          height: _kFieldH,
+                          child: _styledField(
+                            controller: _titleCtrl,
+                            label: 'اسم الكتاب',
+                            validator: (v) => (v == null || v.trim().isEmpty)
+                                ? 'اسم الكتاب مطلوب' : null,
+                            focusNode: _titleF,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _pickCover,
-                          icon: const Icon(Icons.image),
-                          label: Text(_coverFile == null ? 'اختيار صورة الغلاف' : 'تم اختيار الغلاف'),
+                        const SizedBox(height: _kGap),
+
+                        // اسم المؤلف
+                        _sizedField(
+                          height: _kFieldH,
+                          child: _styledField(
+                            controller: _authorCtrl,
+                            label: 'اسم المؤلف',
+                            validator: (v) => (v == null || v.trim().isEmpty)
+                                ? 'اسم المؤلف مطلوب' : null,
+                            focusNode: _authorF,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: _saving ? null : _saveBook,
-                      icon: const Icon(Icons.save),
-                      label: Text(_saving ? 'جارٍ الحفظ...' : 'حفظ'),
+                        const SizedBox(height: _kGap),
+
+                        // التصنيف
+                        _sizedField(
+                          height: _kFieldH,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: _fillGreen,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: DropdownButtonFormField<String>(
+                              value: _category,
+                              dropdownColor: _fillGreen,
+                              decoration: const InputDecoration(
+                                border: InputBorder.none,
+                                labelText: 'التصنيف',
+                              ),
+                              items: _categories
+                                  .map((c) => DropdownMenuItem(
+                                value: c,
+                                child: Text(c),
+                              ))
+                                  .toList(),
+                              onChanged: (v) => setState(() => _category = v),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: _kGap),
+
+                        // وصف مختصر
+                        _sizedField(
+                          height: _kDescH,
+                          child: _styledField(
+                            controller: _descCtrl,
+                            label: 'وصف مختصر',
+                            maxLines: 5,
+                            focusNode: _descF,
+                          ),
+                        ),
+                        const SizedBox(height: _kGap),
+
+                        // PDF
+                        _sizedField(
+                          height: _kFieldH,
+                          child: _fileButton(
+                            text: _pdfFile == null
+                                ? 'اختيار ملف PDF'
+                                : 'تم اختيار: ${_pdfFile!.path.split('/').last}',
+                            icon: Icons.picture_as_pdf,
+                            onPressed: _pickPdf,
+                          ),
+                        ),
+                        const SizedBox(height: _kGap),
+
+                        // الغلاف
+                        _sizedField(
+                          height: _kFieldH,
+                          child: _fileButton(
+                            text: _coverFile == null
+                                ? 'اختيار صورة الغلاف'
+                                : 'تم اختيار الغلاف',
+                            icon: Icons.image,
+                            onPressed: _pickCover,
+                          ),
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        // زر الحفظ
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _saving ? null : _saveBook,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _confirmColor,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: Text(
+                              _saving ? 'جارٍ الحفظ...' : 'حفظ',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
+                ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -342,55 +395,111 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen> with Si
   Widget _buildListTab() {
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('audiobooks')
-            .orderBy('createdAt', descending: true)
-            .snapshots(),
-        builder: (context, snap) {
-          if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (!snap.hasData || snap.data!.docs.isEmpty) {
-            return const Center(child: Text('لا توجد كتب مضافة حتى الآن'));
-          }
-          final docs = snap.data!.docs;
-          return ListView.separated(
-            padding: const EdgeInsets.all(12),
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemCount: docs.length,
-            itemBuilder: (context, i) {
-              final doc = docs[i];
-              final data = doc.data() as Map<String, dynamic>? ?? {};
-              final title = (data['title'] ?? '') as String;
-              final author = (data['author'] ?? '') as String;
-              final cover = (data['coverUrl'] ?? '') as String;
-              final category = (data['category'] ?? '') as String;
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: Image.asset('assets/images/back1.png', fit: BoxFit.cover),
+          ),
+          SafeArea(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('audiobooks')
+                  .orderBy('createdAt', descending: true)
+                  .snapshots(),
+              builder: (context, snap) {
+                if (snap.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (!snap.hasData || snap.data!.docs.isEmpty) {
+                  return const Center(child: Text('لا توجد كتب مضافة حتى الآن'));
+                }
+                final docs = snap.data!.docs;
 
-              return Card(
-                child: ListTile(
-                  leading: cover.isNotEmpty
-                      ? ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.network(cover, width: 48, height: 64, fit: BoxFit.cover),
-                  )
-                      : const Icon(Icons.menu_book, size: 36),
-                  title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
-                  subtitle: Text(
-                    category.isNotEmpty ? '$author • $category' : author,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  trailing: IconButton(
-                    tooltip: 'حذف',
-                    icon: const Icon(Icons.delete_forever, color: Colors.red),
-                    onPressed: () => _deleteBook(doc),
-                  ),
-                ),
-              );
-            },
-          );
-        },
+                return ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemCount: docs.length,
+                  itemBuilder: (context, i) {
+                    final doc = docs[i];
+                    final data = doc.data() as Map<String, dynamic>? ?? {};
+                    final title = (data['title'] ?? '') as String;
+                    final author = (data['author'] ?? '') as String;
+
+                    return Container(
+                      decoration: BoxDecoration(
+                        color: _fillGreen,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween, // توزيع الطرفين
+                        children: [
+                          // ✅ النصوص (يسار)
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start, // يخليها يسار
+                              children: [
+                                Text(
+                                  title.isEmpty ? 'اسم الكتاب' : title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.left,
+                                  style: const TextStyle(
+                                    color: _titleColor,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  author,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.left,
+                                  style: TextStyle(
+                                    color: _titleColor.withOpacity(0.8),
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // ✅ الأيقونات (يمين)
+                          Row(
+                            children: [
+                              IconButton(
+                                tooltip: 'تعديل (لاحقاً)',
+                                icon: const Icon(Icons.edit_outlined, color: _titleColor),
+                                onPressed: () {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('ميزة التعديل ستُضاف لاحقًا')),
+                                  );
+                                },
+                              ),
+                              IconButton(
+                                tooltip: 'حذف',
+                                icon: const Icon(Icons.delete_forever, color: Colors.red),
+                                onPressed: () => _deleteBook(doc),
+                              ),
+                            ],
+                          ),
+                        ],
+                      )
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -401,28 +510,126 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen> with Si
       length: 2,
       child: Directionality(
         textDirection: TextDirection.rtl,
-        child: Scaffold(
-          appBar: AppBar(
-            title: const Text('إدارة الكتب'),
-            bottom: const TabBar(
-              tabs: [
-                Tab(icon: Icon(Icons.add), text: 'إضافة كتاب'),
-                Tab(icon: Icon(Icons.library_books), text: 'الكتب المضافة'),
-              ],
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: Image.asset('assets/images/back1.png', fit: BoxFit.cover),
             ),
-          ),
-          body: const TabBarView(
-            children: [
-              // إضافة
-              _AddTabHost(),
-              // قائمة
-              _ListTabHost(),
-            ],
-          ),
+            Scaffold(
+              backgroundColor: Colors.transparent,
+              extendBodyBehindAppBar: true,
+              appBar: AppBar(
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                leadingWidth: 56,
+                toolbarHeight: 75, // يبعده شوي عن الحافة ويخليه تحت الستاتس بار
+                leading: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsetsDirectional.only(start: 8, top: 4),
+                    child: IconButton(
+                      tooltip: 'رجوع',
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      icon: Stack(
+                        alignment: Alignment.center,
+                        children: const [
+                          // هالة خفيفة خلف السهم (بدون دائرة)
+                          Icon(Icons.arrow_back,
+                              size: 30, color: Colors.white70),
+                          Icon(Icons.arrow_back,
+                              size: 26, color: Color(0xFF0E3A2C)), // _titleColor
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                // 👇 "نزول" التبويبات: زيدي القيمتين إذا تبين تنزل أكثر
+                bottom: PreferredSize(
+                  preferredSize: const Size.fromHeight(100), // <-- غيّري الرقم للنزول العام
+                  child: Column(
+                    children: const [
+                      SizedBox(height: 60),                // <-- زيديه لين يوصل المكان اللي تبين
+                      TabBar(
+                        labelColor: _titleColor,
+                        unselectedLabelColor: Colors.black54,
+                        indicatorColor: _titleColor,
+                        tabs: [
+                          Tab(icon: Icon(Icons.add), text: 'إضافة كتاب'),
+                          Tab(icon: Icon(Icons.library_books), text: 'الكتب المضافة'),
+                        ],
+                      ),
+                      SizedBox(height: 8),
+                    ],
+                  ),
+                ),
+              ),
+              body: const TabBarView(
+                children: [
+                  _AddTabHost(),
+                  _ListTabHost(),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
+}
+
+// ================== Widgets مساعدة ==================
+
+// غلاف لضبط ارتفاع أي ويدجت (ما يغيّر السلوك)
+Widget _sizedField({required double height, required Widget child}) {
+  return SizedBox(height: height, child: child);
+}
+
+// حقل إدخال مصمم
+Widget _styledField({
+  required TextEditingController controller,
+  required String label,
+  String? Function(String?)? validator,
+  int maxLines = 1,
+  FocusNode? focusNode,
+  ValueChanged<String>? onFieldSubmitted,
+}) {
+  return Container(
+    decoration: BoxDecoration(
+      color: const Color(0xFFC9DABF),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: TextFormField(
+      controller: controller,
+      validator: validator,
+      maxLines: maxLines,
+      focusNode: focusNode,
+      onFieldSubmitted: onFieldSubmitted,
+      textAlign: TextAlign.right,
+      decoration: const InputDecoration(
+        labelStyle: TextStyle(color: Color(0xFF0E3A2C)),
+        border: InputBorder.none,
+        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      ).copyWith(labelText: label),
+    ),
+  );
+}
+
+// زر اختيار ملف/صورة
+Widget _fileButton({
+  required String text,
+  required IconData icon,
+  required VoidCallback onPressed,
+}) {
+  return OutlinedButton.icon(
+    onPressed: onPressed,
+    icon: Icon(icon, color: const Color(0xFF0E3A2C)),
+    label: Text(text, style: const TextStyle(color: Color(0xFF0E3A2C))),
+    style: OutlinedButton.styleFrom(
+      side: const BorderSide(color: Color(0xFF0E3A2C)),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      backgroundColor: const Color(0xFFC9DABF),
+    ),
+  );
 }
 
 // التفاف بسيط لأن TabBarView يحتاج Widgets ثابتة
@@ -431,11 +638,11 @@ class _AddTabHost extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // نصل إلى State الفعلي للأب عبر context.findAncestorStateOfType
     final parent = context.findAncestorStateOfType<_AdminBookManagerScreenState>();
     return parent?._buildAddTab() ?? const SizedBox();
   }
 }
+
 class _ListTabHost extends StatelessWidget {
   const _ListTabHost();
 
