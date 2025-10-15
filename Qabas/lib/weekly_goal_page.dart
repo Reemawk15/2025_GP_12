@@ -11,12 +11,12 @@ class WeeklyGoalPage extends StatefulWidget {
 }
 
 class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
-  static const Color _darkGreen  = Color(0xFF0E3A2C);
-  static const Color _midGreen   = Color(0xFF2F5145);
+  static const Color _darkGreen = Color(0xFF0E3A2C);
+  static const Color _midGreen = Color(0xFF2F5145);
   static const Color _lightGreen = Color(0xFFC9DABF);
-  static const Color _confirm    = Color(0xFF6F8E63);
+  static const Color _confirm = Color(0xFF6F8E63);
 
-  String _selectedLevel = 'beginner'; // beginner | active | pro
+  String _selectedLevel = ''; // beginner | active | pro
 
   @override
   void initState() {
@@ -28,7 +28,10 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
-      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
       final data = doc.data();
       if (data != null && data['weeklyGoal'] is Map) {
         final lvl = (data['weeklyGoal']['level'] as String?) ?? _selectedLevel;
@@ -37,54 +40,120 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
         }
       } else if (data != null && data['weeklyGoalMinutes'] != null) {
         final mins = (data['weeklyGoalMinutes'] as num).toInt();
-        if (mins >= 160) _selectedLevel = 'pro';
-        else if (mins >= 100) _selectedLevel = 'active';
-        else _selectedLevel = 'beginner';
+        if (mins >= 160)
+          _selectedLevel = 'pro';
+        else if (mins >= 100)
+          _selectedLevel = 'active';
+        else
+          _selectedLevel = 'beginner';
         setState(() {});
       }
     } catch (_) {}
   }
 
   int _minutesFor(String level) {
+    if (level.isEmpty) return 0;
+
     switch (level) {
-      case 'active': return 120;
-      case 'pro':    return 180;
-      default:       return 60;
+      case 'beginner':
+        return 80;
+      case 'active':
+        return 180;
+      case 'pro':
+        return 360;
+      default:
+        return 0;
     }
   }
 
   String _titleFor(String level) {
+    if (level.isEmpty) return ''; // لو فاضي، ارجع فاضي
+
     switch (level) {
-      case 'active': return 'مستمع نشِط';
-      case 'pro':    return 'مستمع متمرّس';
-      default:       return 'مستمع مبتدئ';
+      case 'active':
+        return 'مستمع نشيط';
+      case 'pro':
+        return 'مستمع محترف';
+      case 'beginner':
+        return 'مستمع مبتدئ';
+      default:
+        return '';
     }
   }
 
   String _descFor(String level) {
     if (level == 'beginner') return 'ساعة (٦٠ دقيقة) على الأقل أسبوعيًا';
-    if (level == 'active')   return 'ساعتان (١٢٠ دقيقة) على الأقل أسبوعيًا';
+    if (level == 'active') return 'ساعتان (١٢٠ دقيقة) على الأقل أسبوعيًا';
     return 'ثلاث ساعات (١٨٠ دقيقة) على الأقل أسبوعيًا';
   }
+
+  /* Future<void> _loadCurrentGoal() async {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      final snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      // 🎯 تحقق إذا الحقل موجود فعلاً
+      if (snapshot.exists && snapshot.data()?['weeklyGoal'] != null) {
+        setState(() {
+          _selectedLevel = snapshot.data()!['weeklyGoal']['level'] ?? '';
+        });
+      }
+      // 🔥 لو مو موجود، يظل _selectedLevel فاضي
+    }*/
 
   Future<void> _save() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('سجّل الدخول أولًا.')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('سجّل الدخول أولًا.')));
       return;
     }
-    final minutes = _minutesFor(_selectedLevel);
-    await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-      'weeklyGoal': {
-        'level': _selectedLevel,
-        'minutes': minutes,
-        'updatedAt': DateTime.now().toIso8601String(),
-      }
-    }, SetOptions(merge: true));
 
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ هدف الاستماع 🎧')));
-    Navigator.pop(context, minutes);
+    final userDoc = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid);
+
+    if (_selectedLevel.isEmpty) {
+      // 🔥 نحذف الحقل من Firebase
+      await userDoc.update({'weeklyGoal': FieldValue.delete()}).catchError((
+        error,
+      ) {
+        // لو المستند مو موجود، نعمل set فاضي
+        return userDoc.set({}, SetOptions(merge: true));
+      });
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('تم إلغاء هدف الاستماع 🎧')));
+
+      Navigator.pop(context, null);
+    } else {
+      // 🟢 المستخدم اختار هدف جديد
+      int minutes = _minutesFor(_selectedLevel);
+
+      await userDoc.set({
+        'weeklyGoal': {
+          'level': _selectedLevel,
+          'minutes': minutes,
+          'updatedAt': DateTime.now().toIso8601String(),
+        },
+      }, SetOptions(merge: true));
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('تم حفظ هدف الاستماع 🎧')));
+
+      Navigator.pop(context, minutes);
+    }
   }
 
   Widget _goalTile(String level) {
@@ -92,7 +161,18 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
 
     return InkWell(
       borderRadius: BorderRadius.circular(18),
-      onTap: () => setState(() => _selectedLevel = level),
+      onTap: () {
+        print('Selected: $_selectedLevel');
+
+        setState(() {
+          if (_selectedLevel == level) {
+            _selectedLevel = ''; // إلغاء التحديد
+          } else {
+            _selectedLevel = level; // تحديد جديد
+          }
+        });
+      },
+
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         height: 72,
@@ -100,13 +180,23 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
         decoration: BoxDecoration(
           color: selected ? _confirm.withOpacity(0.28) : _lightGreen,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: selected ? _confirm : Colors.transparent, width: 1.2),
+          border: Border.all(
+            color: selected ? _confirm : Colors.transparent,
+            width: 1.2,
+          ),
           boxShadow: selected
-              ? [BoxShadow(color: _confirm.withOpacity(0.25), blurRadius: 10, offset: const Offset(0, 4))]
+              ? [
+                  BoxShadow(
+                    color: _confirm.withOpacity(0.25),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
               : [],
         ),
         child: Directionality(
-          textDirection: TextDirection.rtl, // ضروري عشان النص والدائرة يكونوا يمين
+          textDirection:
+              TextDirection.rtl, // ضروري عشان النص والدائرة يكونوا يمين
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -121,7 +211,8 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
               // النص مباشرة بجانبها
               Expanded(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start, // ← يخلي النص يبدأ من يمين الأيقونة مباشرة
+                  crossAxisAlignment: CrossAxisAlignment
+                      .start, // ← يخلي النص يبدأ من يمين الأيقونة مباشرة
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
@@ -165,7 +256,12 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
           Scaffold(
             backgroundColor: Colors.transparent,
             body: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(18, 200, 18, 40), // ↓ نزلنا الصفحة
+              padding: const EdgeInsets.fromLTRB(
+                18,
+                200,
+                18,
+                40,
+              ), // ↓ نزلنا الصفحة
               child: Column(
                 children: [
                   // الكونتينر الأبيض (السهم ثم العنوان تحته، ثم الجملة التعريفية)
@@ -181,7 +277,8 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
                       children: [
                         // زر الرجوع داخل الكونتينر — نفس ستايل الصفحات الثانية
                         Align(
-                          alignment: AlignmentDirectional.centerStart, // RTL: start = يمين
+                          alignment: AlignmentDirectional
+                              .centerStart, // RTL: start = يمين
                           child: IconButton(
                             tooltip: 'رجوع',
                             style: IconButton.styleFrom(
@@ -247,7 +344,10 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
                             onPressed: _save,
                             child: const Text(
                               'حفظ',
-                              style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.w700),
+                              style: TextStyle(
+                                fontSize: 16.5,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
                         ),
