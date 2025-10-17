@@ -87,24 +87,6 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
     return 'ثلاث ساعات (١٨٠ دقيقة) على الأقل أسبوعيًا';
   }
 
-  /* Future<void> _loadCurrentGoal() async {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return;
-
-      final snapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-
-      // 🎯 تحقق إذا الحقل موجود فعلاً
-      if (snapshot.exists && snapshot.data()?['weeklyGoal'] != null) {
-        setState(() {
-          _selectedLevel = snapshot.data()!['weeklyGoal']['level'] ?? '';
-        });
-      }
-      // 🔥 لو مو موجود، يظل _selectedLevel فاضي
-    }*/
-
   Future<void> _save() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
