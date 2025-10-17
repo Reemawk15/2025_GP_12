@@ -4,97 +4,129 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import 'chatbot_placeholder.dart';
 
+// ألوان الثيم
+ const _primary   = Color(0xFF0E3A2C); // نصوص/أيقونات داكنة
+ const _accent    = Color(0xFF6F8E63); // زر محادثة
+ const _pillGreen = Color(0xFFE6F0E0); // خلفيات فاتحة ناعمة
+ const _chipRose  = Color(0xFFFFEFF0); // صندوق التعليقات
+ const Color _darkGreen  = Color(0xFF0E3A2C);
+
 class BookDetailsPage extends StatelessWidget {
   final String bookId;
   const BookDetailsPage({super.key, required this.bookId});
 
-  // ألوان قريبة من المرفق
-  static const _primary   = Color(0xFF0E3A2C); // أخضر داكن للنصوص
-  static const _accent    = Color(0xFF6F8E63); // زر أساسي
-  static const _pillGreen = Color(0xFFE6F0E0); // حبات خضراء فاتحة
-  static const _chipRose  = Color(0xFFFFEFF0); // صندوق التعليقات وردي
+
 
   @override
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: Scaffold(
-        backgroundColor: Colors.white,
-        appBar: AppBar(
-          title: const Text('تفاصيل الكتاب'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios),
-            onPressed: () => Navigator.pop(context),
+      child: Stack(
+        children: [
+          // الخلفية الموحّدة
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/back_private.png',
+              fit: BoxFit.cover,
+            ),
           ),
-        ),
-        body: StreamBuilder<DocumentSnapshot>(
-          stream: FirebaseFirestore.instance.collection('audiobooks').doc(bookId).snapshots(),
-          builder: (context, snap) {
-            if (snap.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (!snap.hasData || !snap.data!.exists) {
-              return const Center(child: Text('تعذر تحميل تفاصيل الكتاب'));
-            }
 
-            final data = snap.data!.data() as Map<String, dynamic>? ?? {};
-            final title = (data['title'] ?? '') as String;
-            final author = (data['author'] ?? '') as String;
-            final cover = (data['coverUrl'] ?? '') as String;
-            final category = (data['category'] ?? '') as String;
-            final desc = (data['description'] ?? '') as String;
+          // المحتوى فوق الخلفية
+          Scaffold(
+            backgroundColor: Colors.transparent,
+            appBar: AppBar(
+              backgroundColor: Colors.transparent,
+              surfaceTintColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+              elevation: 0,
+              toolbarHeight: 150,
+              leading: IconButton(
+                tooltip: 'رجوع',
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _primary, size: 22, ),
+                onPressed: () => Navigator.of(context).maybePop(),
+              ),
+              title: const Text('تفاصيل الكتاب', style: TextStyle(color: _primary)),
+            ),
+            body: StreamBuilder<DocumentSnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('audiobooks')
+                  .doc(bookId)
+                  .snapshots(),
+              builder: (context, snap) {
+                if (snap.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (!snap.hasData || !snap.data!.exists) {
+                  return const Center(child: Text('تعذّر تحميل تفاصيل الكتاب'));
+                }
 
-            return Stack(
-              children: [
-                // الصفحة قابلة للسكرول بالكامل
-                SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+                final data = snap.data!.data() as Map<String, dynamic>? ?? {};
+                final title = (data['title'] ?? '') as String;
+                final author = (data['author'] ?? '') as String;
+                final cover = (data['coverUrl'] ?? '') as String;
+                final category = (data['category'] ?? '') as String;
+                final desc = (data['description'] ?? '') as String;
+
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(16, 60, 16, 24),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // غلاف كبير بظلال وحواف مدوّرة
+                      // الغلاف
                       Center(
                         child: Container(
                           width: 220,
-                          height: 300,
+                          height: 270,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(20),
-                            boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 20, offset: Offset(0, 8))],
+                            boxShadow: const [
+                              BoxShadow(
+                                  color: Colors.black26,
+                                  blurRadius: 20,
+                                  offset: Offset(0, 8))
+                            ],
                             color: Colors.white,
                           ),
                           clipBehavior: Clip.antiAlias,
                           child: cover.isNotEmpty
                               ? Image.network(cover, fit: BoxFit.cover)
-                              : const Icon(Icons.menu_book, size: 80, color: _primary),
+                              : const Icon(Icons.menu_book,
+                              size: 80, color: _primary),
                         ),
                       ),
                       const SizedBox(height: 16),
 
-                      // تصنيف الكتاب (حبة خضراء) ← ✅ تعديـل: عرض التصنيف الفعلي
+                      // التصنيف
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(color: _pillGreen, borderRadius: BorderRadius.circular(16)),
-                            child: Text(category.isEmpty ? 'غير مصنّف' : category),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                                color: _pillGreen,
+                                borderRadius: BorderRadius.circular(16)),
+                            child:
+                            Text(category.isEmpty ? 'غير مصنّف' : category),
                           ),
                         ],
                       ),
-
                       const SizedBox(height: 10),
 
-                      // عنوان كبير
+                      // العنوان
                       Center(
                         child: Text(
                           title,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: _primary),
+                          style: const TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w800,
+                              color: _primary),
                         ),
                       ),
                       const SizedBox(height: 6),
 
-                      // الكاتب + تقييم شكلي (نجوم وأيقونة مايك)
+                      // تقييم شكلي + الكاتب
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: const [
@@ -105,79 +137,90 @@ class BookDetailsPage extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Center(
-                        child: Text('الكاتب: $author', style: const TextStyle(color: Colors.black54)),
-                      ),
+                          child: Text('الكاتب: $author',
+                              style: const TextStyle(color: Colors.black54))),
 
                       const SizedBox(height: 18),
 
-                      // نبذة عن الكتاب (حبة خضراء كبيرة)
+                      // نبذة
                       _PillCard(
                         title: 'نبذة عن الكتاب :',
-                        child: Text(desc.isEmpty ? 'لا توجد نبذة متاحة حالياً.' : desc),
+                        child: Text(desc.isEmpty
+                            ? 'لا توجد نبذة متاحة حالياً.'
+                            : desc),
                       ),
                       const SizedBox(height: 12),
 
-                      // زر "ملخص عن الكتاب" (شكل فقط)
-                      _AudioPillButton(
-                        icon: Icons.record_voice_over,
-                        label: 'ملخص عن الكتاب',
-                        onPressed: null, // مؤجل
-                      ),
+                      // أزرار صوتية شكلية
+                      const _AudioPillButton(
+                          icon: Icons.record_voice_over, label: 'ملخص عن الكتاب'),
                       const SizedBox(height: 10),
-
-                      // زر "بدء الاستماع" (شكل فقط)
-                      _AudioPillButton(
-                        icon: Icons.play_arrow,
-                        label: 'بدء الاستماع',
-                        onPressed: null, // مؤجل
-                      ),
+                      const _AudioPillButton(
+                          icon: Icons.play_arrow, label: 'بدء الاستماع'),
 
                       const SizedBox(height: 18),
 
-                      const Text('التعليقات حول الكتاب:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-
+                      const Text('التعليقات حول الكتاب:',
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w700)),
                       const SizedBox(height: 8),
-
-                      // قائمة التعليقات
                       _ReviewsList(bookId: bookId),
 
                       const SizedBox(height: 12),
+                      const Divider(height: 1),
 
-                      // إضافة تعليق
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          icon: const Icon(Icons.add_comment),
-                          label: const Text('أضف تعليقك'),
-                          onPressed: () => _showAddReviewSheet(context, bookId, title, cover),
+                      // ✅ الخيارات الثلاثة (غير ثابتة — تحت التعليقات مباشرة)
+                      const SizedBox(height: 8),
+                      _InlineActionsRow(
+                        onAddToList: () => _showAddToListSheet(
+                          context,
+                          bookId: bookId,
+                          title: title,
+                          author: author,
+                          cover: cover,
                         ),
+                        onDownload: null, // شكل فقط حالياً
+                        onReview: () =>
+                            _showAddReviewSheet(context, bookId, title, cover),
                       ),
+
+                      const SizedBox(height: 90),
                     ],
                   ),
-                ),
+                );
+              },
+            ),
 
-                // زر التشات بوت داخل صفحة التفاصيل فقط
-                Positioned(
-                  bottom: 20,
-                  left: 20,
-                  child: FloatingActionButton(
-                    backgroundColor: _accent,
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const ChatBotPlaceholderPage()),
-                      );
-                    },
-                    child: const Icon(Icons.chat_bubble_outline, color: Colors.white),
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
+            // ✅ زر الشات بوت داخل الـ Scaffold وليس بعده
+            floatingActionButton: FloatingActionButton(
+              backgroundColor: _accent,
+              onPressed: () {
+                Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => const ChatBotPlaceholderPage()));
+              },
+              child: const Icon(Icons.chat_bubble_outline, color: Colors.white),
+            ),
+          ),
+        ],
       ),
     );
   }
+  // === شيت "إضافة إلى قائمة" ===
+  void _showAddToListSheet(
+      BuildContext context, {
+        required String bookId,
+        required String title,
+        required String author,
+        required String cover,
+      }) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => _AddToListSheet(bookId: bookId, title: title, author: author, cover: cover),
+    );
+  }
 
+  // شيت التعليقات (موجود عندك)
   void _showAddReviewSheet(BuildContext context, String bookId, String title, String cover) {
     showModalBottomSheet(
       context: context,
@@ -188,7 +231,78 @@ class BookDetailsPage extends StatelessWidget {
   }
 }
 
-/// بطاقة خضراء ناعمة مع عنوان (مثل نبذة/ملخص)
+/// صف خيارات أسفل التعليقات (ألوان من الثيم)
+class _InlineActionsRow extends StatelessWidget {
+  final VoidCallback? onAddToList;
+  final VoidCallback? onDownload;
+  final VoidCallback? onReview;
+  const _InlineActionsRow({this.onAddToList, this.onDownload, this.onReview});
+
+  @override
+  Widget build(BuildContext context) {
+    Widget item(IconData icon, String l1, String l2, VoidCallback? onTap) {
+      final enabled = onTap != null;
+      return Expanded(
+        child: InkWell(
+          onTap: onTap,
+          child: Column(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: _pillGreen,
+                child: Icon(icon, color: _accent),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                l1,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black87.withOpacity(enabled ? 1 : 0.4),
+                ),
+              ),
+              if (l2.trim().isNotEmpty)
+                Text(
+                  l2,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    height: 1.0,
+                    color: Colors.black87.withOpacity(enabled ? 1 : 0.4),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        item(Icons.folder_copy_rounded, 'إضافة', 'إلى قائمة', onAddToList),
+        const _DividerV(),
+        item(Icons.download_rounded, 'تحميل الكتاب', ' ', onDownload), // شكل فقط
+        const _DividerV(),
+        item(Icons.star_rate_rounded, 'أضف', 'تقييماً', onReview),
+      ],
+    );
+  }
+}
+
+/// فاصل عمودي رفيع
+class _DividerV extends StatelessWidget {
+  const _DividerV();
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      width: 1,
+      height: 44,
+      child: DecoratedBox(decoration: BoxDecoration(color: Color(0xFFEEEEEE))),
+    );
+  }
+}
+
+/// بطاقة خضراء
 class _PillCard extends StatelessWidget {
   final String title;
   final Widget child;
@@ -198,7 +312,7 @@ class _PillCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: BookDetailsPage._pillGreen, borderRadius: BorderRadius.circular(16)),
+      decoration: BoxDecoration(color: _pillGreen, borderRadius: BorderRadius.circular(16)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -211,12 +325,11 @@ class _PillCard extends StatelessWidget {
   }
 }
 
-/// زر صوتي بشكل Pill مع أيقونة (للملخص / للكتاب)
+/// زر صوتي شكلي
 class _AudioPillButton extends StatelessWidget {
   final IconData icon;
   final String label;
-  final VoidCallback? onPressed;
-  const _AudioPillButton({required this.icon, required this.label, this.onPressed});
+  const _AudioPillButton({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -224,12 +337,12 @@ class _AudioPillButton extends StatelessWidget {
       height: 48,
       child: ElevatedButton.icon(
         style: ElevatedButton.styleFrom(
-          backgroundColor: BookDetailsPage._pillGreen,
-          foregroundColor: BookDetailsPage._primary,
+          backgroundColor: _pillGreen,
+          foregroundColor: _primary,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
           elevation: 0,
         ),
-        onPressed: onPressed, // مؤجل
+        onPressed: null,
         icon: Icon(icon),
         label: Text(label),
       ),
@@ -237,6 +350,22 @@ class _AudioPillButton extends StatelessWidget {
   }
 }
 
+/// نجوم تقييم شكلية
+class _Stars extends StatelessWidget {
+  final int rating; // 0..5
+  const _Stars({required this.rating});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: List.generate(5, (i) {
+        return Icon(i < rating ? Icons.star : Icons.star_border, size: 16, color: Colors.amber[700]);
+      }),
+    );
+  }
+}
+
+/// قائمة التعليقات (كما كانت)
 class _ReviewsList extends StatelessWidget {
   final String bookId;
   const _ReviewsList({required this.bookId});
@@ -245,8 +374,7 @@ class _ReviewsList extends StatelessWidget {
   Widget build(BuildContext context) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
-          .collection('audiobooks')
-          .doc(bookId)
+          .collection('audiobooks').doc(bookId)
           .collection('reviews')
           .orderBy('createdAt', descending: true)
           .snapshots(),
@@ -272,14 +400,14 @@ class _ReviewsList extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: BookDetailsPage._chipRose,
+                color: _chipRose,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   CircleAvatar(
-                    backgroundColor: BookDetailsPage._accent.withOpacity(0.25),
+                    backgroundColor: _accent.withOpacity(0.25),
                     child: Text(userName.isNotEmpty ? userName.characters.first : 'ق'),
                   ),
                   const SizedBox(width: 10),
@@ -308,20 +436,72 @@ class _ReviewsList extends StatelessWidget {
   }
 }
 
-class _Stars extends StatelessWidget {
-  final int rating; // 0..5
-  const _Stars({required this.rating});
+/// شيت إضافة إلى قائمة (يحفظ في users/{uid}/library/{bookId})
+class _AddToListSheet extends StatelessWidget {
+  final String bookId, title, author, cover;
+  const _AddToListSheet({required this.bookId, required this.title, required this.author, required this.cover});
+
+  Future<void> _setStatus(BuildContext context, String status) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('الرجاء تسجيل الدخول أولاً')));
+      return;
+    }
+    final ref = FirebaseFirestore.instance
+        .collection('users').doc(user.uid)
+        .collection('library').doc(bookId);
+
+    await ref.set({
+      'bookId'   : bookId,
+      'status'   : status, // listen_now | want | listened
+      'title'    : title,
+      'author'   : author,
+      'coverUrl' : cover,
+      'addedAt'  : FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    if (context.mounted) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تمت الإضافة إلى قائمتك')));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: List.generate(5, (i) {
-        return Icon(i < rating ? Icons.star : Icons.star_border, size: 16, color: Colors.amber[700]);
-      }),
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(height: 4, width: 40, decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 16),
+            const Text('إضافة إلى أي قائمة؟', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 12),
+            ListTile(
+              leading: const Icon(Icons.play_circle_fill, color: _primary),
+              title: const Text('استمع لها الآن'),
+              onTap: () => _setStatus(context, 'listen_now'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.schedule, color: _primary),
+              title: const Text('أرغب بالاستماع لها'),
+              onTap: () => _setStatus(context, 'want'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.check_circle, color: _primary),
+              title: const Text('استمعت لها'),
+              onTap: () => _setStatus(context, 'listened'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
+/// ======= شيت إضافة تعليق (كما عندك) =======
 class _AddReviewSheet extends StatefulWidget {
   final String bookId;
   final String bookTitle;
@@ -349,7 +529,6 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
     }
     setState(() => _saving = true);
 
-    // اسم المستخدم من users/{uid}
     String userName = user.displayName ?? 'قارئ';
     try {
       final u = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
@@ -363,16 +542,12 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
     final batch = FirebaseFirestore.instance.batch();
 
     final bookReviewRef = FirebaseFirestore.instance
-        .collection('audiobooks')
-        .doc(widget.bookId)
-        .collection('reviews')
-        .doc();
+        .collection('audiobooks').doc(widget.bookId)
+        .collection('reviews').doc();
 
     final userReviewRef = FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .collection('reviews')
-        .doc(bookReviewRef.id);
+        .collection('users').doc(user.uid)
+        .collection('reviews').doc(bookReviewRef.id);
 
     final payload = {
       'userId': user.uid,
@@ -424,10 +599,7 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
               TextField(
                 controller: _ctrl,
                 maxLines: 3,
-                decoration: const InputDecoration(
-                  hintText: 'اكتب رأيك حول الكتاب...',
-                  border: OutlineInputBorder(),
-                ),
+                decoration: const InputDecoration(hintText: 'اكتب رأيك حول الكتاب...', border: OutlineInputBorder()),
               ),
               const SizedBox(height: 10),
               SizedBox(

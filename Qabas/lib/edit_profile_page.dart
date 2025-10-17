@@ -233,7 +233,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                   style: IconButton.styleFrom(
                                     backgroundColor: Colors.white.withOpacity(0.85),
                                   ),
-                                  icon: const Icon(Icons.arrow_back),
+                                  icon: const Icon(Icons.arrow_back_ios_new_rounded),
                                   color: _darkGreen,
                                   onPressed: () => Navigator.pop(context),
                                 ),
