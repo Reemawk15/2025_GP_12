@@ -215,11 +215,11 @@ class _SignUpPageState extends State<SignUpPage> {
         child: AlertDialog(
           backgroundColor: const Color(0xFFE7EEE8),
           title: const Text(
-            'لم نتمكن من إنشاء الحساب',
+            'يبدو أنك جزء من قبس! ',
             textAlign: TextAlign.center,
           ),
           content: const Text(
-            'يبدو أن البريد الإلكتروني أو اسم المستخدم مستخدم من قبل. جرّب بيانات أخرى أو سجّل الدخول.',
+            'هذا البريد أو الاسم مستخدم من قبل. يمكنك تسجيل الدخول أو تجربة بيانات أخرى.',
             textAlign: TextAlign.center,
           ),
 
@@ -474,7 +474,7 @@ class _SignUpPageState extends State<SignUpPage> {
                       child: _FormCols(children: [
                         const _Title('اسم المستخدم'),
                         const Text(
-                          'اسم المستخدم يمكن أصدقائك من العثور عليك',
+                          'اسم المستخدم حتى يتمكن أصدقائك من العثور عليك',
                           textAlign: TextAlign.center,
                           style: TextStyle(color: _SignupTheme.bodyColor),
                         ),
