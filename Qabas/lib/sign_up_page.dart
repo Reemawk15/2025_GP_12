@@ -219,7 +219,7 @@ class _SignUpPageState extends State<SignUpPage> {
             textAlign: TextAlign.center,
           ),
           content: const Text(
-            'هذا البريد أو الاسم مستخدم من قبل. يمكنك تسجيل الدخول أو تجربة بيانات أخرى.',
+            'هذا البريد أو الاسم, مستخدم من قبل.\n يمكنك تسجيل الدخول أو تجربة بيانات أخرى.',
             textAlign: TextAlign.center,
           ),
 
