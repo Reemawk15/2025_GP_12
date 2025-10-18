@@ -51,6 +51,23 @@ class _SignInPageState extends State<SignInPage> {
     );
   }
 
+  // إخفاء البريد: نُظهر أول 3 حروف من الجزء قبل @ والباقي ** ونترك الدومين كما هو
+  String _maskEmailForDisplay(String email) {
+    final trimmed = email.trim();
+    if (!trimmed.contains('@')) {
+      final local = trimmed;
+      final keep = local.length >= 3 ? 3 : local.length;
+      final shown = local.substring(0, keep);
+      return '$shown**';
+    }
+    final parts = trimmed.split('@');
+    final local = parts[0];
+    final domain = parts[1];
+    final keep = local.length >= 3 ? 3 : local.length;
+    final shown = local.substring(0, keep);
+    return '$shown**@$domain';
+  }
+
   // نحول اسم المستخدم إلى بريد من Firestore — لو دخل بريد نرجعه كما هو
   Future<String?> _resolveEmail(String input) async {
     final id = input.trim();
@@ -71,7 +88,6 @@ class _SignInPageState extends State<SignInPage> {
     }
   }
 
-
   String _authMessage(FirebaseAuthException e) {
     switch (e.code) {
       case 'wrong-password':
@@ -79,7 +95,7 @@ class _SignInPageState extends State<SignInPage> {
       case 'user-not-found':
         return 'لا يوجد حساب يطابق البريد الإلكتروني/اسم المستخدم المدخل.';
       case 'invalid-credential':
-        return 'بيانات الدخول غير صحيحة. تحقق من المعرّف وكلمة المرور.';
+        return 'بيانات الدخول غير صحيحة. تحقق من اسم المستخدم أو البريد الإلكتروني وكلمة المرور.';
       case 'invalid-email':
         return 'صيغة البريد الإلكتروني غير صحيحة.';
       case 'too-many-requests':
@@ -165,7 +181,10 @@ class _SignInPageState extends State<SignInPage> {
         return;
       }
       await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
-      _toast('أرسلنا رابط إعادة تعيين كلمة المرور إلى $email');
+
+      // ✅ هنا التغيير: نظهر البريد مُخفّى
+      final masked = _maskEmailForDisplay(email);
+      _toast('أرسلنا رابط إعادة تعيين كلمة المرور إلى $masked');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -352,6 +371,7 @@ class _SignInPageState extends State<SignInPage> {
 }
 
 /// شريط بسيط + دائرة يمين فيها سهم، للرجوع
+/// شريط بسيط + دائرة يمين فيها سهم، للرجوع
 class _TopBarArrow extends StatelessWidget {
   final VoidCallback onTap;
   const _TopBarArrow({required this.onTap});
@@ -359,6 +379,9 @@ class _TopBarArrow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
+      // نجبر هذا الصف يكون LTR عشان ترتيب العناصر يكون:
+      // [المسار الممدود] ثم [مسافة] ثم [الدائرة بالسهم] على اليمين
+      textDirection: TextDirection.ltr,
       children: [
         // المسار المليان (شكل جمالي مثل التصميم)
         Expanded(
@@ -385,7 +408,7 @@ class _TopBarArrow extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 10),
-        // الدائرة بالسهم (ترجع للمين)
+        // الدائرة بالسهم (يمين الشريط ويشير لليمين)
         InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(24),
@@ -395,7 +418,7 @@ class _TopBarArrow extends StatelessWidget {
               color: _SigninTheme.fill,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.chevron_right, color: Colors.white), // يتجه لليمين
+            child: const Icon(Icons.chevron_left, color: Colors.white),
           ),
         ),
       ],
