@@ -79,12 +79,11 @@ flutter:
     - assets/images/signup.png
     - assets/images/back.png
     - assets/images/home_bg.png
-
     - assets/images/private.png
     - assets/images/private2.png
-
     - assets/images/back_private.png
     - assets/images/back_private2.png
+    - assets/images/back1.png
 
 
 

@@ -26,13 +26,13 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
   static const double _kGap    = 14;
   static const double _kDescH  = 120;
 
-  // حقول الكتاب
+  // حقول الكتاب (لتبويب الإضافة)
   final _titleCtrl  = TextEditingController();
   final _authorCtrl = TextEditingController();
   String? _category;
   final _descCtrl   = TextEditingController();
 
-  // FocusNodes (لو حبيتي ترجعي للنقاط لاحقًا)
+  // FocusNodes
   final _titleF  = FocusNode();
   final _authorF = FocusNode();
   final _descF   = FocusNode();
@@ -243,6 +243,17 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
     }
   }
 
+  // ===== تفعيل القلم: يفتح صفحة التعديل =====
+  void _openEdit(DocumentSnapshot doc, Map<String, dynamic> data) {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => _EditBookPage(
+        docId: doc.id,
+        initialData: data,
+        categories: _categories,
+      ),
+    ));
+  }
+
   // ================== واجهات التبويبات ==================
 
   Widget _buildAddTab() {
@@ -439,12 +450,12 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
                       ),
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween, // توزيع الطرفين
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          // ✅ النصوص (يسار)
+                          // النصوص (يسار)
                           Expanded(
                             child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start, // يخليها يسار
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
                                   title.isEmpty ? 'اسم الكتاب' : title,
@@ -472,17 +483,13 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
                             ),
                           ),
 
-                          // ✅ الأيقونات (يمين)
+                          // الأيقونات (يمين)
                           Row(
                             children: [
                               IconButton(
-                                tooltip: 'تعديل (لاحقاً)',
+                                tooltip: 'تعديل',
                                 icon: const Icon(Icons.edit_outlined, color: _titleColor),
-                                onPressed: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('ميزة التعديل ستُضاف لاحقًا')),
-                                  );
-                                },
+                                onPressed: () => _openEdit(doc, data),
                               ),
                               IconButton(
                                 tooltip: 'حذف',
@@ -492,7 +499,7 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
                             ],
                           ),
                         ],
-                      )
+                      ),
                     );
                   },
                 );
@@ -522,7 +529,7 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
                 backgroundColor: Colors.transparent,
                 elevation: 0,
                 leadingWidth: 56,
-                toolbarHeight: 75, // يبعده شوي عن الحافة ويخليه تحت الستاتس بار
+                toolbarHeight: 75,
                 leading: SafeArea(
                   child: Padding(
                     padding: const EdgeInsetsDirectional.only(start: 8, top: 4),
@@ -532,22 +539,18 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
                       icon: Stack(
                         alignment: Alignment.center,
                         children: const [
-                          // هالة خفيفة خلف السهم (بدون دائرة)
-                          Icon(Icons.arrow_back,
-                              size: 30, color: Colors.white70),
-                          Icon(Icons.arrow_back,
-                              size: 26, color: Color(0xFF0E3A2C)), // _titleColor
+                          Icon(Icons.arrow_back, size: 30, color: Colors.white70),
+                          Icon(Icons.arrow_back, size: 26, color: Color(0xFF0E3A2C)),
                         ],
                       ),
                     ),
                   ),
                 ),
-                // 👇 "نزول" التبويبات: زيدي القيمتين إذا تبين تنزل أكثر
-                bottom: PreferredSize(
-                  preferredSize: const Size.fromHeight(100), // <-- غيّري الرقم للنزول العام
+                bottom: const PreferredSize(
+                  preferredSize: Size.fromHeight(100),
                   child: Column(
-                    children: const [
-                      SizedBox(height: 60),                // <-- زيديه لين يوصل المكان اللي تبين
+                    children: [
+                      SizedBox(height: 60),
                       TabBar(
                         labelColor: _titleColor,
                         unselectedLabelColor: Colors.black54,
@@ -583,7 +586,7 @@ Widget _sizedField({required double height, required Widget child}) {
   return SizedBox(height: height, child: child);
 }
 
-// حقل إدخال مصمم
+// حقل إدخال مصمم (يدعم hintText للـ placeholders)
 Widget _styledField({
   required TextEditingController controller,
   required String label,
@@ -591,6 +594,8 @@ Widget _styledField({
   int maxLines = 1,
   FocusNode? focusNode,
   ValueChanged<String>? onFieldSubmitted,
+  bool readOnly = false,
+  String? hintText,
 }) {
   return Container(
     decoration: BoxDecoration(
@@ -602,13 +607,14 @@ Widget _styledField({
       validator: validator,
       maxLines: maxLines,
       focusNode: focusNode,
+      readOnly: readOnly,
       onFieldSubmitted: onFieldSubmitted,
       textAlign: TextAlign.right,
       decoration: const InputDecoration(
         labelStyle: TextStyle(color: Color(0xFF0E3A2C)),
         border: InputBorder.none,
         contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      ).copyWith(labelText: label),
+      ).copyWith(labelText: label, hintText: hintText),
     ),
   );
 }
@@ -650,5 +656,379 @@ class _ListTabHost extends StatelessWidget {
   Widget build(BuildContext context) {
     final parent = context.findAncestorStateOfType<_AdminBookManagerScreenState>();
     return parent?._buildListTab() ?? const SizedBox();
+  }
+}
+
+// ================== صفحة تعديل الكتاب ==================
+
+// مفاتيح تحكم:
+// - kAppBarHeight: ارتفاع الشريط العلوي
+// - kTitleTopOffset: نزول عنوان "تعديل الكتاب" داخل الـAppBar
+// - kPageTopOffset: تنزيل محتوى الصفحة
+// - kFormTopOffset: تنزيل بداية الفورم
+class _EditBookPage extends StatefulWidget {
+  final String docId;
+  final Map<String, dynamic> initialData;
+  final List<String> categories;
+
+  const _EditBookPage({
+    required this.docId,
+    required this.initialData,
+    required this.categories,
+  });
+
+  @override
+  State<_EditBookPage> createState() => _EditBookPageState();
+}
+
+class _EditBookPageState extends State<_EditBookPage> {
+  final _formKey = GlobalKey<FormState>();
+
+  // تحكم بالـ AppBar والهوامش
+  static const double kAppBarHeight   = 120; // غيّريه للي يناسبك
+  static const double kTitleTopOffset = 90; // ينزّل عنوان "تعديل الكتاب"
+  static const double kPageTopOffset  = 40; // ينزّل محتوى الصفحة
+  static const double kFormTopOffset  = 30; // ينزّل بداية الفورم
+
+  // ألوان/أبعاد مطابقة
+  static const _titleColor   = Color(0xFF0E3A2C);
+  static const _fillGreen    = Color(0xFFC9DABF);
+  static const _confirmColor = Color(0xFF6F8E63);
+
+  static const double _kFieldH = 56;
+  static const double _kGap    = 14;
+  static const double _kDescH  = 120;
+
+  late final TextEditingController _titleCtrl;
+  late final TextEditingController _authorCtrl; // قابل للتعديل
+  late final TextEditingController _descCtrl;
+
+  String? _category;
+
+  File? _newPdfFile;
+  File? _newCoverFile;
+
+  bool _saving = false;
+
+  String? _currentPdfUrl;
+  String? _currentCoverUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    final data = widget.initialData;
+
+    _titleCtrl  = TextEditingController(text: (data['title'] ?? '').toString());
+    _authorCtrl = TextEditingController(text: (data['author'] ?? '').toString());
+    _descCtrl   = TextEditingController(text: (data['description'] ?? '').toString());
+
+    final cat = (data['category'] ?? '').toString().trim();
+    _category = cat.isEmpty ? null : cat;
+
+    final pdf = (data['pdfUrl'] ?? '').toString().trim();
+    final cov = (data['coverUrl'] ?? '').toString().trim();
+    _currentPdfUrl   = pdf.isEmpty ? null : pdf;
+    _currentCoverUrl = cov.isEmpty ? null : cov;
+  }
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _authorCtrl.dispose();
+    _descCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickPdf() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['pdf'],
+      withData: false,
+    );
+    if (result != null && result.files.single.path != null) {
+      setState(() => _newPdfFile = File(result.files.single.path!));
+    }
+  }
+
+  Future<void> _pickCover() async {
+    final picker = ImagePicker();
+    final x = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+    if (x != null) {
+      setState(() => _newCoverFile = File(x.path));
+    }
+  }
+
+  Future<void> _saveEdits() async {
+    if (!_formKey.currentState!.validate()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('فضلاً أكمل الحقول المطلوبة')),
+      );
+      return;
+    }
+
+    try {
+      setState(() => _saving = true);
+
+      final docRef   = FirebaseFirestore.instance.collection('audiobooks').doc(widget.docId);
+      final storage  = FirebaseStorage.instance;
+      final pdfRef   = storage.ref('audiobooks/${widget.docId}/book.pdf');
+      final coverRef = storage.ref('audiobooks/${widget.docId}/cover.jpg');
+
+      String? pdfUrl   = _currentPdfUrl;
+      String? coverUrl = _currentCoverUrl;
+
+      if (_newPdfFile != null) {
+        final task = await pdfRef.putFile(_newPdfFile!);
+        pdfUrl = await task.ref.getDownloadURL();
+      }
+      if (_newCoverFile != null) {
+        final task = await coverRef.putFile(_newCoverFile!);
+        coverUrl = await task.ref.getDownloadURL();
+      }
+
+      await docRef.update({
+        'title': _titleCtrl.text.trim(),
+        'author': _authorCtrl.text.trim(),
+        'category': _category?.trim(),
+        'description': _descCtrl.text.trim(),
+        if (pdfUrl != null) 'pdfUrl': pdfUrl,
+        if (coverUrl != null) 'coverUrl': coverUrl,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تم حفظ تعديلاتك')),
+        );
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('تعذّر حفظ التعديلات: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // معاينة الغلاف (بسيطة لتجنّب أخطاء أقواس/ثلاثي)
+    Widget coverPreview;
+    if (_newCoverFile != null) {
+      coverPreview = Image.file(_newCoverFile!, fit: BoxFit.cover);
+    } else if (_currentCoverUrl != null) {
+      coverPreview = Image.network(_currentCoverUrl!, fit: BoxFit.cover);
+    } else {
+      coverPreview = Container(
+        color: Colors.white24,
+        child: const Icon(Icons.image, size: 40, color: _titleColor),
+      );
+    }
+
+    final pdfButtonText = _newPdfFile != null
+        ? 'تم اختيار: ${_newPdfFile!.path.split('/').last}'
+        : (_currentPdfUrl != null
+        ? 'الملف الحالي: book.pdf (اضغط لاستبداله)'
+        : 'اختيار ملف PDF');
+
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: Image.asset('assets/images/back1.png', fit: BoxFit.cover),
+          ),
+          Scaffold(
+            backgroundColor: Colors.transparent,
+            appBar: AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              toolbarHeight: kAppBarHeight, // ← تحكم ارتفاع الـAppBar
+              leadingWidth: 56,
+              leading: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsetsDirectional.only(start: 8, top: 4),
+                  child: IconButton(
+                    tooltip: 'رجوع',
+                    onPressed: () => Navigator.of(context).maybePop(),
+                    icon: Stack(
+                      alignment: Alignment.center,
+                      children: const [
+                        Icon(Icons.arrow_back, size: 30, color: Colors.white70),
+                        Icon(Icons.arrow_back, size: 26, color: _titleColor),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              title: Padding(
+                padding: EdgeInsets.only(top: kTitleTopOffset), // ← نزول العنوان
+                child: const Text(
+                  'تفاصيل الكتاب',
+                  style: TextStyle(color: _titleColor, fontWeight: FontWeight.w600),
+                ),
+              ),
+              centerTitle: true,
+            ),
+            body: SafeArea(
+              child: SingleChildScrollView(
+                // ↓ نزول محتوى الصفحة
+                padding: EdgeInsets.fromLTRB(16, kPageTopOffset, 16, 24),
+                child: AbsorbPointer(
+                  absorbing: _saving,
+                  child: Opacity(
+                    opacity: _saving ? 0.6 : 1,
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        children: [
+                          // ↓ نزول الفورم
+                          SizedBox(height: kFormTopOffset),
+
+                          // الغلاف + زر تغيير
+                          Container(
+                            decoration: BoxDecoration(
+                              color: _fillGreen,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            padding: const EdgeInsets.all(12),
+                            child: Row(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: SizedBox(
+                                    width: 80,
+                                    height: 100,
+                                    child: coverPreview,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _fileButton(
+                                    text: _newCoverFile == null
+                                        ? 'تغيير صورة الغلاف'
+                                        : 'تم اختيار غلاف جديد',
+                                    icon: Icons.image_outlined,
+                                    onPressed: _pickCover,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: _kGap),
+
+                          // العنوان
+                          _sizedField(
+                            height: _kFieldH,
+                            child: _styledField(
+                              controller: _titleCtrl,
+                              label: 'اسم الكتاب',
+                              hintText: (_titleCtrl.text.trim().isEmpty) ? 'لا يوجد عنوان' : null,
+                              validator: (v) => (v == null || v.trim().isEmpty) ? 'اسم الكتاب مطلوب' : null,
+                            ),
+                          ),
+                          const SizedBox(height: _kGap),
+
+                          // المؤلف (قابل للتعديل)
+                          _sizedField(
+                            height: _kFieldH,
+                            child: _styledField(
+                              controller: _authorCtrl,
+                              label: 'اسم المؤلف',
+                              hintText: (_authorCtrl.text.trim().isEmpty) ? 'لا يوجد مؤلف' : null,
+                              validator: (v) => (v == null || v.trim().isEmpty) ? 'اسم المؤلف مطلوب' : null,
+                            ),
+                          ),
+                          const SizedBox(height: _kGap),
+
+                          // التصنيف
+                          _sizedField(
+                            height: _kFieldH,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: _fillGreen,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              child: DropdownButtonFormField<String>(
+                                value: (widget.categories.contains(_category)) ? _category : null,
+                                dropdownColor: _fillGreen,
+                                decoration: const InputDecoration(
+                                  border: InputBorder.none,
+                                  labelText: 'التصنيف',
+                                ),
+                                items: widget.categories
+                                    .map((c) => DropdownMenuItem(
+                                  value: c,
+                                  child: Text(c),
+                                ))
+                                    .toList(),
+                                onChanged: (v) => setState(() => _category = v),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: _kGap),
+
+                          // الوصف
+                          _sizedField(
+                            height: _kDescH,
+                            child: _styledField(
+                              controller: _descCtrl,
+                              label: 'وصف مختصر',
+                              hintText: (_descCtrl.text.trim().isEmpty) ? 'لا توجد نبذة' : null,
+                              maxLines: 5,
+                            ),
+                          ),
+                          const SizedBox(height: _kGap),
+
+                          // PDF
+                          _sizedField(
+                            height: _kFieldH,
+                            child: _fileButton(
+                              text: pdfButtonText,
+                              icon: Icons.picture_as_pdf,
+                              onPressed: _pickPdf,
+                            ),
+                          ),
+
+                          const SizedBox(height: 24),
+
+                          // زر الحفظ
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: _saving ? null : _saveEdits,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _confirmColor,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: Text(
+                                _saving ? 'جارٍ الحفظ...' : 'حفظ التعديلات',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
