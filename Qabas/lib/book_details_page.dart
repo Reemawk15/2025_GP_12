@@ -5,17 +5,15 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'chatbot_placeholder.dart';
 
 // ألوان الثيم
- const _primary   = Color(0xFF0E3A2C); // نصوص/أيقونات داكنة
- const _accent    = Color(0xFF6F8E63); // زر محادثة
- const _pillGreen = Color(0xFFE6F0E0); // خلفيات فاتحة ناعمة
- const _chipRose  = Color(0xFFFFEFF0); // صندوق التعليقات
- const Color _darkGreen  = Color(0xFF0E3A2C);
+const _primary   = Color(0xFF0E3A2C); // نصوص/أيقونات داكنة
+const _accent    = Color(0xFF6F8E63); // زر محادثة
+const _pillGreen = Color(0xFFE6F0E0); // خلفيات فاتحة ناعمة
+const _chipRose  = Color(0xFFFFEFF0); // صندوق التعليقات
+const Color _darkGreen  = Color(0xFF0E3A2C);
 
 class BookDetailsPage extends StatelessWidget {
   final String bookId;
   const BookDetailsPage({super.key, required this.bookId});
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -205,6 +203,7 @@ class BookDetailsPage extends StatelessWidget {
       ),
     );
   }
+
   // === شيت "إضافة إلى قائمة" ===
   void _showAddToListSheet(
       BuildContext context, {
@@ -453,7 +452,7 @@ class _AddToListSheet extends StatelessWidget {
 
     await ref.set({
       'bookId'   : bookId,
-      'status'   : status, // listen_now | want | listened
+      'status'   : status, // listen_now | want
       'title'    : title,
       'author'   : author,
       'coverUrl' : cover,
@@ -489,11 +488,7 @@ class _AddToListSheet extends StatelessWidget {
               title: const Text('أرغب بالاستماع لها'),
               onTap: () => _setStatus(context, 'want'),
             ),
-            ListTile(
-              leading: const Icon(Icons.check_circle, color: _primary),
-              title: const Text('استمعت لها'),
-              onTap: () => _setStatus(context, 'listened'),
-            ),
+            // ✅ تم حذف خيار "استمعت لها"
           ],
         ),
       ),

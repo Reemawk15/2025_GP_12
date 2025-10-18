@@ -1,3 +1,4 @@
+import 'dart:async'; // ممكن يبقى حتى لو ما احتجناه لاحقًا
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -94,7 +95,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _index = 0;
-  String? _displayName;
 
   /// 👇 تقدر تتحكم هنا وتعمل Hot Reload وتشوف التغيير فورًا
   double _topSpacingUnderHeader = 130; // مسافة نزول المحتوى تحت التعرّجات
@@ -111,25 +111,27 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   @override
-  void initState() {
-    super.initState();
-    _loadDisplayName();
-  }
+  Widget build(BuildContext context) {
+    final pages = <Widget>[
+      _homeContent(),
+      const CommunityTab(),
+      const LibraryTab(),
+      const ProfileTab(),
+    ];
 
-  Future<void> _loadDisplayName() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-    String? name;
-    try {
-      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-      if (doc.exists) {
-        final data = doc.data() ?? {};
-        name = (data['name'] ?? data['fullName'] ?? data['displayName'] ?? '') as String;
-        if (name.trim().isEmpty) name = null;
-      }
-    } catch (_) {}
-    name ??= user.displayName;
-    setState(() => _displayName = name);
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        extendBody: true,
+        body: IndexedStack(index: _index, children: pages),
+        bottomNavigationBar: QabasBottomNav(
+          items: _items,
+          currentIndex: _index,
+          onTap: (i) => setState(() => _index = i),
+        ),
+      ),
+    );
   }
 
   // سطر الأغلفة بالمنتصف
@@ -143,11 +145,10 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context, c) {
         final w = c.maxWidth;
         final visibleWidth = cardW * count + gap * (count - 1);
-        // 👇 تأكدنا أنه double
         final double sidePad = ((w - visibleWidth) / 2).clamp(0.0, double.infinity).toDouble();
 
         return SizedBox(
-          height: cardH + 30.0, // 👈 double
+          height: cardH + 30.0,
           child: StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance
                 .collection('audiobooks')
@@ -218,16 +219,18 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-
   Widget _homeContent() {
+    final user = FirebaseAuth.instance.currentUser;
+    final uid = user?.uid;
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Stack(
         children: [
-          // خلفيتك
+          // الخلفية
           Positioned.fill(
             child: Image.asset(
-              'assets/images/back.png', // عدّل المسار إذا لزم
+              'assets/images/back.png',
               fit: BoxFit.cover,
               alignment: Alignment.topCenter,
             ),
@@ -240,11 +243,40 @@ class _HomeScreenState extends State<HomeScreen> {
               // مسافة تحت التعرّجات
               SizedBox(height: _topSpacingUnderHeader),
 
-              // الترحيب
-              Text(
-                'مساؤك سعيد، ${_displayName ?? 'صديقي'}',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: _HomeColors.selected),
-              ),
+              // ✅ الترحيب (Reactive) يقرأ مباشرة من Firestore ويتحدث فورًا
+              if (uid == null)
+                const Text(
+                  'مساؤك سعيد، صديقي',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: _HomeColors.selected),
+                )
+              else
+                StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                  stream: FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
+                  builder: (context, snap) {
+                    String display;
+                    if (snap.hasData && snap.data!.exists) {
+                      final data = snap.data!.data() ?? {};
+                      final docName = ((data['name'] ?? data['fullName'] ?? data['displayName'] ?? '') as String).trim();
+                      if (docName.isNotEmpty) {
+                        display = docName;
+                      } else {
+                        // لو الحقل فاضي نرجع للاسم من Auth (قد يكون محدث)
+                        display = (FirebaseAuth.instance.currentUser?.displayName ?? 'صديقي').trim();
+                        if (display.isEmpty) display = 'صديقي';
+                      }
+                    } else {
+                      // أثناء التحميل أو لو ما فيه وثيقة
+                      display = (FirebaseAuth.instance.currentUser?.displayName ?? 'صديقي').trim();
+                      if (display.isEmpty) display = 'صديقي';
+                    }
+
+                    return Text(
+                      'مساؤك سعيد، $display',
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: _HomeColors.selected),
+                    );
+                  },
+                ),
+
               const SizedBox(height: 26),
 
               // البحث (شكل)
@@ -294,57 +326,26 @@ class _HomeScreenState extends State<HomeScreen> {
 
               const SizedBox(height: 16),
 
-              // العنوان يمين
               const Align(
                 alignment: Alignment.centerRight,
                 child: Text('جديد قبس', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
               ),
               const SizedBox(height: 10),
 
-              // سطر الأغلفة (بالوسط)
               _centeredCoversRail(),
 
               const SizedBox(height: 24),
 
-              // عنوان يمين
               const Align(
                 alignment: Alignment.centerRight,
                 child: Text('اختيارات قبس لك', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
               ),
               const SizedBox(height: 12),
 
-              // هنا مكان كروت التوصيات الحالية عندك…
+              // … كروت التوصيات
             ],
           ),
         ],
-      ),
-    );
-  }
-
-  final _community = const CommunityTab();
-  final _library   = const LibraryTab();
-  final _profile   = const ProfileTab();
-
-  @override
-  Widget build(BuildContext context) {
-    final pages = <Widget>[
-      _homeContent(),
-      _community,
-      _library,
-      _profile,
-    ];
-
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        backgroundColor: Colors.white,
-        extendBody: true,
-        body: IndexedStack(index: _index, children: pages),
-        bottomNavigationBar: QabasBottomNav(
-          items: _items,
-          currentIndex: _index,
-          onTap: (i) => setState(() => _index = i),
-        ),
       ),
     );
   }

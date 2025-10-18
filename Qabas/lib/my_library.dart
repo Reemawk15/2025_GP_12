@@ -7,9 +7,23 @@ import 'library_tab.dart'; // للرجوع لو ما فيه صفحة قبل
 
 const Color _midGreen = Color(0xFF2F5145);
 
+// =======================
+// ⬅ تحكم بالأرقام لموضع/حجم الزر الدائري أعلى الكرت
+// -1 يسار/أعلى .. +1 يمين/أسفل بالنسبة لحدود الكرت
+const double kCheckAlignX   = 1.0;     // 0 = منتصف أفقيًا
+const double kCheckAlignY   = -1.7;    // سالب = فوق الكرت
+// إزاحة إضافية بالبكسل (بعد المحاذاة)
+const double kCheckOffsetX  = 0.0;
+const double kCheckOffsetY  = 0.0;
+// الحجم والشكل
+const double kCheckDiameter = 28.0;    // قطر الدائرة
+const double kCheckIconSize = 18.0;    // حجم أيقونة الصح
+const double kCheckElevation = 2.0;    // ظل بسيط
+// =======================
+
 /// نموذج الكتاب داخل مكتبة المستخدم
 class Book {
-  final String id;                 // يساوي bookId
+  final String id;                 // 👈 docId الحقيقي في collection('library')
   final String title;
   final ImageProvider? cover;
   final String status;             // listen_now | want | listened
@@ -117,7 +131,7 @@ class MyLibraryPage extends StatelessWidget {
   }
 }
 
-/// تبويب واحد (يقرأ من Firestore حسب الحالة) — Stateful مع كاش لآخر نتيجة غير فاضية
+/// تبويب واحد (يقرأ من Firestore حسب الحالة) — Stateful مع كاش + إخفاء تفاؤلي
 class _LibraryShelf extends StatefulWidget {
   final String status;
   final String uid;
@@ -128,8 +142,18 @@ class _LibraryShelf extends StatefulWidget {
 }
 
 class _LibraryShelfState extends State<_LibraryShelf> {
-  // نحتفظ بآخر قائمة غير فاضية لمنع اختفاء الكتب لحظياً عند تحديثات مؤقتة
+  // آخر قائمة غير فاضية لمنع اختفاء مفاجئ
   List<Book> _lastNonEmpty = const [];
+  // 👇 عناصر نخفيها محليًا مباشرة بعد النقل (optimistic)
+  final Set<String> _locallyHidden = <String>{};
+
+  void _onMovedLocally(String docId) {
+    setState(() {
+      _locallyHidden.add(docId);
+      // حدّث النسخة المعروضة الآن فورًا:
+      _lastNonEmpty = _lastNonEmpty.where((b) => b.id != docId).toList();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -143,41 +167,44 @@ class _LibraryShelfState extends State<_LibraryShelf> {
       stream: q.snapshots(),
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
-          // إن كان لدينا بيانات سابقة، نعرضها بدل الدايرة
           if (_lastNonEmpty.isNotEmpty) {
-            return _ShelfView(books: _lastNonEmpty, uid: widget.uid);
+            return _ShelfView(books: _lastNonEmpty, uid: widget.uid, onMoved: _onMovedLocally);
           }
           return const Center(child: CircularProgressIndicator());
         }
 
         if (snap.hasError) {
           if (_lastNonEmpty.isNotEmpty) {
-            return _ShelfView(books: _lastNonEmpty, uid: widget.uid);
+            return _ShelfView(books: _lastNonEmpty, uid: widget.uid, onMoved: _onMovedLocally);
           }
           return const Center(child: Text('تعذّر تحميل المكتبة'));
         }
 
         final docs = snap.data?.docs ?? [];
-        final current = docs.map((d) {
+        // ⚠️ استخدم دائمًا docId الحقيقي d.id
+        final all = docs.map((d) {
           final m = d.data() as Map<String, dynamic>? ?? {};
           final title  = (m['title'] ?? '') as String;
           final cover  = (m['coverUrl'] ?? '') as String;
           final status = (m['status'] ?? 'want') as String;
           return Book(
-            id: (m['bookId'] ?? d.id) as String,
+            id: d.id, // 👈 هنا التعديل: docId فقط
             title: title.isEmpty ? 'كتاب' : title,
             cover: cover.isNotEmpty ? NetworkImage(cover) : null,
             status: status,
           );
         }).toList();
 
+        // استبعد اللي أُخفي محليًا فورًا
+        final current = all.where((b) => !_locallyHidden.contains(b.id)).toList();
+
         if (current.isNotEmpty) {
           _lastNonEmpty = current;
-          return _ShelfView(books: current, uid: widget.uid);
+          return _ShelfView(books: current, uid: widget.uid, onMoved: _onMovedLocally);
         }
 
         if (_lastNonEmpty.isNotEmpty) {
-          return _ShelfView(books: _lastNonEmpty, uid: widget.uid);
+          return _ShelfView(books: _lastNonEmpty, uid: widget.uid, onMoved: _onMovedLocally);
         }
 
         return const Center(child: Text('لا توجد كتب في هذه القائمة بعد'));
@@ -201,7 +228,8 @@ class ShelfRect {
 class _ShelfView extends StatefulWidget {
   final List<Book> books;
   final String uid;
-  const _ShelfView({required this.books, required this.uid});
+  final void Function(String docId) onMoved; // 👈 نمرّر كولباك للإخفاء الفوري
+  const _ShelfView({required this.books, required this.uid, required this.onMoved});
 
   @override
   State<_ShelfView> createState() => _ShelfViewState();
@@ -311,7 +339,7 @@ class _ShelfViewState extends State<_ShelfView> {
                             height: bookHeight,
                             child: book == null
                                 ? const SizedBox.shrink()
-                                : _BookCard(book: book, uid: widget.uid),
+                                : _BookCard(book: book, uid: widget.uid, onMoved: widget.onMoved), // 👈 نمرر الكولباك
                           );
                         }),
                       ),
@@ -361,7 +389,8 @@ class _ShelfViewState extends State<_ShelfView> {
 class _BookCard extends StatelessWidget {
   final Book book;
   final String uid;
-  const _BookCard({required this.book, required this.uid});
+  final void Function(String docId) onMoved; // 👈 نستدعيه بعد النجاح
+  const _BookCard({required this.book, required this.uid, required this.onMoved});
 
   static const Map<String, String> _arabicStatus = {
     'listen_now': 'استمع لها الآن',
@@ -390,16 +419,33 @@ class _BookCard extends StatelessWidget {
     }
   }
 
-  Future<void> _moveToStatus(BuildContext context, String newStatus) async {
+  // دالة النقل — تستخدم docId الحقيقي + إخفاء تفاؤلي
+  Future<void> _moveToStatus(BuildContext context, String newStatus, {bool shouldPop = true}) async {
     final ref = FirebaseFirestore.instance
         .collection('users').doc(uid)
-        .collection('library').doc(book.id);
-    await ref.set({'status': newStatus, 'addedAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
-    if (context.mounted) {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('نُقل إلى "${_arabicStatus[newStatus] ?? newStatus}"')),
+        .collection('library').doc(book.id); // book.id هو docId
+    try {
+      await ref.set(
+        {'status': newStatus, 'addedAt': FieldValue.serverTimestamp()},
+        SetOptions(merge: true),
       );
+      // 👇 أخفِ البطاقة فورًا محليًا
+      onMoved(book.id);
+
+      if (context.mounted) {
+        if (shouldPop) {
+          Navigator.pop(context);
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('نُقل إلى "${_arabicStatus[newStatus] ?? newStatus}"')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تعذّر النقل. حاول مجددًا')),
+        );
+      }
     }
   }
 
@@ -431,12 +477,12 @@ class _BookCard extends StatelessWidget {
                 ListTile(
                   leading: const Icon(Icons.drive_file_move_outline, color: Colors.teal),
                   title: Text('نقل إلى: ${_arabicStatus[dst1]}'),
-                  onTap: () => _moveToStatus(context, dst1),
+                  onTap: () => _moveToStatus(context, dst1), // يغلق الـSheet
                 ),
                 ListTile(
                   leading: const Icon(Icons.drive_file_move_rtl_outlined, color: Colors.teal),
                   title: Text('نقل إلى: ${_arabicStatus[dst2]}'),
-                  onTap: () => _moveToStatus(context, dst2),
+                  onTap: () => _moveToStatus(context, dst2), // يغلق الـSheet
                 ),
                 const SizedBox(height: 8),
               ],
@@ -460,6 +506,7 @@ class _BookCard extends StatelessWidget {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
+          // الكرت
           Container(
             decoration: BoxDecoration(
               color: Colors.white,
@@ -484,6 +531,8 @@ class _BookCard extends StatelessWidget {
               ),
             ),
           ),
+
+          // الشريطة العلوية كما هي
           const Positioned(
             top: -2,
             left: 8,
@@ -501,6 +550,34 @@ class _BookCard extends StatelessWidget {
               ),
             ),
           ),
+
+          // ✅ زر دائري "صح" فوق الكرت — بدون نص
+          if (book.status == 'listen_now')
+            Positioned.fill(
+              child: Align(
+                alignment: Alignment(kCheckAlignX, kCheckAlignY),
+                child: Transform.translate(
+                  offset: Offset(kCheckOffsetX, kCheckOffsetY),
+                  child: Material(
+                    color: const Color(0xFF6F8E63),
+                    shape: const CircleBorder(),
+                    elevation: kCheckElevation,
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      onTap: () => _moveToStatus(context, 'listened', shouldPop: false),
+                      customBorder: const CircleBorder(),
+                      child: SizedBox(
+                        width: kCheckDiameter,
+                        height: kCheckDiameter,
+                        child: const Center(
+                          child: Icon(Icons.check, color: Colors.white, size: kCheckIconSize),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

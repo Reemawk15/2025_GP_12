@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';          // ✅ Auth
@@ -60,82 +59,192 @@ class _EditProfilePageState extends State<EditProfilePage> {
     try {
       final uid = _user.uid;
       final ref = FirebaseStorage.instance.ref('users/$uid/avatar.jpg');
-      await ref.putFile(File(x.path));
+
+      final bytes = await x.readAsBytes();
+      await ref.putData(bytes, SettableMetadata(contentType: 'image/jpeg'));
       final url = await ref.getDownloadURL();
 
-      // Firestore + Auth
       await FirebaseFirestore.instance.collection('users').doc(uid)
           .set({'photoUrl': url}, SetOptions(merge: true));
-      await _user.updateProfile(photoURL: url); // ✅ نفس طريقتك
+      await _user.updatePhotoURL(url);
+      await _user.reload();
 
       setState(() => _photoUrl = url);
       _snack('تم تحديث الصورة بنجاح');
     } catch (e) {
-      _snack('تعذّر تحديث الصورة: $e', error: true);
+      _snack('تعذّر تحديث الصورة. تحقق من الاتصال وحاول مرة أخرى.', error: true);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  Future<void> _removePhoto() async {
+    if (_photoUrl == null || _photoUrl!.isEmpty) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('إزالة الصورة', textAlign: TextAlign.center),
+          content: const Text('هل تريد إزالة صورة الملف الشخصي؟', textAlign: TextAlign.center),
+          contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          actions: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(
+                  height: 48,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _confirm,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: const Text('تأكيد'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => _saving = true);
+    try {
+      final uid = _user.uid;
+
+      try {
+        final ref = FirebaseStorage.instance.ref('users/$uid/avatar.jpg');
+        await ref.delete();
+      } catch (_) {}
+
+      await FirebaseFirestore.instance.collection('users').doc(uid)
+          .set({'photoUrl': FieldValue.delete()}, SetOptions(merge: true));
+
+      await _user.updatePhotoURL(null);
+      await _user.reload();
+
+      setState(() => _photoUrl = null);
+      _snack('تمت إزالة الصورة');
+    } catch (e) {
+      _snack('تعذّرت إزالة الصورة. جرّب لاحقًا.', error: true);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  // رسائل أخطاء Firebase بالعربي
+  String _authErrorAr(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'requires-recent-login':
+        return 'لا يمكن إكمال العملية الآن. سجّل خروجًا ثم ادخل من جديد وأعيد المحاولة.';
+      case 'weak-password':
+        return 'كلمة المرور ضعيفة.';
+      case 'too-many-requests':
+        return 'طلبات كثيرة مؤخرًا. يرجى المحاولة لاحقًا.';
+      case 'network-request-failed':
+        return 'تعذر الاتصال. تحقق من الشبكة.';
+      default:
+        return 'تعذّر تنفيذ العملية. (${e.code})';
+    }
+  }
+
+  // فحص بسيط لتنسيق كلمة المرور (اختياري)
+  String? _validatePassword(String? v) {
+    final t = (v ?? '').trim();
+    if (t.isEmpty) return null; // اختيارية
+    final hasUpper   = t.contains(RegExp(r'[A-Z]'));
+    final hasLower   = t.contains(RegExp(r'[a-z]'));
+    final hasDigit   = t.contains(RegExp(r'\d'));
+    final hasSymbol  = t.contains(RegExp(r'[!@#\$%^&*()_+\-=\[\]{};:"\\|,.<>/?`~]'));
+    final noSpaces   = !t.contains(' ');
+    if (t.length < 8 || !hasUpper || !hasLower || !hasDigit || !hasSymbol || !noSpaces) {
+      return 'كلمة المرور يجب أن تكون ٨ أحرف على الأقل\n وتضمّ حرفًا كبيرًا وحرفًا صغيرًا ورقمًا ورمزًا خاصًا.';
+    }
+    return null;
   }
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _saving = true);
-    final uid = _user.uid;
+
+    final currentName  = _user.displayName ?? '';
+    final currentPhoto = _user.photoURL ?? '';
+
+    final newName   = _name.text.trim();
+    final newUser   = _username.text.trim();  // لن نستخدمه (غير قابل للتعديل)
+    final newEmail  = _email.text.trim();     // لن نستخدمه (غير قابل للتعديل)
+    final newPass   = _password.text.trim();
+    final newPhoto  = _photoUrl ?? '';
+
+    final nameChanged  = newName.isNotEmpty && newName != currentName;
+    final photoChanged = newPhoto != currentPhoto;
+    final passProvided = newPass.isNotEmpty;
+
+    bool anySuccess = false;
+    bool anyError   = false;
 
     try {
-      // 1) Firestore
-      await FirebaseFirestore.instance.collection('users').doc(uid).set({
-        'name'     : _name.text.trim(),
-        'username' : _username.text.trim(),
-        'email'    : _email.text.trim(),
+      // 1) Firestore — نحدّث فقط الحقول المسموح بها (بدون username/email)
+      final profilePayload = <String, dynamic>{
+        if (nameChanged) 'name': newName,
         if (_photoUrl != null) 'photoUrl': _photoUrl,
         'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      };
 
-      // 2) Auth: الاسم (والصورة لو كانت موجودة)
-      final newName = _name.text.trim();
-      if ((_user.displayName ?? '') != newName || (_user.photoURL ?? '') != (_photoUrl ?? '')) {
-        await _user.updateProfile(
-          displayName: newName,
-          photoURL: _photoUrl,
-        );
+      final willWriteProfile = nameChanged || photoChanged;
+      if (willWriteProfile) {
+        await FirebaseFirestore.instance
+            .collection('users').doc(_user.uid)
+            .set(profilePayload, SetOptions(merge: true));
+        anySuccess = true;
       }
 
-      // 3) Auth: البريد (verifyBeforeUpdateEmail ترسل رسالة تحقق)
-      final newEmail = _email.text.trim();
-      if ((_user.email ?? '') != newEmail) {
-        try {
-          await _user.verifyBeforeUpdateEmail(newEmail);
-          _snack('تم إرسال رسالة تحقق للبريد الجديد.\nبعد التأكيد سيتحدث البريد تلقائيًا.');
-        } on FirebaseAuthException catch (e) {
-          if (e.code == 'requires-recent-login') {
-            _snack('يحتاج إعادة تسجيل الدخول لتغيير البريد.', error: true);
-          } else {
-            _snack('تعذّر تحديث البريد: ${e.message}', error: true);
+      // 2) Auth: الاسم/الصورة فقط
+      if (nameChanged || photoChanged) {
+        if (nameChanged) await _user.updateDisplayName(newName);
+        await _user.updatePhotoURL(_photoUrl);
+        await _user.reload();
+        anySuccess = true;
+      }
+
+      // 3) كلمة المرور (اختيارية)
+      if (passProvided) {
+        final passError = _validatePassword(newPass);
+        if (passError != null) {
+          anyError = true;
+          _snack(passError, error: true);
+        } else {
+          try {
+            await _user.updatePassword(newPass);
+            anySuccess = true;
+            _snack('تم تحديث كلمة المرور');
+          } on FirebaseAuthException catch (e) {
+            anyError = true;
+            _snack(_authErrorAr(e), error: true);
           }
         }
       }
 
-      // 4) Auth: كلمة المرور (اختياري — فقط إذا امتلأت)
-      final newPass = _password.text;
-      if (newPass.isNotEmpty) {
-        try {
-          await _user.updatePassword(newPass);
-          _snack('تم تحديث كلمة المرور');
-        } on FirebaseAuthException catch (e) {
-          if (e.code == 'requires-recent-login') {
-            _snack('يحتاج إعادة تسجيل الدخول لتغيير كلمة المرور.', error: true);
-          } else {
-            _snack('تعذّر تحديث كلمة المرور: ${e.message}', error: true);
-          }
-        }
+      // ✅ الرسالة النهائية/التنقّل
+      if (anySuccess && !anyError) {
+        _snack('تم حفظ التعديلات ✅');
+        if (mounted) Navigator.pop(context);
+      } else if (!anySuccess && !anyError) {
+        _snack('لا توجد تغييرات لحفظها.');
       }
 
-      _snack('تم حفظ التعديلات ✅');
-      if (mounted) Navigator.pop(context); // رجوع لصفحة البروفايل
     } catch (e) {
-      _snack('حدث خطأ أثناء الحفظ: $e', error: true);
+      _snack('حدث خطأ أثناء الحفظ. حاول لاحقًا.', error: true);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -153,14 +262,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
       textDirection: TextDirection.rtl,
       child: Stack(
         children: [
-          // الخلفية
           Positioned.fill(
             child: Image.asset('assets/images/back.png', fit: BoxFit.cover),
           ),
-
           Scaffold(
             backgroundColor: Colors.transparent,
-            // ❌ ما في AppBar — زر الرجوع داخل الكرت الأبيض
             body: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : AbsorbPointer(
@@ -169,9 +275,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
                 child: Column(
                   children: [
-                    const SizedBox(height: 100), // ننزل المحتوى شوي
-
-                    // صورة البروفايل مع زر تعديل صغير
+                    const SizedBox(height: 100),
                     Center(
                       child: Stack(
                         children: [
@@ -182,7 +286,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                 ? NetworkImage(_photoUrl!)
                                 : null,
                             child: (_photoUrl == null || _photoUrl!.isEmpty)
-                                ? Icon(Icons.person, size: 50, color: _darkGreen.withValues(alpha: 0.8))
+                                ? Icon(Icons.person, size: 50, color: _darkGreen.withOpacity(0.8))
                                 : null,
                           ),
                           Positioned(
@@ -193,18 +297,29 @@ class _EditProfilePageState extends State<EditProfilePage> {
                               borderRadius: BorderRadius.circular(16),
                               child: CircleAvatar(
                                 radius: 16,
-                                backgroundColor: _confirm, // ✅ نفس لون "تأكيد"
+                                backgroundColor: _confirm,
                                 child: const Icon(Icons.edit, size: 16, color: Colors.white),
                               ),
                             ),
                           ),
+                          if (_photoUrl != null && _photoUrl!.isNotEmpty)
+                            Positioned(
+                              left: 0,
+                              bottom: 0,
+                              child: InkWell(
+                                onTap: _removePhoto,
+                                borderRadius: BorderRadius.circular(16),
+                                child: CircleAvatar(
+                                  radius: 16,
+                                  backgroundColor: Colors.red.shade600,
+                                  child: const Icon(Icons.delete_outline, size: 16, color: Colors.white),
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ),
-
-                    const SizedBox(height: 10), // ننزل الكرت الأبيض أكثر
-
-                    // الكرت الأبيض
+                    const SizedBox(height: 10),
                     Container(
                       width: double.infinity,
                       decoration: BoxDecoration(
@@ -212,7 +327,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                         borderRadius: BorderRadius.circular(24),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.05),
+                            color: Colors.black.withOpacity(0.05),
                             blurRadius: 12,
                             offset: const Offset(0, 4),
                           ),
@@ -223,11 +338,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            // ✅ زر الرجوع داخل بداية الكرت (يمين لأن RTL) + مسافة تحته
                             Padding(
                               padding: const EdgeInsetsDirectional.only(top: 8, end: 4),
                               child: Align(
-                                alignment: AlignmentDirectional.centerStart, // RTL: start = يمين
+                                alignment: AlignmentDirectional.centerStart,
                                 child: IconButton(
                                   tooltip: 'رجوع',
                                   style: IconButton.styleFrom(
@@ -239,9 +353,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 16), // 👈 مسافة تحت السهم
-
-                            // النموذج
+                            const SizedBox(height: 16),
                             Form(
                               key: _formKey,
                               child: Column(
@@ -252,7 +364,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                   const SizedBox(height: 12),
 
                                   _label('اسم المستخدم'),
-                                  _field(controller: _username, hint: '@username'),
+                                  _field(
+                                    controller: _username,
+                                    hint: '@username',
+                                    enabled: false, // ⛔️ غير قابل للتعديل
+                                    suffixIcon: const Icon(Icons.lock_outline, size: 18),
+                                  ),
                                   const SizedBox(height: 12),
 
                                   _label('البريد الإلكتروني'),
@@ -260,12 +377,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                     controller: _email,
                                     keyboard: TextInputType.emailAddress,
                                     hint: 'name@example.com',
-                                    validator: (v) {
-                                      final t = (v ?? '').trim();
-                                      if (t.isEmpty) return 'البريد مطلوب';
-                                      if (!t.contains('@')) return 'صيغة البريد غير صحيحة';
-                                      return null;
-                                    },
+                                    enabled: false, // ⛔️ غير قابل للتعديل
+                                    suffixIcon: const Icon(Icons.lock_outline, size: 18),
+                                    // لا حاجة لمحقق صحة لأنه disabled
+                                    validator: (_) => null,
                                   ),
                                   const SizedBox(height: 12),
 
@@ -274,7 +389,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                     controller: _password,
                                     hint: '••••••••',
                                     obscure: true,
-                                    validator: (_) => null, // اختيارية
+                                    validator: _validatePassword,
                                   ),
                                   const SizedBox(height: 20),
 
@@ -282,7 +397,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                     height: 48,
                                     child: FilledButton(
                                       style: FilledButton.styleFrom(
-                                        backgroundColor: _confirm, // ✅ نفس لون "تأكيد"
+                                        backgroundColor: _confirm,
                                         shape: RoundedRectangleBorder(
                                           borderRadius: BorderRadius.circular(26),
                                         ),
@@ -315,11 +430,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       padding: const EdgeInsetsDirectional.only(bottom: 6, start: 6),
       child: Text(
         text,
-        style: const TextStyle(
-          fontSize: 14.5,
-          fontWeight: FontWeight.w700,
-          color: _darkGreen,
-        ),
+        style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: _darkGreen),
         textAlign: TextAlign.right,
       ),
     );
@@ -331,6 +442,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
     TextInputType? keyboard,
     bool obscure = false,
     String? Function(String?)? validator,
+    bool enabled = true,
+    Widget? suffixIcon,
   }) {
     return TextFormField(
       controller: controller,
@@ -338,19 +451,29 @@ class _EditProfilePageState extends State<EditProfilePage> {
       obscureText: obscure,
       validator: validator ??
               (v) => (v == null || v.trim().isEmpty) ? 'هذا الحقل مطلوب' : null,
+      enabled: enabled,
+      readOnly: !enabled,
       decoration: InputDecoration(
         hintText: hint,
         filled: true,
-        fillColor: const Color(0xFFF6F7F5),
+        fillColor: enabled ? const Color(0xFFF6F7F5) : const Color(0xFFF0F0F0),
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        suffixIcon: suffixIcon,
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: _lightGreen, width: 2),
+          borderSide: BorderSide(color: enabled ? _lightGreen : Colors.grey.shade400, width: 2),
+        ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade400, width: 2),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: _darkGreen, width: 2),
         ),
+      ),
+      style: TextStyle(
+        color: enabled ? Colors.black : Colors.grey.shade700,
       ),
       textDirection: TextDirection.rtl,
       textAlign: TextAlign.right,

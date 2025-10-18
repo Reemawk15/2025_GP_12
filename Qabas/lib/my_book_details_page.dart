@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:url_launcher/url_launcher_string.dart';
+import 'package:firebase_storage/firebase_storage.dart' as storage;
 
 class MyBookDetailsPage extends StatelessWidget {
   final String bookId; // id المستند داخل users/{uid}/mybooks
@@ -11,23 +13,90 @@ class MyBookDetailsPage extends StatelessWidget {
   static const _accent    = Color(0xFF6F8E63);
   static const _pillGreen = Color(0xFFE6F0E0);
 
+  // 1) تحويل الروابط إلى https صالح
+  Future<String?> _normalizeUrl(String raw) async {
+    String url = (raw).trim();
+    if (url.isEmpty) return null;
 
-  Future<void> _openPdf(BuildContext context, String url) async {
-    if (await canLaunchUrlString(url)) {
-      final ok = await launchUrlString(
-        url,
-        mode: LaunchMode.externalApplication,
-      );
-      if (!ok && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تعذّر فتح ملف الـ PDF')),
-        );
+    // gs://bucket/path/file.pdf  -> https download URL
+    if (url.startsWith('gs://')) {
+      try {
+        final ref = storage.FirebaseStorage.instance.refFromURL(url);
+        final https = await ref.getDownloadURL();
+        return https;
+      } catch (_) {
+        return null;
       }
-    } else {
+    }
+
+    // روابط درايف — نحولها إلى direct download
+    if (url.contains('drive.google.com')) {
+      // يدعم الشكلين:
+      // https://drive.google.com/file/d/<ID>/view?usp=sharing
+      // https://drive.google.com/open?id=<ID>
+      final uri = Uri.tryParse(url);
+      if (uri != null) {
+        String? id;
+        if (uri.pathSegments.length >= 3 && uri.pathSegments[0] == 'file' && uri.pathSegments[1] == 'd') {
+          id = uri.pathSegments[2];
+        } else if (uri.queryParameters['id'] != null) {
+          id = uri.queryParameters['id'];
+        }
+        if (id != null && id.isNotEmpty) {
+          // رابط تنزيل مباشر
+          return 'https://drive.google.com/uc?export=download&id=$id';
+        }
+      }
+    }
+
+    // إذا ما فيه scheme نضيف https://
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://$url';
+    }
+
+    return url;
+  }
+
+  Future<void> _openPdf(BuildContext context, String rawUrl) async {
+    final normalized = await _normalizeUrl(rawUrl);
+    if (normalized == null) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('الرابط غير صالح أو لا يمكن فتحه')),
+          const SnackBar(content: Text('الرابط غير صالح أو الملف غير متاح')),
         );
+      }
+      return;
+    }
+
+    // أولاً نحاول external، ولو فشل نجرّب in-app
+    final uri = Uri.parse(normalized);
+
+    try {
+      // canLaunch في بعض الأجهزة يرجّع false خطأً؛ نجرب الإطلاق مباشرة
+      final okExternal = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!okExternal) {
+        final okInApp = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+        if (!okInApp && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('تعذّر فتح ملف الـ PDF')),
+          );
+        }
+      }
+    } catch (_) {
+      // محاولة أخيرة داخل التطبيق
+      try {
+        final okInApp = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+        if (!okInApp && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('تعذّر فتح ملف الـ PDF')),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('الرابط غير صالح أو لا يمكن فتحه')),
+          );
+        }
       }
     }
   }
@@ -123,7 +192,7 @@ class MyBookDetailsPage extends StatelessWidget {
                       ),
                       const SizedBox(height: 18),
 
-// بطاقة بسيطة: "ملف الكتاب"
+                      // بطاقة "ملف الكتاب"
                       Container(
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
@@ -135,7 +204,7 @@ class MyBookDetailsPage extends StatelessWidget {
                             const Icon(Icons.picture_as_pdf, color: _primary),
                             const SizedBox(width: 10),
                             Expanded(
-                              child: pdfUrl.isEmpty
+                              child: pdfUrl.trim().isEmpty
                                   ? const Text('لا يوجد ملف PDF', style: TextStyle(fontWeight: FontWeight.w600))
                                   : InkWell(
                                 onTap: () => _openPdf(context, pdfUrl),
@@ -154,18 +223,18 @@ class MyBookDetailsPage extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
 
-// زر بدء الاستماع (شكلي فقط حالياً)
+                      // زر بدء الاستماع (غير مفعل)
                       SizedBox(
                         height: 52,
                         child: ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.grey.shade400, // لون باهت ليدل أنه غير مفعل
+                            backgroundColor: Colors.grey.shade400,
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(14),
                             ),
                           ),
-                          onPressed: null, // غير قابل للنقر حالياً
+                          onPressed: null,
                           icon: const Icon(Icons.play_arrow),
                           label: const Text('بدء الاستماع'),
                         ),
