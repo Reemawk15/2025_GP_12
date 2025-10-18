@@ -381,9 +381,31 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
                                 borderRadius: BorderRadius.circular(12),
                               ),
                             ),
-                            child: Text(
-                              _saving ? 'جارٍ الحفظ...' : 'حفظ',
-                              style: const TextStyle(
+                            child: _saving
+                                ? Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: const [
+                                SizedBox(
+                                  width: 18, height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
+                                ),
+                                SizedBox(width: 10),
+                                Text(
+                                  'جار الحفظ...',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            )
+                                : const Text(
+                              'حفظ',
+                              style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
@@ -565,7 +587,8 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
                   ),
                 ),
               ),
-              body: const TabBarView(
+              // ✅ شلّينا const عشان يتحدث المحتوى مع تغيّر _saving
+              body: TabBarView(
                 children: [
                   _AddTabHost(),
                   _ListTabHost(),
@@ -660,12 +683,7 @@ class _ListTabHost extends StatelessWidget {
 }
 
 // ================== صفحة تعديل الكتاب ==================
-
-// مفاتيح تحكم:
-// - kAppBarHeight: ارتفاع الشريط العلوي
-// - kTitleTopOffset: نزول عنوان "تعديل الكتاب" داخل الـAppBar
-// - kPageTopOffset: تنزيل محتوى الصفحة
-// - kFormTopOffset: تنزيل بداية الفورم
+// (بدون تغيير في المنطق – فقط نفس تحسين زر الحفظ)
 class _EditBookPage extends StatefulWidget {
   final String docId;
   final Map<String, dynamic> initialData;
@@ -684,13 +702,11 @@ class _EditBookPage extends StatefulWidget {
 class _EditBookPageState extends State<_EditBookPage> {
   final _formKey = GlobalKey<FormState>();
 
-  // تحكم بالـ AppBar والهوامش
-  static const double kAppBarHeight   = 120; // غيّريه للي يناسبك
-  static const double kTitleTopOffset = 90; // ينزّل عنوان "تعديل الكتاب"
-  static const double kPageTopOffset  = 40; // ينزّل محتوى الصفحة
-  static const double kFormTopOffset  = 30; // ينزّل بداية الفورم
+  static const double kAppBarHeight   = 120;
+  static const double kTitleTopOffset = 90;
+  static const double kPageTopOffset  = 40;
+  static const double kFormTopOffset  = 30;
 
-  // ألوان/أبعاد مطابقة
   static const _titleColor   = Color(0xFF0E3A2C);
   static const _fillGreen    = Color(0xFFC9DABF);
   static const _confirmColor = Color(0xFF6F8E63);
@@ -700,7 +716,7 @@ class _EditBookPageState extends State<_EditBookPage> {
   static const double _kDescH  = 120;
 
   late final TextEditingController _titleCtrl;
-  late final TextEditingController _authorCtrl; // قابل للتعديل
+  late final TextEditingController _authorCtrl;
   late final TextEditingController _descCtrl;
 
   String? _category;
@@ -815,7 +831,6 @@ class _EditBookPageState extends State<_EditBookPage> {
 
   @override
   Widget build(BuildContext context) {
-    // معاينة الغلاف (بسيطة لتجنّب أخطاء أقواس/ثلاثي)
     Widget coverPreview;
     if (_newCoverFile != null) {
       coverPreview = Image.file(_newCoverFile!, fit: BoxFit.cover);
@@ -846,7 +861,7 @@ class _EditBookPageState extends State<_EditBookPage> {
             appBar: AppBar(
               backgroundColor: Colors.transparent,
               elevation: 0,
-              toolbarHeight: kAppBarHeight, // ← تحكم ارتفاع الـAppBar
+              toolbarHeight: kAppBarHeight,
               leadingWidth: 56,
               leading: SafeArea(
                 child: Padding(
@@ -865,7 +880,7 @@ class _EditBookPageState extends State<_EditBookPage> {
                 ),
               ),
               title: Padding(
-                padding: EdgeInsets.only(top: kTitleTopOffset), // ← نزول العنوان
+                padding: EdgeInsets.only(top: kTitleTopOffset),
                 child: const Text(
                   'تفاصيل الكتاب',
                   style: TextStyle(color: _titleColor, fontWeight: FontWeight.w600),
@@ -875,7 +890,6 @@ class _EditBookPageState extends State<_EditBookPage> {
             ),
             body: SafeArea(
               child: SingleChildScrollView(
-                // ↓ نزول محتوى الصفحة
                 padding: EdgeInsets.fromLTRB(16, kPageTopOffset, 16, 24),
                 child: AbsorbPointer(
                   absorbing: _saving,
@@ -885,10 +899,7 @@ class _EditBookPageState extends State<_EditBookPage> {
                       key: _formKey,
                       child: Column(
                         children: [
-                          // ↓ نزول الفورم
                           SizedBox(height: kFormTopOffset),
-
-                          // الغلاف + زر تغيير
                           Container(
                             decoration: BoxDecoration(
                               color: _fillGreen,
@@ -918,10 +929,7 @@ class _EditBookPageState extends State<_EditBookPage> {
                               ],
                             ),
                           ),
-
                           const SizedBox(height: _kGap),
-
-                          // العنوان
                           _sizedField(
                             height: _kFieldH,
                             child: _styledField(
@@ -932,8 +940,6 @@ class _EditBookPageState extends State<_EditBookPage> {
                             ),
                           ),
                           const SizedBox(height: _kGap),
-
-                          // المؤلف (قابل للتعديل)
                           _sizedField(
                             height: _kFieldH,
                             child: _styledField(
@@ -944,8 +950,6 @@ class _EditBookPageState extends State<_EditBookPage> {
                             ),
                           ),
                           const SizedBox(height: _kGap),
-
-                          // التصنيف
                           _sizedField(
                             height: _kFieldH,
                             child: Container(
@@ -972,8 +976,6 @@ class _EditBookPageState extends State<_EditBookPage> {
                             ),
                           ),
                           const SizedBox(height: _kGap),
-
-                          // الوصف
                           _sizedField(
                             height: _kDescH,
                             child: _styledField(
@@ -984,8 +986,6 @@ class _EditBookPageState extends State<_EditBookPage> {
                             ),
                           ),
                           const SizedBox(height: _kGap),
-
-                          // PDF
                           _sizedField(
                             height: _kFieldH,
                             child: _fileButton(
@@ -994,10 +994,7 @@ class _EditBookPageState extends State<_EditBookPage> {
                               onPressed: _pickPdf,
                             ),
                           ),
-
                           const SizedBox(height: 24),
-
-                          // زر الحفظ
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton(
@@ -1009,9 +1006,31 @@ class _EditBookPageState extends State<_EditBookPage> {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
-                              child: Text(
-                                _saving ? 'جارٍ الحفظ...' : 'حفظ التعديلات',
-                                style: const TextStyle(
+                              child: _saving
+                                  ? Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: const [
+                                  SizedBox(
+                                    width: 18, height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    ),
+                                  ),
+                                  SizedBox(width: 10),
+                                  Text(
+                                    'جار الحفظ...',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              )
+                                  : const Text(
+                                'حفظ التعديلات',
+                                style: TextStyle(
                                   color: Colors.white,
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,

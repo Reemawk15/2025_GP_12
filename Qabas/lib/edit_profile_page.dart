@@ -194,9 +194,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
     bool anyError   = false;
 
     try {
-      // 1) Firestore — نحدّث فقط الحقول المسموح بها (بدون username/email)
+      // 1) Firestore — اكتب كل الحقول المتوقعة للاسم لتتزامن كل الشاشات
       final profilePayload = <String, dynamic>{
-        if (nameChanged) 'name': newName,
+        if (nameChanged) ...{
+          'name': newName,
+          'fullName': newName,
+          'displayName': newName,
+          'nameLower': newName.toLowerCase(),
+        },
         if (_photoUrl != null) 'photoUrl': _photoUrl,
         'updatedAt': FieldValue.serverTimestamp(),
       };
@@ -209,12 +214,15 @@ class _EditProfilePageState extends State<EditProfilePage> {
         anySuccess = true;
       }
 
-      // 2) Auth: الاسم/الصورة فقط
-      if (nameChanged || photoChanged) {
-        if (nameChanged) await _user.updateDisplayName(newName);
+      // 2) Auth: الاسم/الصورة لضمان تزامن FirebaseAuth أيضًا
+      if (nameChanged) {
+        await _user.updateDisplayName(newName);
+      }
+      if (photoChanged) {
         await _user.updatePhotoURL(_photoUrl);
+      }
+      if (nameChanged || photoChanged) {
         await _user.reload();
-        anySuccess = true;
       }
 
       // 3) كلمة المرور (اختيارية)
