@@ -134,6 +134,19 @@ class _HomeScreenState extends State<HomeScreen> {
     BottomNavItem(Icons.person, 'الملف'),
   ];
 
+  List<String> _selectedCategories = [];
+  final List<String> _categories = const [
+    'تطوير ذات',
+    'روايات',
+    'تقنية',
+    'دين',
+    'تاريخ',
+    'علم نفس',
+    'تعليمي',
+    'أعمال',
+    'أطفال',
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -168,16 +181,29 @@ class _HomeScreenState extends State<HomeScreen> {
     final col = FirebaseFirestore.instance.collection('audiobooks');
 
     return col.orderBy('createdAt', descending: true).snapshots().map((snap) {
-      if (_searchQuery.isEmpty) return snap.docs;
+      var books = snap.docs;
 
-      final queryLower = _searchQuery.toLowerCase();
-      final filtered = snap.docs.where((doc) {
-        final data = doc.data();
-        final title = (data['title'] ?? '').toString().toLowerCase();
-        return title.contains(queryLower);
-      }).toList();
+      // 🔍 فلترة البحث بالاسم
+      if (_searchQuery.isNotEmpty) {
+        final queryLower = _searchQuery.toLowerCase();
+        books = books.where((doc) {
+          final data = doc.data();
+          final title = (data['title'] ?? '').toString().toLowerCase();
+          return title.contains(queryLower);
+        }).toList();
+      }
 
-      return filtered;
+      // 🎧 فلترة الفئة (category)
+      if (_selectedCategories.isNotEmpty) {
+        books = books.where((doc) {
+          final data = doc.data();
+          final category = (data['category'] ?? '').toString();
+          return _selectedCategories.contains(category);
+        }).toList();
+      }
+
+      // ✅ ترجع النتيجة النهائية بعد تطبيق البحث والفئة معًا
+      return books;
     });
   }
 
@@ -202,11 +228,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
           child:
               StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
-                /*
-                stream: FirebaseFirestore.instance
-                    .collection('audiobooks')
-                    .orderBy('createdAt', descending: true)
-                    .snapshots(),*/
                 stream: _booksStream(),
                 builder: (context, snap) {
                   if (snap.connectionState == ConnectionState.waiting) {
@@ -361,7 +382,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
 
-                    const Icon(Icons.tune, color: _HomeColors.unselected),
+                    GestureDetector(
+                      onTap: _openFilterSheet,
+                      child: const Icon(
+                        Icons.tune,
+                        color: _HomeColors.unselected,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -460,6 +487,105 @@ class _HomeScreenState extends State<HomeScreen> {
           onTap: (i) => setState(() => _index = i),
         ),
       ),
+    );
+  }
+
+  // خاصه ب عند الضغط على زر الفلتر
+  void _openFilterSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFFC9DABF),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateSheet) {
+            return Padding(
+              padding: const EdgeInsets.all(20),
+              child: SizedBox(
+                height: MediaQuery.of(context).size.height * 0.7,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Center(
+                      child: Text(
+                        'اختر الفئات',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: _HomeColors.selected,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // ✅ قائمة الفئات
+                    Expanded(
+                      child: ListView(
+                        children: _categories.map((cat) {
+                          final selected = _selectedCategories.contains(cat);
+                          return CheckboxListTile(
+                            activeColor: _HomeColors.selected,
+                            checkboxShape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            title: Text(
+                              cat,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: _HomeColors.selected,
+                              ),
+                            ),
+                            value: selected,
+                            onChanged: (val) {
+                              setStateSheet(() {
+                                if (val == true) {
+                                  _selectedCategories.add(cat);
+                                } else {
+                                  _selectedCategories.remove(cat);
+                                }
+                              });
+                            },
+                          );
+                        }).toList(),
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    // ✅ الأزرار بالأسفل
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              setState(() {});
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _HomeColors.selected,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            child: const Text(
+                              'تخصيص ',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 20),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
