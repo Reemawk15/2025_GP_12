@@ -96,7 +96,7 @@ class HomePage extends StatelessWidget {
         children: [
           // الخلفية: الصورة الجديدة
           Image.asset(
-            'assets/images/firstPage.png', // ← اسم الصورة
+            'assets/images/First.png', // ← اسم الصورة
             fit: BoxFit.cover,
           ),
 

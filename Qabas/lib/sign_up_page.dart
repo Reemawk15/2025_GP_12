@@ -10,7 +10,7 @@ import 'sign_in_page.dart';
 /// ===== مفاتيح تحكّم سريعة =====
 /// مكان شريط التقدّم وارتفاع المنطقة السفلية
 const double kProgressTop = 210;          // مكان شريط التقدم من أعلى
-const double kContentBottomPadding = 250; // مسافة المحتوى من أسفل
+const double kContentBottomPadding = 240; // مسافة المحتوى من أسفل
 
 /// حرّكي كل صفحة على حدة (سالب = فوق، موجب = تحت)
 const double kShiftIntro     = 0;
@@ -280,7 +280,7 @@ class _SignUpPageState extends State<SignUpPage> {
           body: Stack(
             fit: StackFit.expand,
             children: [
-              Image.asset('assets/images/signup.png', fit: BoxFit.cover),
+              Image.asset('assets/images/SignIn.png', fit: BoxFit.cover),
 
               // شريط التقدم RTL (يمتلي من اليمين لليسار)
               Positioned(
@@ -307,7 +307,7 @@ class _SignUpPageState extends State<SignUpPage> {
                       bottomPadding: kContentBottomPadding,
                       yShift: kShiftName,
                       child: _FormCols(children: [
-                        const _Title('أهلًا بك، عرفنا باسمك؟'),
+                        const _Title('أهلاً بك، عرفنا باسمك؟'),
                         FractionallySizedBox(
                           widthFactor: 0.85,
                           child: SizedBox(
@@ -544,7 +544,7 @@ class _IntroBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _FormCols(children: [
-      const _Title('أهلًا بك في قَبَس'),
+      const _Title('أهلاً بك في قَبَس'),
       const SizedBox(height: 6),
       const Text(
         'قَبَس هو تطبيق ذكي يساعدك على بناء عادة القراءة بطريقة تناسب وقتك وأسلوبك، '

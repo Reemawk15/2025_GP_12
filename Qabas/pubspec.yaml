@@ -76,6 +76,9 @@ flutter:
     - assets/images/CopyLogo.png
     - assets/images/signup_bg.png
     - assets/images/firstPage.png
+    - assets/images/First.png
+    - assets/images/SignIn.png
+
     - assets/images/signup.png
     - assets/images/back.png
     - assets/images/home_bg.png

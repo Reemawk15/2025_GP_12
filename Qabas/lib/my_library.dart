@@ -81,30 +81,45 @@ class MyLibraryPage extends StatelessWidget {
                     const SizedBox(height: 15),
 
                     // شريط التبويبات
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Container(
-                        height: 42,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(.9),
-                          borderRadius: BorderRadius.circular(24),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Container(
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(.9),
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: TabBar(
+                        // ✅ بدون خلفية أو حبة ملوّنة
+                        indicator: const UnderlineTabIndicator(
+                          borderSide: BorderSide(width: 2),
+                        ),                        dividerColor: Colors.transparent,   // يخفي الخط الفاصل السفلي (Flutter 3.13+)
+                        overlayColor: MaterialStateProperty.all(Colors.transparent), // يلغي وميض الضغط
+
+                        // شكل النص المختار/غير المختار
+                        labelColor: _midGreen,
+                        unselectedLabelColor: Colors.black54,
+                        labelStyle: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700, // أوضح عند التحديد
                         ),
-                        child: const TabBar(
-                          labelPadding: EdgeInsets.symmetric(horizontal: 12),
-                          indicator: BoxDecoration(
-                            color: Color(0xFFE7C4DA),
-                            borderRadius: BorderRadius.all(Radius.circular(22)),
-                          ),
-                          labelColor: Colors.black,
-                          unselectedLabelColor: Colors.black54,
-                          tabs: [
-                            Tab(text: 'استمع لها الآن'),
-                            Tab(text: 'أرغب بالاستماع لها'),
-                            Tab(text: 'استمعت لها'),
-                          ],
+                        unselectedLabelStyle: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
                         ),
+
+                        // مسافات لطيفة حول العناوين
+                        labelPadding: const EdgeInsets.symmetric(horizontal: 12),
+
+                        tabs: const [
+                          Tab(text: 'استمع لها الآن'),
+                          Tab(text: 'أرغب بالاستماع لها'),
+                          Tab(text: 'استمعت لها'),
+                        ],
                       ),
                     ),
+                    ),
+
                     const SizedBox(height: 8),
 
                     // محتوى التبويبات

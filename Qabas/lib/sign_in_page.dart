@@ -9,7 +9,7 @@ import 'admin_home_screen.dart'; //
 
 /// ======== تحكم سريع بالتموضع/الألوان ========
 const double kSigninProgressTop      = 190;   // موضع الشريط من الأعلى
-const double kSigninBottomPadding    = 200;   // مسافة المحتوى عن أسفل الخلفية
+const double kSigninBottomPadding    = 190;   // مسافة المحتوى عن أسفل الخلفية
 const double kSigninFieldWidthFactor = 0.85;  // عرض الحقول بالنسبة لعرض الشاشة
 
 class _SigninTheme {
@@ -222,7 +222,7 @@ class _SignInPageState extends State<SignInPage> {
           fit: StackFit.expand,
           children: [
             // الخلفية (نفس أسلوب التسجيل)
-            Image.asset('assets/images/signin_bg.png', fit: BoxFit.cover),
+            Image.asset('assets/images/SignIn.png', fit: BoxFit.cover),
 
             // شريط رفيع + دائرة بسهم ترجع للمين
             Positioned(

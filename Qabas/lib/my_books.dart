@@ -9,7 +9,6 @@ import 'package:image_picker/image_picker.dart';
 import 'library_tab.dart'; // للعودة للـ Hub الخاص بالبرايفت
 import 'my_book_details_page.dart';
 
-
 const Color _darkGreen  = Color(0xFF0E3A2C);
 const Color _midGreen   = Color(0xFF2F5145);
 const Color _fillGreen  = Color(0xFFC9DABF);
@@ -33,11 +32,26 @@ class _MyBooksPageState extends State<MyBooksPage>
 
   bool _saving = false;
 
+  // يفرض إظهار رسائل التحقق بدون لمس الحقول
+  bool _forceValidate = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleCtrl.addListener(() => setState(() {})); // لتحديث حالة الزر
+  }
+
   @override
   void dispose() {
     _titleCtrl.dispose();
     super.dispose();
   }
+
+  // جاهزية الزر: اسم + PDF وموب في وضع الحفظ
+  bool get _isReadyToSave =>
+      _titleCtrl.text.trim().isNotEmpty &&
+          _pdfFile != null &&
+          !_saving;
 
   void _backToHub(BuildContext context) {
     if (Navigator.of(context).canPop()) {
@@ -59,7 +73,10 @@ class _MyBooksPageState extends State<MyBooksPage>
     );
     if (!mounted) return;
     if (result != null && result.files.single.path != null) {
-      setState(() => _pdfFile = File(result.files.single.path!));
+      setState(() {
+        _pdfFile = File(result.files.single.path!);
+        _forceValidate = true; // أظهري أخطاء الحقول المطلوبة فورًا
+      });
     }
   }
 
@@ -81,15 +98,22 @@ class _MyBooksPageState extends State<MyBooksPage>
       return;
     }
 
-    if (!_formKey.currentState!.validate()) {
+    // فعّلي إظهار الأخطاء لو حاول يحفظ وفيه نقص
+    if (_titleCtrl.text.trim().isEmpty || _pdfFile == null) {
+      setState(() => _forceValidate = true);
+    }
+
+    // طبقة أمان إضافية
+    if (_titleCtrl.text.trim().isEmpty || _pdfFile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('فضلاً أكمل الحقول المطلوبة')),
+        SnackBar(content: Text(_missingFriendlyMessage())),
       );
       return;
     }
-    if (_pdfFile == null) {
+
+    if (!_formKey.currentState!.validate()) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('فضلاً اختر ملف الكتاب (PDF)')),
+        const SnackBar(content: Text('فضلاً أكمل الحقول المطلوبة')),
       );
       return;
     }
@@ -136,6 +160,7 @@ class _MyBooksPageState extends State<MyBooksPage>
         _titleCtrl.clear();
         _pdfFile = null;
         _coverFile = null;
+        _forceValidate = false;
       });
 
       if (mounted) {
@@ -243,8 +268,27 @@ class _MyBooksPageState extends State<MyBooksPage>
     }
   }
 
+  // نص تنبيه لطيف حسب الشيء الناقص (SnackBar فقط)
+  String _missingFriendlyMessage() {
+    final nameMissing = _titleCtrl.text.trim().isEmpty;
+    final pdfMissing = _pdfFile == null;
+    if (nameMissing && pdfMissing) {
+      return 'أضيفي اسم الكتاب واخترِي ملف PDF أولاً ✨';
+    } else if (nameMissing) {
+      return 'أضيفي اسم الكتاب أولاً ✍️';
+    } else {
+      return 'اختاري ملف الكتاب (PDF) أولاً 📄';
+    }
+  }
+
   // ===== واجهة إضافة كتاب (اسم + PDF إجباري، غلاف اختياري) =====
   Widget _buildAddTab() {
+    final nameMissing = _titleCtrl.text.trim().isEmpty;
+    final pdfMissing  = _pdfFile == null;
+
+    // ✅ نعرض رسالة نقص الـPDF بمجرد ما الاسم يصير غير فاضي
+    final showPdfValidation = _forceValidate || _titleCtrl.text.trim().isNotEmpty;
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Stack(
@@ -261,12 +305,17 @@ class _MyBooksPageState extends State<MyBooksPage>
                   opacity: _saving ? 0.6 : 1,
                   child: Form(
                     key: _formKey,
+                    autovalidateMode: _forceValidate
+                        ? AutovalidateMode.always
+                        : AutovalidateMode.onUserInteraction,
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         const SizedBox(height: 8),
 
-                        // اسم الكتاب (إجباري)
+                        // اسم الكتاب
                         _fieldContainer(
+                          isError: _forceValidate && nameMissing,
                           child: TextFormField(
                             controller: _titleCtrl,
                             textAlign: TextAlign.right,
@@ -282,32 +331,38 @@ class _MyBooksPageState extends State<MyBooksPage>
                         ),
                         const SizedBox(height: 14),
 
-                        // اختيار PDF (إجباري)
+                        // ✅ اختيار PDF (إجباري) — يظهر بالأحمر بمجرد تعبئة الاسم وهو مفقود
                         _fileButton(
                           text: _pdfFile == null
                               ? 'اختيار ملف PDF *'
                               : 'تم اختيار: ${_pdfFile!.path.split('/').last}',
                           icon: Icons.picture_as_pdf,
                           onPressed: _pickPdf,
+                          required: true,
+                          isMissing: showPdfValidation && pdfMissing, // <-- أهم سطر
                         ),
                         const SizedBox(height: 14),
 
-                        // اختيار الغلاف (اختياري)
+                        // الغلاف (اختياري)
                         _fileButton(
-                          text: _coverFile == null ? 'اختيار صورة الغلاف (اختياري)' : 'تم اختيار الغلاف',
+                          text: _coverFile == null
+                              ? 'اختيار صورة الغلاف (اختياري)'
+                              : 'تم اختيار الغلاف',
                           icon: Icons.image_outlined,
                           onPressed: _pickCover,
                         ),
 
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 8),
 
                         // زر الحفظ
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
-                            onPressed: _saving ? null : _saveBook,
+                            onPressed: _isReadyToSave ? _saveBook : null,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: _confirm,
+                              disabledBackgroundColor: _confirm.withOpacity(0.45),
+                              disabledForegroundColor: Colors.white70,
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
@@ -365,7 +420,6 @@ class _MyBooksPageState extends State<MyBooksPage>
                     separatorBuilder: (_, __) => const SizedBox(height: 12),
                     itemCount: docs.length,
                     itemBuilder: (context, i) {
-                      // ... داخل itemBuilder:
                       final doc = docs[i];
                       final data = doc.data() as Map<String, dynamic>? ?? {};
                       final title = (data['title'] ?? '') as String;
@@ -402,7 +456,7 @@ class _MyBooksPageState extends State<MyBooksPage>
 
                             const SizedBox(width: 12),
 
-                            // 👇 العنوان قابل للنقر → يفتح صفحة التفاصيل
+                            // العنوان قابل للنقر → يفتح صفحة التفاصيل
                             Expanded(
                               child: InkWell(
                                 onTap: () {
@@ -421,7 +475,7 @@ class _MyBooksPageState extends State<MyBooksPage>
                                     color: _darkGreen,
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
-                                    decoration: TextDecoration.underline, // اختياري: يبين أنه رابط
+                                    decoration: TextDecoration.underline,
                                   ),
                                 ),
                               ),
@@ -518,11 +572,15 @@ class _MyBooksPageState extends State<MyBooksPage>
 
 // ================== Widgets مساعدة ==================
 
-Widget _fieldContainer({required Widget child}) {
+Widget _fieldContainer({required Widget child, bool isError = false}) {
   return Container(
     decoration: BoxDecoration(
       color: _fillGreen,
       borderRadius: BorderRadius.circular(12),
+      border: Border.all(
+        color: isError ? Colors.red : Colors.transparent,
+        width: isError ? 1.2 : 0,
+      ),
     ),
     child: child,
   );
@@ -532,16 +590,36 @@ Widget _fileButton({
   required String text,
   required IconData icon,
   required VoidCallback onPressed,
+  bool required = false,
+  bool isMissing = false,
 }) {
-  return OutlinedButton.icon(
-    onPressed: onPressed,
-    icon: Icon(icon, color: _darkGreen),
-    label: Text(text, style: const TextStyle(color: _darkGreen)),
-    style: OutlinedButton.styleFrom(
-      side: const BorderSide(color: _darkGreen),
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      backgroundColor: _fillGreen,
-    ),
+  // تمييز الاختياري/الإجباري بصريًا + رسالة صغيرة تحت الزر عند الحاجة
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon, color: _darkGreen),
+        label: Text(
+          text,
+          style: const TextStyle(color: _darkGreen),
+        ),
+        style: OutlinedButton.styleFrom(
+          side: BorderSide(color: isMissing ? Colors.red : _darkGreen),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          backgroundColor: _fillGreen,
+        ),
+      ),
+      if (required && isMissing)
+        const Padding(
+          padding: EdgeInsetsDirectional.only(top: 6, start: 6, end: 6),
+          child: Text(
+            'هذا الحقل مطلوب',
+            textAlign: TextAlign.right,
+            style: TextStyle(color: Colors.red, fontSize: 12),
+          ),
+        ),
+    ],
   );
 }
