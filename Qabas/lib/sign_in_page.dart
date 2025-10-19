@@ -8,8 +8,8 @@ import 'sign_up_page.dart';
 import 'admin_home_screen.dart'; //
 
 /// ======== تحكم سريع بالتموضع/الألوان ========
-const double kSigninProgressTop      = 170;   // موضع الشريط من الأعلى
-const double kSigninBottomPadding    = 270;   // مسافة المحتوى عن أسفل الخلفية
+const double kSigninProgressTop      = 190;   // موضع الشريط من الأعلى
+const double kSigninBottomPadding    = 200;   // مسافة المحتوى عن أسفل الخلفية
 const double kSigninFieldWidthFactor = 0.85;  // عرض الحقول بالنسبة لعرض الشاشة
 
 class _SigninTheme {
@@ -243,7 +243,7 @@ class _SignInPageState extends State<SignInPage> {
                     children: [
                       // العنوان والوصف
                       const Text(
-                        'مرحباً بعودتك',
+                        'مرحبًا بعودتك',
                         style: TextStyle(
                           color: _SigninTheme.textDark,
                           fontWeight: FontWeight.w700,

@@ -389,12 +389,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   final name = (liveName == null || liveName.trim().isEmpty)
                       ? fallbackName
                       : liveName;
-                  return Text(
-                    'مساؤك سعيد، $name',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: _HomeColors.selected,
+
+                  return Transform.translate(
+                    offset: const Offset(0, -11), // 🔹 بالسالب = يرفع النص للأعلى
+                    child: Text(
+                      'مساؤك سعيد $name',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: _HomeColors.selected,
+                      ),
                     ),
                   );
                 },

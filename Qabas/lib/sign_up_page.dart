@@ -9,8 +9,8 @@ import 'sign_in_page.dart';
 
 /// ===== مفاتيح تحكّم سريعة =====
 /// مكان شريط التقدّم وارتفاع المنطقة السفلية
-const double kProgressTop = 185;          // مكان شريط التقدم من أعلى
-const double kContentBottomPadding = 360; // مسافة المحتوى من أسفل
+const double kProgressTop = 210;          // مكان شريط التقدم من أعلى
+const double kContentBottomPadding = 250; // مسافة المحتوى من أسفل
 
 /// حرّكي كل صفحة على حدة (سالب = فوق، موجب = تحت)
 const double kShiftIntro     = 0;
