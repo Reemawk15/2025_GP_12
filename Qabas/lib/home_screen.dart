@@ -164,17 +164,22 @@ class _HomeScreenState extends State<HomeScreen> {
           .doc(user.uid)
           .snapshots()
           .listen((doc) {
-        String? name;
-        if (doc.exists) {
-          final data = doc.data() ?? {};
-          name = (data['name'] ?? data['fullName'] ?? data['displayName'] ?? '') as String?;
-          if ((name ?? '').trim().isEmpty) name = null;
-        }
-        name ??= user.displayName;
-        if (mounted) {
-          setState(() => _displayName = name);
-        }
-      }, onError: (_) {});
+            String? name;
+            if (doc.exists) {
+              final data = doc.data() ?? {};
+              name =
+                  (data['name'] ??
+                          data['fullName'] ??
+                          data['displayName'] ??
+                          '')
+                      as String?;
+              if ((name ?? '').trim().isEmpty) name = null;
+            }
+            name ??= user.displayName;
+            if (mounted) {
+              setState(() => _displayName = name);
+            }
+          }, onError: (_) {});
     }
   }
 
@@ -190,8 +195,8 @@ class _HomeScreenState extends State<HomeScreen> {
       if (doc.exists) {
         final data = doc.data() ?? {};
         name =
-        (data['name'] ?? data['fullName'] ?? data['displayName'] ?? '')
-        as String;
+            (data['name'] ?? data['fullName'] ?? data['displayName'] ?? '')
+                as String;
         if (name.trim().isEmpty) name = null;
       }
     } catch (_) {}
@@ -214,12 +219,13 @@ class _HomeScreenState extends State<HomeScreen> {
         .doc(user.uid)
         .snapshots()
         .map((doc) {
-      final data = doc.data();
-      String? name =
-      (data?['name'] ?? data?['fullName'] ?? data?['displayName']) as String?;
-      if ((name ?? '').trim().isEmpty) name = null;
-      return name;
-    });
+          final data = doc.data();
+          String? name =
+              (data?['name'] ?? data?['fullName'] ?? data?['displayName'])
+                  as String?;
+          if ((name ?? '').trim().isEmpty) name = null;
+          return name;
+        });
   }
 
   // part for Search
@@ -275,83 +281,83 @@ class _HomeScreenState extends State<HomeScreen> {
           height: cardH + 30.0, // 👈 double
 
           child:
-          StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
-            stream: _booksStream(),
-            builder: (context, snap) {
-              if (snap.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              if (!snap.hasData || snap.data!.isEmpty) {
-                return const Center(child: Text('لا توجد نتائج مطابقة'));
-              }
-              final docs = snap.data!;
+              StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+                stream: _booksStream(),
+                builder: (context, snap) {
+                  if (snap.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (!snap.hasData || snap.data!.isEmpty) {
+                    return const Center(child: Text('لا توجد نتائج مطابقة'));
+                  }
+                  final docs = snap.data!;
 
-              return ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: EdgeInsets.symmetric(horizontal: sidePad),
-                itemCount: docs.length,
-                separatorBuilder: (_, __) => SizedBox(width: gap),
-                itemBuilder: (context, i) {
-                  final d = docs[i];
-                  final data = d.data() as Map<String, dynamic>? ?? {};
-                  final cover = (data['coverUrl'] ?? '') as String;
-                  final title = (data['title'] ?? '') as String;
+                  return ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: EdgeInsets.symmetric(horizontal: sidePad),
+                    itemCount: docs.length,
+                    separatorBuilder: (_, __) => SizedBox(width: gap),
+                    itemBuilder: (context, i) {
+                      final d = docs[i];
+                      final data = d.data() as Map<String, dynamic>? ?? {};
+                      final cover = (data['coverUrl'] ?? '') as String;
+                      final title = (data['title'] ?? '') as String;
 
-                  return GestureDetector(
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => BookDetailsPage(bookId: d.id),
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => BookDetailsPage(bookId: d.id),
+                            ),
+                          );
+                        },
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: cardW,
+                              height: cardH,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(14),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Colors.black26,
+                                    blurRadius: 12,
+                                    offset: Offset(0, 6),
+                                  ),
+                                ],
+                                color: Colors.white,
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: cover.isNotEmpty
+                                  ? Image.network(cover, fit: BoxFit.cover)
+                                  : const Icon(
+                                      Icons.menu_book,
+                                      size: 48,
+                                      color: _HomeColors.unselected,
+                                    ),
+                            ),
+                            const SizedBox(height: 6),
+                            SizedBox(
+                              width: cardW,
+                              child: Text(
+                                title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       );
                     },
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: cardW,
-                          height: cardH,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(14),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Colors.black26,
-                                blurRadius: 12,
-                                offset: Offset(0, 6),
-                              ),
-                            ],
-                            color: Colors.white,
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: cover.isNotEmpty
-                              ? Image.network(cover, fit: BoxFit.cover)
-                              : const Icon(
-                            Icons.menu_book,
-                            size: 48,
-                            color: _HomeColors.unselected,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        SizedBox(
-                          width: cardW,
-                          child: Text(
-                            title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
                   );
                 },
-              );
-            },
-          ),
+              ),
         );
       },
     );
@@ -383,7 +389,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 stream: _userNameStream(),
                 builder: (context, snap) {
                   final liveName = snap.data;
-                  final fallbackName = _displayName ??
+                  final fallbackName =
+                      _displayName ??
                       FirebaseAuth.instance.currentUser?.displayName ??
                       'صديقي';
                   final name = (liveName == null || liveName.trim().isEmpty)
@@ -391,7 +398,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       : liveName;
 
                   return Transform.translate(
-                    offset: const Offset(0, -11), // 🔹 بالسالب = يرفع النص للأعلى
+                    offset: const Offset(
+                      0,
+                      -11,
+                    ), // 🔹 بالسالب = يرفع النص للأعلى
                     child: Text(
                       'مساؤك سعيد $name',
                       style: const TextStyle(
@@ -558,7 +568,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _openFilterSheet() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFFC9DABF),
+      backgroundColor: const Color(0xFFC9DABF), // نفس خلفيتك الحالية
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -571,47 +581,57 @@ class _HomeScreenState extends State<HomeScreen> {
               child: SizedBox(
                 height: MediaQuery.of(context).size.height * 0.7,
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    const Center(
-                      child: Text(
-                        'اختر الفئات',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: _HomeColors.selected,
-                        ),
+                    // 🌿 العنوان
+                    const Text(
+                      'اختر عالمك القرائي المفضل:',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0E3A2C),
                       ),
                     ),
                     const SizedBox(height: 16),
 
-                    // ✅ قائمة الفئات
+                    // ✅ قائمة الفئات داخل صناديق أنيقة
                     Expanded(
                       child: ListView(
                         children: _categories.map((cat) {
                           final selected = _selectedCategories.contains(cat);
-                          return CheckboxListTile(
-                            activeColor: _HomeColors.selected,
-                            checkboxShape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(6),
+                          return Container(
+                            margin: const EdgeInsets.symmetric(vertical: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDDE9CD),
+                              borderRadius: BorderRadius.circular(16),
                             ),
-                            title: Text(
-                              cat,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                                color: _HomeColors.selected,
+                            child: CheckboxListTile(
+                              checkboxShape: const CircleBorder(),
+                              activeColor: const Color(0xFF0E3A2C),
+                              title: Text(
+                                cat,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                  color: selected
+                                      ? const Color(
+                                          0xFFB85C8A,
+                                        ) // وردي ناعم عند التحديد
+                                      : const Color(0xFF0E3A2C),
+                                ),
+                                textAlign: TextAlign.center,
                               ),
+                              value: selected,
+                              onChanged: (val) {
+                                setStateSheet(() {
+                                  if (val == true) {
+                                    _selectedCategories.add(cat);
+                                  } else {
+                                    _selectedCategories.remove(cat);
+                                  }
+                                });
+                              },
                             ),
-                            value: selected,
-                            onChanged: (val) {
-                              setStateSheet(() {
-                                if (val == true) {
-                                  _selectedCategories.add(cat);
-                                } else {
-                                  _selectedCategories.remove(cat);
-                                }
-                              });
-                            },
                           );
                         }).toList(),
                       ),
@@ -619,29 +639,30 @@ class _HomeScreenState extends State<HomeScreen> {
 
                     const SizedBox(height: 10),
 
-                    // ✅ الأزرار بالأسفل
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              setState(() {});
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _HomeColors.selected,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                            child: const Text(
-                              'تخصيص ',
-                              style: TextStyle(color: Colors.white),
-                            ),
+                    // ✅ زر التأكيد
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          setState(() {});
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0E3A2C),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        child: const Text(
+                          'تخصيص',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
                           ),
                         ),
-                        const SizedBox(width: 20),
-                      ],
+                      ),
                     ),
                   ],
                 ),
@@ -652,4 +673,17 @@ class _HomeScreenState extends State<HomeScreen> {
       },
     );
   }
+
+  // نفس قائمة الكتوقري الأصلية (ما تغيرت)
+  final List<String> _categoriess = [
+    'تطوير ذات',
+    'روايات',
+    'تقنية',
+    'دين',
+    'تاريخ',
+    'علم نفس',
+    'تعليمي',
+    'أعمال',
+    'أطفال',
+  ];
 }
