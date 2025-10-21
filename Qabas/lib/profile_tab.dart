@@ -14,6 +14,8 @@ class ProfileTab extends StatelessWidget {
   static const Color _darkGreen  = Color(0xFF0E3A2C);
   static const Color _lightGreen = Color(0xFFC9DABF);
   static const Color _confirm    = Color(0xFF6F8E63); // ✅ نفس لون التأكيد
+  static const _titleColor   = _darkGreen;
+  static const _confirmColor = _confirm; // 0xFF6F8E63 حسب كودك السابق
 
   // --- نفس تدفق الخروج الموجود سابقًا (نفس النصوص/الألوان/الانتقال) ---
   Future<void> _logout(BuildContext context) async {
@@ -28,37 +30,64 @@ class ProfileTab extends StatelessWidget {
   Future<void> _confirmLogout(BuildContext context) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-          title: const Text('  متأكد من تسجيل الخروج؟    '),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: _confirm,       // ✅ نفس اللون
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size.fromHeight(48),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+          child: Directionality(
+            textDirection: TextDirection.rtl,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'تأكيد تسجيل الخروج',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: _titleColor, // نفس حوار الحذف
                   ),
-                  onPressed: () => Navigator.pop(ctx, true),
-                  child: const Text('تأكيد'),
                 ),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('إلغاء'),
-              ),
-            ],
+                const SizedBox(height: 10),
+                const Text(
+                  'هل أنت متأكد من أنك تريد تسجيل الخروج؟',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 15, color: Colors.black87),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _confirmColor, // نفس لون التأكيد
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: const Text('تأكيد', style: TextStyle(fontSize: 16, color: Colors.white)),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor:  Colors.grey[300], //
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('إلغاء', style: TextStyle(fontSize: 16, color: _titleColor)),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
+
     if (ok == true) await _logout(context);
   }
   // ---------------------------------------------------------------------------

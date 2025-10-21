@@ -130,9 +130,26 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('تم حفظ هدف الاستماع 🎧')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.check_circle, color: Color(0xFFE7C4DA)), // 🌸 وردي فاتح
+              SizedBox(width: 8),
+              Text(
+                'تم حفظ هدف الاستماع 🎧',
+                style: TextStyle(
+                  color: Colors.white, // نص أبيض واضح
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: _midGreen, // 🌿 أخضر داكن (لون قبس)
+          duration: Duration(seconds: 3),
+        ),
+      );
 
       Navigator.pop(context, minutes);
     }

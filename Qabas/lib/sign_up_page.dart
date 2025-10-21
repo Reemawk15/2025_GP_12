@@ -1,3 +1,4 @@
+// sign_up_page.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,12 +8,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'home_screen.dart';
 import 'sign_in_page.dart';
 
-/// ===== مفاتيح تحكّم سريعة =====
-/// مكان شريط التقدّم وارتفاع المنطقة السفلية
-const double kProgressTop = 210;          // مكان شريط التقدم من أعلى
+/// ===== تحكّم سريع بالمظهر والتموضع =====
+const double kProgressTop = 210;          // موضع شريط التقدم + السهم من الأعلى
 const double kContentBottomPadding = 240; // مسافة المحتوى من أسفل
 
-/// حرّكي كل صفحة على حدة (سالب = فوق، موجب = تحت)
+/// إزاحات اختيارية لكل صفحة (سالب = يطلع فوق، موجب = ينزل)
 const double kShiftIntro     = 0;
 const double kShiftName      = 0;
 const double kShiftNotifs    = 0;
@@ -24,13 +24,13 @@ const double kShiftUsername  = 30;
 /// ارتفاع حقول الإدخال
 const double kFieldHeight = 90;
 
+/// لوحة ألوان
 class _SignupTheme {
   static const primary     = Color(0xFF0E3A2C);
   static const btnFill     = Color(0xFF6F8E63);
   static const inputBorder = Color(0xFF6F8E63);
   static const inputFill   = Colors.white;
 
-  // ألوان النصوص
   static const titleColor = Color(0xFF6F8E63);
   static const bodyColor  = Color(0xFF2E4A3F);
   static const hintColor  = Color(0x99334D40);
@@ -78,6 +78,17 @@ class _SignUpPageState extends State<SignUpPage> {
     });
   }
 
+  @override
+  void dispose() {
+    _pc.dispose();
+    _nameCtrl.dispose();
+    _emailCtrl.dispose();
+    _passCtrl.dispose();
+    _pass2Ctrl.dispose();
+    _usernameCtrl.dispose();
+    super.dispose();
+  }
+
   void _to(int i) {
     setState(() => _index = i);
     _pc.animateToPage(i, duration: const Duration(milliseconds: 280), curve: Curves.easeInOut);
@@ -122,7 +133,7 @@ class _SignUpPageState extends State<SignUpPage> {
   }
 
   InputDecoration _dec(String hint, {bool error = false, String? helper}) {
-    final r = 22.0;
+    const r = 22.0;
     final borderColor = error ? Colors.red : _SignupTheme.inputBorder.withOpacity(0.35);
     final focusColor  = error ? Colors.red : _SignupTheme.inputBorder;
     return InputDecoration(
@@ -162,6 +173,7 @@ class _SignUpPageState extends State<SignUpPage> {
 
     setState(() => _loading = true);
     try {
+      // تحقق من توفر اسم المستخدم
       final u = await FirebaseFirestore.instance
           .collection('users')
           .where('usernameLower', isEqualTo: username.toLowerCase())
@@ -173,6 +185,7 @@ class _SignUpPageState extends State<SignUpPage> {
         return;
       }
 
+      // إنشاء مستخدم
       final cred = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(email: email, password: pass);
 
@@ -214,27 +227,15 @@ class _SignUpPageState extends State<SignUpPage> {
         textDirection: TextDirection.rtl,
         child: AlertDialog(
           backgroundColor: const Color(0xFFE7EEE8),
-          title: const Text(
-            'يبدو أنك جزء من قبس! ',
-            textAlign: TextAlign.center,
-          ),
+          title: const Text('يبدو أنك جزء من قبس!', textAlign: TextAlign.center),
           content: const Text(
-            'هذا البريد أو الاسم, مستخدم من قبل.\n يمكنك تسجيل الدخول أو تجربة بيانات أخرى.',
+            'هذا البريد أو الاسم مستخدم من قبل.\nيمكنك تسجيل الدخول أو تجربة بيانات أخرى.',
             textAlign: TextAlign.center,
           ),
-
-          // 🎯 هذي اللي تخلّي زر يمين وزر يسار
           actionsAlignment: MainAxisAlignment.spaceBetween,
           actionsPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-
           actions: [
-            // هذا بيطلع يمين (لأن RTL)
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('حسنًا'),
-            ),
-
-            // وهذا بيطلع يسار
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('حسنًا')),
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
@@ -251,18 +252,6 @@ class _SignUpPageState extends State<SignUpPage> {
     );
   }
 
-
-  @override
-  void dispose() {
-    _pc.dispose();
-    _nameCtrl.dispose();
-    _emailCtrl.dispose();
-    _passCtrl.dispose();
-    _pass2Ctrl.dispose();
-    _usernameCtrl.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -275,25 +264,20 @@ class _SignUpPageState extends State<SignUpPage> {
       child: Directionality(
         textDirection: TextDirection.rtl,
         child: Scaffold(
-          resizeToAvoidBottomInset: false, // ثبات العناصر مع الكيبورد
+          resizeToAvoidBottomInset: false,
           backgroundColor: Colors.white,
           body: Stack(
             fit: StackFit.expand,
             children: [
+              // الخلفية
               Image.asset('assets/images/SignIn.png', fit: BoxFit.cover),
 
-              // شريط التقدم RTL (يمتلي من اليمين لليسار)
-              Positioned(
-                top: kProgressTop,
-                left: 24,
-                right: 24,
-                child: _ProgressBarRtl(step: _index, total: 7),
-              ),
-
+              // المحتوى — نخليه تحت السهم عشان ما يبلع اللمس
               SafeArea(
                 child: PageView(
                   controller: _pc,
                   physics: const NeverScrollableScrollPhysics(),
+                  onPageChanged: (i) => setState(() => _index = i),
                   children: [
                     // 0) المقدمة
                     _BottomSheetArea(
@@ -315,16 +299,16 @@ class _SignUpPageState extends State<SignUpPage> {
                             child: TextField(
                               controller: _nameCtrl,
                               textInputAction: TextInputAction.next,
-                              decoration: _dec('الاسم',
-                                  error: _nameCtrl.text.isEmpty && _index == 1),
+                              decoration: _dec(
+                                'الاسم',
+                                error: _nameCtrl.text.isEmpty && _index == 1,
+                              ),
                               onChanged: (_) => setState(() {}),
                             ),
                           ),
                         ),
                         const SizedBox(height: 20),
                         _RoundMainButton(label: 'التالي', onTap: _canGoNext() ? _next : null),
-                        const SizedBox(height: 12),
-                        _BackButton(onTap: _back),
                       ]),
                     ),
 
@@ -351,12 +335,11 @@ class _SignUpPageState extends State<SignUpPage> {
                             children: [
                               Icon(
                                 _notifsEnabled ? Icons.check_circle : Icons.radio_button_unchecked,
-                                color: _SignupTheme.inputBorder, size: 24,
+                                color: _SignupTheme.inputBorder,
+                                size: 24,
                               ),
                               const SizedBox(width: 8),
-                              const Expanded(
-                                child: Text('الإشعارات', style: TextStyle(height: 1.2)),
-                              ),
+                              const Expanded(child: Text('الإشعارات', style: TextStyle(height: 1.2))),
                               const SizedBox(width: 8),
                               Switch(
                                 value: _notifsEnabled,
@@ -368,8 +351,6 @@ class _SignUpPageState extends State<SignUpPage> {
                         ),
                         const SizedBox(height: 20),
                         _RoundMainButton(label: 'التالي', onTap: _next),
-                        const SizedBox(height: 12),
-                        _BackButton(onTap: _back),
                       ]),
                     ),
 
@@ -380,14 +361,12 @@ class _SignUpPageState extends State<SignUpPage> {
                       child: _FormCols(children: [
                         const _Title('رائع'),
                         const Text(
-                          'جاهزون للبدء , لنقم بانشاء حسابك لحفظ تفضيلاتك وتخصيص تجربتك',
+                          'جاهزون للبدء، لنقم بإنشاء حسابك لحفظ تفضيلاتك وتخصيص تجربتك',
                           textAlign: TextAlign.center,
                           style: TextStyle(color: _SignupTheme.bodyColor),
                         ),
                         const SizedBox(height: 20),
                         _RoundMainButton(label: 'حسنًا', onTap: _next),
-                        const SizedBox(height: 12),
-                        _BackButton(onTap: _back),
                       ]),
                     ),
 
@@ -416,8 +395,6 @@ class _SignUpPageState extends State<SignUpPage> {
                         ),
                         const SizedBox(height: 20),
                         _RoundMainButton(label: 'التالي', onTap: _canGoNext() ? _next : null),
-                        const SizedBox(height: 12),
-                        _BackButton(onTap: _back),
                       ]),
                     ),
 
@@ -438,7 +415,8 @@ class _SignUpPageState extends State<SignUpPage> {
                               decoration: _dec(
                                 'كلمة المرور',
                                 error: _livePassError != null,
-                                helper: _livePassError ?? 'كلمة المرور يجب أن تكون ٨ أحرف على الأقل\n وتضمّ حرفًا كبيرًا وحرفًا صغيرًا ورقمًا ورمزًا خاصًا.',
+                                helper: _livePassError ??
+                                    'كلمة المرور يجب أن تكون ٨ أحرف على الأقل\nوتضمّ حرفًا كبيرًا وحرفًا صغيرًا ورقمًا ورمزًا خاصًا.',
                               ),
                             ),
                           ),
@@ -462,8 +440,6 @@ class _SignUpPageState extends State<SignUpPage> {
                         ),
                         const SizedBox(height: 18),
                         _RoundMainButton(label: 'التالي', onTap: _canGoNext() ? _next : null),
-                        const SizedBox(height: 12),
-                        _BackButton(onTap: _back),
                       ]),
                     ),
 
@@ -474,7 +450,7 @@ class _SignUpPageState extends State<SignUpPage> {
                       child: _FormCols(children: [
                         const _Title('اسم المستخدم'),
                         const Text(
-                          'اسم المستخدم حتى يتمكن أصدقائك من العثور عليك',
+                          'اسم المستخدم حتى يتمكن أصدقاؤك من العثور عليك',
                           textAlign: TextAlign.center,
                           style: TextStyle(color: _SignupTheme.bodyColor),
                         ),
@@ -500,11 +476,32 @@ class _SignUpPageState extends State<SignUpPage> {
                           label: _loading ? '...جاري' : 'سجّل',
                           onTap: _canGoNext() ? _tryRegister : null,
                         ),
-                        const SizedBox(height: 12),
-                        _BackButton(onTap: _back),
                       ]),
                     ),
                   ],
+                ),
+              ),
+
+              // ✅ شريط التقدم + السهم — آخر عنصر (فوق) ليأخذ اللمس
+              Positioned(
+                top: kProgressTop,
+                left: 24,
+                right: 24,
+                child: _ProgressWithArrow(
+                  step: _index,
+                  total: 7,
+                  onArrowTap: () {
+                    if (_index > 0) {
+                      _back(); // يرجّع خطوة داخل المعالج
+                    } else if (Navigator.of(context).canPop()) {
+                      Navigator.of(context).pop(); // يرجّع للشاشة السابقة
+                    } else {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (_) => const SignInPage()),
+                      );
+                    }
+                  },
                 ),
               ),
             ],
@@ -628,35 +625,6 @@ class _RoundMainButton extends StatelessWidget {
   }
 }
 
-class _BackButton extends StatelessWidget {
-  final VoidCallback onTap;
-  const _BackButton({required this.onTap, super.key});
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 240, height: 50,
-      child: OutlinedButton.icon(
-        onPressed: onTap,
-        icon: const Icon(Icons.chevron_left),
-        label: const Text('رجوع'),
-        style: OutlinedButton.styleFrom(
-          shape: const StadiumBorder(),
-          foregroundColor: _SignupTheme.btnFill,
-          side: const BorderSide(color: _SignupTheme.btnFill, width: 1.6),
-        ).copyWith(
-
-          side: MaterialStateProperty.resolveWith<BorderSide>(
-                (_) => const BorderSide(color: _SignupTheme.btnFill, width: 1.6),
-          ),
-          overlayColor: MaterialStatePropertyAll(
-            _SignupTheme.btnFill.withOpacity(0.06),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// شريط تقدم RTL بدون دائرة (يمتلي من اليمين لليسار)
 class _ProgressBarRtl extends StatelessWidget {
   final int step;   // 0..(total-1)
@@ -695,5 +663,40 @@ class _ProgressBarRtl extends StatelessWidget {
       ),
     );
   }
+}
 
+/// ✅ مركّب: شريط التقدم + دائرة سهم يمين (نفس فكرة تسجيل الدخول)
+class _ProgressWithArrow extends StatelessWidget {
+  final int step;
+  final int total;
+  final VoidCallback onArrowTap;
+  const _ProgressWithArrow({
+    required this.step,
+    required this.total,
+    required this.onArrowTap,
+    super.key,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      textDirection: TextDirection.ltr, // نخلي الدائرة تثبت يمين الشريط
+      children: [
+        Expanded(child: _ProgressBarRtl(step: step, total: total)),
+        const SizedBox(width: 10),
+        InkWell(
+          onTap: onArrowTap,
+          borderRadius: BorderRadius.circular(24),
+          child: Container(
+            width: 44, height: 44,
+            decoration: BoxDecoration(
+              color: _SignupTheme.fill,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.chevron_left, color: Colors.white),
+          ),
+        ),
+      ],
+    );
+  }
 }
