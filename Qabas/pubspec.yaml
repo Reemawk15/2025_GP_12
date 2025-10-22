@@ -78,6 +78,12 @@ flutter:
     - assets/images/firstPage.png
     - assets/images/First.png
     - assets/images/SignIn.png
+    - assets/images/community.png
+    - assets/images/friends1.png
+    - assets/images/friends2.png
+    - assets/images/friend.png
+    - assets/images/clubs1.png
+    - assets/images/clubs2.png
 
     - assets/images/signup.png
     - assets/images/back.png

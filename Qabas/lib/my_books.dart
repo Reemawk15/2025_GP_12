@@ -47,6 +47,35 @@ class _MyBooksPageState extends State<MyBooksPage>
     super.dispose();
   }
 
+  // ✅ SnackBar موحّد — نفس الستايل الأخضر
+  void _showSnack(String message, {IconData icon = Icons.check_circle}) {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        backgroundColor: _midGreen,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        content: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: const Color(0xFFE7C4DA)),
+            const SizedBox(width: 8),
+            Text(
+              message,
+              style: const TextStyle(
+                color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
   // جاهزية الزر: اسم + PDF وموب في وضع الحفظ
   bool get _isReadyToSave =>
       _titleCtrl.text.trim().isNotEmpty &&
@@ -92,9 +121,7 @@ class _MyBooksPageState extends State<MyBooksPage>
   Future<void> _saveBook() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('الرجاء تسجيل الدخول لإضافة كتاب')),
-      );
+      _showSnack('الرجاء تسجيل الدخول لإضافة كتاب', icon: Icons.login_rounded);
       return;
     }
 
@@ -105,16 +132,12 @@ class _MyBooksPageState extends State<MyBooksPage>
 
     // طبقة أمان إضافية
     if (_titleCtrl.text.trim().isEmpty || _pdfFile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_missingFriendlyMessage())),
-      );
+      _showSnack(_missingFriendlyMessage(), icon: Icons.info_outline);
       return;
     }
 
     if (!_formKey.currentState!.validate()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('فضلاً أكمل الحقول المطلوبة')),
-      );
+      _showSnack('فضلاً أكمل الحقول المطلوبة', icon: Icons.info_outline);
       return;
     }
 
@@ -164,17 +187,13 @@ class _MyBooksPageState extends State<MyBooksPage>
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تمت إضافة الكتاب بنجاح')),
-        );
+        _showSnack('تمت إضافة الكتاب بنجاح', icon: Icons.check_circle);
         // بدّل للتبويب الثاني (كتبي) مباشرة بعد الحفظ إن حبيتي
         DefaultTabController.of(context)?.animateTo(1);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('حدث خطأ أثناء الحفظ: $e')),
-        );
+        _showSnack('حدث خطأ أثناء الحفظ: $e', icon: Icons.error_outline);
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -255,15 +274,11 @@ class _MyBooksPageState extends State<MyBooksPage>
       await doc.reference.delete();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم حذف الكتاب')),
-        );
+        _showSnack('تم حذف الكتاب', icon: Icons.check_circle);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('تعذّر الحذف: $e')),
-        );
+        _showSnack('تعذّر الحذف: $e', icon: Icons.error_outline);
       }
     }
   }
@@ -331,7 +346,7 @@ class _MyBooksPageState extends State<MyBooksPage>
                         ),
                         const SizedBox(height: 14),
 
-                        // ✅ اختيار PDF (إجباري) — يظهر بالأحمر بمجرد تعبئة الاسم وهو مفقود
+                        // ✅ اختيار PDF (إجباري)
                         _fileButton(
                           text: _pdfFile == null
                               ? 'اختيار ملف PDF *'
@@ -339,7 +354,7 @@ class _MyBooksPageState extends State<MyBooksPage>
                           icon: Icons.picture_as_pdf,
                           onPressed: _pickPdf,
                           required: true,
-                          isMissing: showPdfValidation && pdfMissing, // <-- أهم سطر
+                          isMissing: showPdfValidation && pdfMissing,
                         ),
                         const SizedBox(height: 14),
 
@@ -408,7 +423,11 @@ class _MyBooksPageState extends State<MyBooksPage>
                     .snapshots(),
                 builder: (context, snap) {
                   if (snap.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
+                    return const Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(_midGreen),
+                      ),
+                    );
                   }
                   if (!snap.hasData || snap.data!.docs.isEmpty) {
                     return const Center(child: Text('لا توجد كتب مضافة حتى الآن'));

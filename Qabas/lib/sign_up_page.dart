@@ -159,6 +159,17 @@ class _SignUpPageState extends State<SignUpPage> {
     );
   }
 
+  // 🔤 توحيد النصوص (للعربية والإنجليزية) — للتخزين والبحث
+  String _normalize(String s) => s
+      .trim()
+      .toLowerCase()
+      .replaceAll('ـ', '')
+      .replaceAll('أ', 'ا')
+      .replaceAll('إ', 'ا')
+      .replaceAll('آ', 'ا')
+      .replaceAll('ة', 'ه')
+      .replaceAll('ى', 'ي');
+
   Future<void> _tryRegister() async {
     final name     = _nameCtrl.text.trim();
     final email    = _emailCtrl.text.trim();
@@ -173,30 +184,34 @@ class _SignUpPageState extends State<SignUpPage> {
 
     setState(() => _loading = true);
     try {
-      // تحقق من توفر اسم المستخدم
-      final u = await FirebaseFirestore.instance
+      // تحقق من توفر اسم المستخدم (Lower)
+      final exists = await FirebaseFirestore.instance
           .collection('users')
-          .where('usernameLower', isEqualTo: username.toLowerCase())
+          .where('usernameLower', isEqualTo: _normalize(username))
           .limit(1)
           .get();
 
-      if (u.docs.isNotEmpty) {
+      if (exists.docs.isNotEmpty) {
         _showGenericExistsDialog();
         return;
       }
 
-      // إنشاء مستخدم
+      // إنشاء مستخدم في Auth
       final cred = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(email: email, password: pass);
 
       final user = cred.user!;
+
+      // حفظ المستخدم في Firestore مع الحقول الموحّدة
       await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
         'uid': user.uid,
         'name': name,
+        'nameLower': _normalize(name),         // ✅ مهم للبحث
         'email': email,
         'emailLower': email.toLowerCase(),
         'username': username,
-        'usernameLower': username.toLowerCase(),
+        'usernameLower': _normalize(username), // ✅ مهم للبحث
+        'photoUrl': '',                        // اختياري
         'notificationsEnabled': _notifsEnabled,
         'createdAt': FieldValue.serverTimestamp(),
       });
@@ -272,7 +287,7 @@ class _SignUpPageState extends State<SignUpPage> {
               // الخلفية
               Image.asset('assets/images/SignIn.png', fit: BoxFit.cover),
 
-              // المحتوى — نخليه تحت السهم عشان ما يبلع اللمس
+              // المحتوى
               SafeArea(
                 child: PageView(
                   controller: _pc,
@@ -482,7 +497,7 @@ class _SignUpPageState extends State<SignUpPage> {
                 ),
               ),
 
-              // ✅ شريط التقدم + السهم — آخر عنصر (فوق) ليأخذ اللمس
+              // ✅ شريط التقدم + السهم
               Positioned(
                 top: kProgressTop,
                 left: 24,
@@ -492,9 +507,9 @@ class _SignUpPageState extends State<SignUpPage> {
                   total: 7,
                   onArrowTap: () {
                     if (_index > 0) {
-                      _back(); // يرجّع خطوة داخل المعالج
+                      _back();
                     } else if (Navigator.of(context).canPop()) {
-                      Navigator.of(context).pop(); // يرجّع للشاشة السابقة
+                      Navigator.of(context).pop();
                     } else {
                       Navigator.pushReplacement(
                         context,
@@ -665,7 +680,7 @@ class _ProgressBarRtl extends StatelessWidget {
   }
 }
 
-/// ✅ مركّب: شريط التقدم + دائرة سهم يمين (نفس فكرة تسجيل الدخول)
+/// ✅ مركّب: شريط التقدم + دائرة سهم يمين
 class _ProgressWithArrow extends StatelessWidget {
   final int step;
   final int total;
@@ -680,7 +695,7 @@ class _ProgressWithArrow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      textDirection: TextDirection.ltr, // نخلي الدائرة تثبت يمين الشريط
+      textDirection: TextDirection.ltr,
       children: [
         Expanded(child: _ProgressBarRtl(step: step, total: total)),
         const SizedBox(width: 10),

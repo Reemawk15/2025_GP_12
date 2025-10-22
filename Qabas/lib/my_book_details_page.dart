@@ -13,6 +13,34 @@ class MyBookDetailsPage extends StatelessWidget {
   static const _accent    = Color(0xFF6F8E63);
   static const _pillGreen = Color(0xFFE6F0E0);
 
+  // ✅ SnackBar موحّد بنفس الستايل، وبألوان الملف فقط
+  void _showSnack(BuildContext context, String message, {IconData icon = Icons.check_circle}) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        backgroundColor: _accent,                       // خلفية خضراء من ألوان الملف
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        content: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: Color(0xFFE7C4DA)),       // وردي فاتح ثابت
+            const SizedBox(width: 8),
+            Text(
+              message,
+              style: const TextStyle(
+                color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
   // 1) تحويل الروابط إلى https صالح
   Future<String?> _normalizeUrl(String raw) async {
     String url = (raw).trim();
@@ -31,9 +59,6 @@ class MyBookDetailsPage extends StatelessWidget {
 
     // روابط درايف — نحولها إلى direct download
     if (url.contains('drive.google.com')) {
-      // يدعم الشكلين:
-      // https://drive.google.com/file/d/<ID>/view?usp=sharing
-      // https://drive.google.com/open?id=<ID>
       final uri = Uri.tryParse(url);
       if (uri != null) {
         String? id;
@@ -43,7 +68,6 @@ class MyBookDetailsPage extends StatelessWidget {
           id = uri.queryParameters['id'];
         }
         if (id != null && id.isNotEmpty) {
-          // رابط تنزيل مباشر
           return 'https://drive.google.com/uc?export=download&id=$id';
         }
       }
@@ -61,41 +85,30 @@ class MyBookDetailsPage extends StatelessWidget {
     final normalized = await _normalizeUrl(rawUrl);
     if (normalized == null) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('الرابط غير صالح أو الملف غير متاح')),
-        );
+        _showSnack(context, 'الرابط غير صالح أو الملف غير متاح', icon: Icons.error_outline);
       }
       return;
     }
 
-    // أولاً نحاول external، ولو فشل نجرّب in-app
     final uri = Uri.parse(normalized);
 
     try {
-      // canLaunch في بعض الأجهزة يرجّع false خطأً؛ نجرب الإطلاق مباشرة
       final okExternal = await launchUrl(uri, mode: LaunchMode.externalApplication);
       if (!okExternal) {
         final okInApp = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
         if (!okInApp && context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('تعذّر فتح ملف الـ PDF')),
-          );
+          _showSnack(context, 'تعذّر فتح ملف الـ PDF', icon: Icons.error_outline);
         }
       }
     } catch (_) {
-      // محاولة أخيرة داخل التطبيق
       try {
         final okInApp = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
         if (!okInApp && context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('تعذّر فتح ملف الـ PDF')),
-          );
+          _showSnack(context, 'تعذّر فتح ملف الـ PDF', icon: Icons.error_outline);
         }
       } catch (e) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('الرابط غير صالح أو لا يمكن فتحه')),
-          );
+          _showSnack(context, 'الرابط غير صالح أو لا يمكن فتحه', icon: Icons.error_outline);
         }
       }
     }
@@ -142,7 +155,11 @@ class MyBookDetailsPage extends StatelessWidget {
                   .snapshots(),
               builder: (context, snap) {
                 if (snap.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const Center(
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(_primary), // لون التحميل من ألوان الملف
+                    ),
+                  );
                 }
                 if (!snap.hasData || !snap.data!.exists) {
                   return const Center(child: Text('تعذّر تحميل تفاصيل الكتاب'));

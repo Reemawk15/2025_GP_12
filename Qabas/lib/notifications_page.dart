@@ -71,7 +71,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
           Scaffold(
             backgroundColor: Colors.transparent,
             body: _loading
-                ? const Center(child: CircularProgressIndicator())
+                ? Center(
+              child: CircularProgressIndicator(
+                valueColor: const AlwaysStoppedAnimation<Color>(_midGreen),
+              ),
+            )
                 : SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
               child: Column(
@@ -85,7 +89,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
+                          // لو واجهتِ تعارض مع withValues، استخدمي withOpacity(0.05)
+                          color: Colors.black.withOpacity(0.05),
                           blurRadius: 12,
                           offset: const Offset(0, 4),
                         ),
@@ -138,8 +143,15 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                 ),
                                 Switch.adaptive(
                                   value: _enabled,
+                                  // ✅ ألوان التفعيل حسب الهوية
                                   activeTrackColor: _lightGreen,
                                   onChanged: (v) => _save(v),
+                                  // (اختياري بسيط للثيم) لون الزر نفسه وقت التفعيل:
+                                  thumbColor: MaterialStateProperty.resolveWith<Color?>(
+                                        (states) => states.contains(MaterialState.selected)
+                                        ? _confirm
+                                        : null,
+                                  ),
                                 ),
                               ],
                             ),

@@ -35,6 +35,35 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _load();
   }
 
+  // ✅ SnackBar موحّد بنفس الستايل المطلوب
+  void _showSnack(String message, {IconData icon = Icons.check_circle}) {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        backgroundColor: _midGreen,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        content: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: const Color(0xFFE7C4DA)),
+            const SizedBox(width: 8),
+            Text(
+              message,
+              style: const TextStyle(
+                color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
   Future<void> _load() async {
     try {
       final uid = _user.uid;
@@ -70,9 +99,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
       await _user.reload();
 
       setState(() => _photoUrl = url);
-      _snack('تم تحديث الصورة بنجاح');
+      _showSnack('تم تحديث الصورة بنجاح', icon: Icons.check_circle);
     } catch (e) {
-      _snack('تعذّر تحديث الصورة. تحقق من الاتصال وحاول مرة أخرى.', error: true);
+      _showSnack('تعذّر تحديث الصورة. تحقق من الاتصال وحاول مرة أخرى.', icon: Icons.error_outline);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -133,9 +162,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
       await _user.reload();
 
       setState(() => _photoUrl = null);
-      _snack('تمت إزالة الصورة');
+      _showSnack('تمت إزالة الصورة', icon: Icons.check_circle);
     } catch (e) {
-      _snack('تعذّرت إزالة الصورة. جرّب لاحقًا.', error: true);
+      _showSnack('تعذّرت إزالة الصورة. جرّب لاحقًا.', icon: Icons.error_outline);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -181,8 +210,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
     final currentPhoto = _user.photoURL ?? '';
 
     final newName   = _name.text.trim();
-    final newUser   = _username.text.trim();  // لن نستخدمه (غير قابل للتعديل)
-    final newEmail  = _email.text.trim();     // لن نستخدمه (غير قابل للتعديل)
+    final newUser   = _username.text.trim();  // غير قابل للتعديل
+    final newEmail  = _email.text.trim();     // غير قابل للتعديل
     final newPass   = _password.text.trim();
     final newPhoto  = _photoUrl ?? '';
 
@@ -194,7 +223,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     bool anyError   = false;
 
     try {
-      // 1) Firestore — اكتب كل الحقول المتوقعة للاسم لتتزامن كل الشاشات
+      // 1) Firestore
       final profilePayload = <String, dynamic>{
         if (nameChanged) ...{
           'name': newName,
@@ -214,7 +243,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         anySuccess = true;
       }
 
-      // 2) Auth: الاسم/الصورة لضمان تزامن FirebaseAuth أيضًا
+      // 2) Auth: الاسم/الصورة
       if (nameChanged) {
         await _user.updateDisplayName(newName);
       }
@@ -230,38 +259,32 @@ class _EditProfilePageState extends State<EditProfilePage> {
         final passError = _validatePassword(newPass);
         if (passError != null) {
           anyError = true;
-          _snack(passError, error: true);
+          _showSnack(passError, icon: Icons.error_outline);
         } else {
           try {
             await _user.updatePassword(newPass);
             anySuccess = true;
-            _snack('تم تحديث كلمة المرور');
+            _showSnack('تم تحديث كلمة المرور', icon: Icons.check_circle);
           } on FirebaseAuthException catch (e) {
             anyError = true;
-            _snack(_authErrorAr(e), error: true);
+            _showSnack(_authErrorAr(e), icon: Icons.error_outline);
           }
         }
       }
 
       // ✅ الرسالة النهائية/التنقّل
       if (anySuccess && !anyError) {
-        _snack('تم حفظ التعديلات ✅');
+        _showSnack('تم حفظ التعديلات ✅', icon: Icons.check_circle);
         if (mounted) Navigator.pop(context);
       } else if (!anySuccess && !anyError) {
-        _snack('لا توجد تغييرات لحفظها.');
+        _showSnack('لا توجد تغييرات لحفظها.', icon: Icons.info_outline);
       }
 
     } catch (e) {
-      _snack('حدث خطأ أثناء الحفظ. حاول لاحقًا.', error: true);
+      _showSnack('حدث خطأ أثناء الحفظ. حاول لاحقًا.', icon: Icons.error_outline);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
-  }
-
-  void _snack(String msg, {bool error = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: error ? Colors.red : _midGreen),
-    );
   }
 
   @override
@@ -276,7 +299,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
           Scaffold(
             backgroundColor: Colors.transparent,
             body: _loading
-                ? const Center(child: CircularProgressIndicator())
+                ? const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(_midGreen),
+              ),
+            )
                 : AbsorbPointer(
               absorbing: _saving,
               child: SingleChildScrollView(
@@ -387,7 +414,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                     hint: 'name@example.com',
                                     enabled: false, // ⛔️ غير قابل للتعديل
                                     suffixIcon: const Icon(Icons.lock_outline, size: 18),
-                                    // لا حاجة لمحقق صحة لأنه disabled
                                     validator: (_) => null,
                                   ),
                                   const SizedBox(height: 12),
@@ -457,8 +483,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       controller: controller,
       keyboardType: keyboard,
       obscureText: obscure,
-      validator: validator ??
-              (v) => (v == null || v.trim().isEmpty) ? 'هذا الحقل مطلوب' : null,
+      validator: validator ?? (v) => (v == null || v.trim().isEmpty) ? 'هذا الحقل مطلوب' : null,
       enabled: enabled,
       readOnly: !enabled,
       decoration: InputDecoration(

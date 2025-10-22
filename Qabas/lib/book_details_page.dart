@@ -6,10 +6,38 @@ import 'chatbot_placeholder.dart';
 
 // ألوان الثيم
 const _primary   = Color(0xFF0E3A2C); // نصوص/أيقونات داكنة
-const _accent    = Color(0xFF6F8E63); // زر محادثة
+const _accent    = Color(0xFF6F8E63); // زر محادثة + SnackBar
 const _pillGreen = Color(0xFFE6F0E0); // خلفيات فاتحة ناعمة
 const _chipRose  = Color(0xFFFFEFF0); // صندوق التعليقات
 const Color _darkGreen  = Color(0xFF0E3A2C);
+
+/// ✅ SnackBar موحّد بنفس ستايلك
+void _showSnack(BuildContext context, String message, {IconData icon = Icons.check_circle}) {
+  final messenger = ScaffoldMessenger.of(context);
+  messenger.hideCurrentSnackBar();
+  messenger.showSnackBar(
+    SnackBar(
+      backgroundColor: _accent,
+      behavior: SnackBarBehavior.floating,
+      margin: const EdgeInsets.all(16),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      content: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: const Color(0xFFE7C4DA)),
+          const SizedBox(width: 8),
+          Text(
+            message,
+            style: const TextStyle(
+              color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16,
+            ),
+          ),
+        ],
+      ),
+      duration: const Duration(seconds: 3),
+    ),
+  );
+}
 
 class BookDetailsPage extends StatelessWidget {
   final String bookId;
@@ -443,7 +471,7 @@ class _AddToListSheet extends StatelessWidget {
   Future<void> _setStatus(BuildContext context, String status) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('الرجاء تسجيل الدخول أولاً')));
+      _showSnack(context, 'الرجاء تسجيل الدخول أولاً', icon: Icons.info_outline);
       return;
     }
     final ref = FirebaseFirestore.instance
@@ -461,7 +489,7 @@ class _AddToListSheet extends StatelessWidget {
 
     if (context.mounted) {
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تمت الإضافة إلى قائمتك')));
+      _showSnack(context, 'تمت الإضافة إلى قائمتك', icon: Icons.check_circle);
     }
   }
 
@@ -515,11 +543,11 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
   Future<void> _save() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('الرجاء تسجيل الدخول أولاً')));
+      _showSnack(context, 'الرجاء تسجيل الدخول أولاً', icon: Icons.info_outline);
       return;
     }
     if (_ctrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('فضلاً اكتب تعليقاً مختصراً')));
+      _showSnack(context, 'فضلاً اكتب تعليقاً مختصراً', icon: Icons.info_outline);
       return;
     }
     setState(() => _saving = true);
@@ -555,14 +583,14 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
       'createdAt': FieldValue.serverTimestamp(),
     };
 
-    batch.set(bookReviewRef, payload);
-    batch.set(userReviewRef, payload);
-
-    await batch.commit();
+    await Future.wait([
+      // تنفيذ الدُفعة
+          () async { batch.set(bookReviewRef, payload); batch.set(userReviewRef, payload); await batch.commit(); }(),
+    ]);
 
     if (!mounted) return;
     Navigator.pop(context);
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إضافة تعليقك بنجاح')));
+    _showSnack(context, 'تم إضافة تعليقك بنجاح', icon: Icons.check_circle);
   }
 
   @override

@@ -81,43 +81,44 @@ class MyLibraryPage extends StatelessWidget {
                     const SizedBox(height: 15),
 
                     // شريط التبويبات
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Container(
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(.9),
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      child: TabBar(
-                        // ✅ بدون خلفية أو حبة ملوّنة
-                        indicator: const UnderlineTabIndicator(
-                          borderSide: BorderSide(width: 2),
-                        ),                        dividerColor: Colors.transparent,   // يخفي الخط الفاصل السفلي (Flutter 3.13+)
-                        overlayColor: MaterialStateProperty.all(Colors.transparent), // يلغي وميض الضغط
-
-                        // شكل النص المختار/غير المختار
-                        labelColor: _midGreen,
-                        unselectedLabelColor: Colors.black54,
-                        labelStyle: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700, // أوضح عند التحديد
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Container(
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(.9),
+                          borderRadius: BorderRadius.circular(24),
                         ),
-                        unselectedLabelStyle: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+                        child: TabBar(
+                          // ✅ بدون خلفية أو حبة ملوّنة
+                          indicator: const UnderlineTabIndicator(
+                            borderSide: BorderSide(width: 2),
+                          ),
+                          dividerColor: Colors.transparent,   // يخفي الخط الفاصل السفلي
+                          overlayColor: MaterialStateProperty.all(Colors.transparent), // يلغي وميض الضغط
+
+                          // شكل النص المختار/غير المختار
+                          labelColor: _midGreen,
+                          unselectedLabelColor: Colors.black54,
+                          labelStyle: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          unselectedLabelStyle: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+
+                          // مسافات لطيفة حول العناوين
+                          labelPadding: const EdgeInsets.symmetric(horizontal: 12),
+
+                          tabs: const [
+                            Tab(text: 'استمع لها الآن'),
+                            Tab(text: 'أرغب بالاستماع لها'),
+                            Tab(text: 'استمعت لها'),
+                          ],
                         ),
-
-                        // مسافات لطيفة حول العناوين
-                        labelPadding: const EdgeInsets.symmetric(horizontal: 12),
-
-                        tabs: const [
-                          Tab(text: 'استمع لها الآن'),
-                          Tab(text: 'أرغب بالاستماع لها'),
-                          Tab(text: 'استمعت لها'),
-                        ],
                       ),
-                    ),
                     ),
 
                     const SizedBox(height: 8),
@@ -165,7 +166,6 @@ class _LibraryShelfState extends State<_LibraryShelf> {
   void _onMovedLocally(String docId) {
     setState(() {
       _locallyHidden.add(docId);
-      // حدّث النسخة المعروضة الآن فورًا:
       _lastNonEmpty = _lastNonEmpty.where((b) => b.id != docId).toList();
     });
   }
@@ -196,21 +196,19 @@ class _LibraryShelfState extends State<_LibraryShelf> {
         }
 
         final docs = snap.data?.docs ?? [];
-        // ⚠️ استخدم دائمًا docId الحقيقي d.id
         final all = docs.map((d) {
           final m = d.data() as Map<String, dynamic>? ?? {};
           final title  = (m['title'] ?? '') as String;
           final cover  = (m['coverUrl'] ?? '') as String;
           final status = (m['status'] ?? 'want') as String;
           return Book(
-            id: d.id, // 👈 هنا التعديل: docId فقط
+            id: d.id, // 👈 docId الحقيقي
             title: title.isEmpty ? 'كتاب' : title,
             cover: cover.isNotEmpty ? NetworkImage(cover) : null,
             status: status,
           );
         }).toList();
 
-        // استبعد اللي أُخفي محليًا فورًا
         final current = all.where((b) => !_locallyHidden.contains(b.id)).toList();
 
         if (current.isNotEmpty) {
@@ -266,8 +264,6 @@ class _ShelfViewState extends State<_ShelfView> {
   static const double _bookStretch = 1.2;
 
   final PageController _pageController = PageController();
-
-  // تثبيت الصفحات لتقليل الوميض عند إعادة البناء
   late List<List<Book>> _pages;
 
   @override
@@ -279,7 +275,6 @@ class _ShelfViewState extends State<_ShelfView> {
   @override
   void didUpdateWidget(covariant _ShelfView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // حدّث الصفحات فقط عند تغيّر عدد الكتب (يقلل الحسابات)
     if (oldWidget.books.length != widget.books.length) {
       _pages = _paginate(widget.books, _booksPerPage);
     }
@@ -354,7 +349,7 @@ class _ShelfViewState extends State<_ShelfView> {
                             height: bookHeight,
                             child: book == null
                                 ? const SizedBox.shrink()
-                                : _BookCard(book: book, uid: widget.uid, onMoved: widget.onMoved), // 👈 نمرر الكولباك
+                                : _BookCard(book: book, uid: widget.uid, onMoved: widget.onMoved),
                           );
                         }),
                       ),
@@ -424,14 +419,42 @@ class _BookCard extends StatelessWidget {
     'listened'  : 'want',
   };
 
+  // ✅ نفس تصميم SnackBar الموحد
+  void _showSnack(BuildContext context, String message, {IconData icon = Icons.check_circle}) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        backgroundColor: _midGreen,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        content: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: const Color(0xFFE7C4DA)),
+            const SizedBox(width: 8),
+            Text(
+              message,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
   Future<void> _removeFromList(BuildContext context) async {
     final ref = FirebaseFirestore.instance
         .collection('users').doc(uid)
         .collection('library').doc(book.id);
     await ref.delete();
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم الحذف من قائمتك')));
-    }
+    _showSnack(context, 'تم الحذف من قائمتك', icon: Icons.check_circle);
   }
 
   // دالة النقل — تستخدم docId الحقيقي + إخفاء تفاؤلي
@@ -444,23 +467,14 @@ class _BookCard extends StatelessWidget {
         {'status': newStatus, 'addedAt': FieldValue.serverTimestamp()},
         SetOptions(merge: true),
       );
-      // 👇 أخفِ البطاقة فورًا محليًا
-      onMoved(book.id);
+      onMoved(book.id); // 👈 أخفِ البطاقة فورًا محليًا
 
-      if (context.mounted) {
-        if (shouldPop) {
-          Navigator.pop(context);
-        }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('نُقل إلى "${_arabicStatus[newStatus] ?? newStatus}"')),
-        );
+      if (shouldPop) {
+        Navigator.pop(context); // إغلاق الـBottomSheet فقط
       }
+      _showSnack(context, 'نُقل إلى "${_arabicStatus[newStatus] ?? newStatus}"', icon: Icons.check_circle);
     } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تعذّر النقل. حاول مجددًا')),
-        );
-      }
+      _showSnack(context, 'تعذّر النقل. حاول مجددًا', icon: Icons.error_outline);
     }
   }
 

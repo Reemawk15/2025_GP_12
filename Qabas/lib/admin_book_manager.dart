@@ -17,7 +17,7 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
   final _formKey = GlobalKey<FormState>();
 
   // ألوان ثابتة
-  static const _confirmColor = Color(0xFF6F8E63); // زر حفظ وتأكيد
+  static const _confirmColor = Color(0xFF6F8E63); // زر حفظ وتأكيد + SnackBar
   static const _titleColor   = Color(0xFF0E3A2C); // أخضر داكن للنصوص
   static const _fillGreen    = Color(0xFFC9DABF); // أخضر فاتح لحقول الإدخال
 
@@ -56,6 +56,34 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
     'أطفال',
   ];
 
+  // ✅ SnackBar الموحّد
+  void _showSnack(String message, {IconData icon = Icons.check_circle}) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        backgroundColor: _confirmColor,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        content: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: const Color(0xFFE7C4DA)),
+            const SizedBox(width: 8),
+            Text(
+              message,
+              style: const TextStyle(
+                color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _titleCtrl.dispose();
@@ -88,21 +116,15 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
 
   Future<void> _saveBook() async {
     if (!_formKey.currentState!.validate()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('فضلاً أكمل الحقول المطلوبة')),
-      );
+      _showSnack('فضلاً أكمل الحقول المطلوبة', icon: Icons.info_outline);
       return;
     }
     if (_pdfFile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('فضلاً اختر ملف الكتاب (PDF)')),
-      );
+      _showSnack('فضلاً اختر ملف الكتاب (PDF)', icon: Icons.info_outline);
       return;
     }
     if (_coverFile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('فضلاً اختر صورة الغلاف')),
-      );
+      _showSnack('فضلاً اختر صورة الغلاف', icon: Icons.info_outline);
       return;
     }
 
@@ -139,15 +161,11 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تمت إضافة الكتاب بنجاح')),
-        );
+        _showSnack('تمت إضافة الكتاب بنجاح');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('حدث خطأ أثناء الحفظ: $e')),
-        );
+        _showSnack('حدث خطأ أثناء الحفظ: $e', icon: Icons.error_outline);
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -229,17 +247,9 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
 
       await doc.reference.delete();
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم حذف الكتاب بنجاح')),
-        );
-      }
+      if (mounted) _showSnack('تم حذف الكتاب بنجاح');
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('تعذّر الحذف: $e')),
-        );
-      }
+      if (mounted) _showSnack('تعذّر الحذف: $e', icon: Icons.error_outline);
     }
   }
 
@@ -683,7 +693,7 @@ class _ListTabHost extends StatelessWidget {
 }
 
 // ================== صفحة تعديل الكتاب ==================
-// (بدون تغيير في المنطق – فقط نفس تحسين زر الحفظ)
+// (بدون تغيير في المنطق – فقط توحيد SnackBar بنفس الستايل)
 class _EditBookPage extends StatefulWidget {
   final String docId;
   final Map<String, dynamic> initialData;
@@ -728,6 +738,34 @@ class _EditBookPageState extends State<_EditBookPage> {
 
   String? _currentPdfUrl;
   String? _currentCoverUrl;
+
+  // ✅ SnackBar موحد محليًا
+  void _showSnack(String message, {IconData icon = Icons.check_circle}) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        backgroundColor: _confirmColor,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        content: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: const Color(0xFFE7C4DA)),
+            const SizedBox(width: 8),
+            Text(
+              message,
+              style: const TextStyle(
+                color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -776,9 +814,7 @@ class _EditBookPageState extends State<_EditBookPage> {
 
   Future<void> _saveEdits() async {
     if (!_formKey.currentState!.validate()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('فضلاً أكمل الحقول المطلوبة')),
-      );
+      _showSnack('فضلاً أكمل الحقول المطلوبة', icon: Icons.info_outline);
       return;
     }
 
@@ -813,16 +849,12 @@ class _EditBookPageState extends State<_EditBookPage> {
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم حفظ تعديلاتك')),
-        );
+        _showSnack('تم حفظ تعديلاتك');
         Navigator.of(context).pop();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('تعذّر حفظ التعديلات: $e')),
-        );
+        _showSnack('تعذّر حفظ التعديلات: $e', icon: Icons.error_outline);
       }
     } finally {
       if (mounted) setState(() => _saving = false);

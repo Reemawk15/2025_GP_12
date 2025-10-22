@@ -12,11 +12,12 @@ class WeeklyGoalPage extends StatefulWidget {
 
 class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
   static const Color _darkGreen = Color(0xFF0E3A2C);
-  static const Color _midGreen = Color(0xFF2F5145);
+  static const Color _midGreen  = Color(0xFF2F5145);
   static const Color _lightGreen = Color(0xFFC9DABF);
-  static const Color _confirm = Color(0xFF6F8E63);
+  static const Color _confirm   = Color(0xFF6F8E63);
 
-  String _selectedLevel = ''; // beginner | active | pro
+  /// beginner | active | pro | '' (بدون هدف)
+  String _selectedLevel = '';
 
   @override
   void initState() {
@@ -24,58 +25,93 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
     _loadExisting();
   }
 
+  /// ✅ نفس تصميم SnackBar في كل الرسائل
+  void _showSnack(String message, {IconData icon = Icons.check_circle}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: _midGreen,                 // نفس اللون
+        behavior: SnackBarBehavior.floating,        // يطفو فوق المحتوى
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
+        content: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: const Color(0xFFE7C4DA)), // 🌸 وردي فاتح
+            const SizedBox(width: 8),
+            Text(
+              message,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
   Future<void> _loadExisting() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
+
       final doc = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .get();
       final data = doc.data();
+
       if (data != null && data['weeklyGoal'] is Map) {
         final lvl = (data['weeklyGoal']['level'] as String?) ?? _selectedLevel;
         if (['beginner', 'active', 'pro'].contains(lvl)) {
           setState(() => _selectedLevel = lvl);
         }
       } else if (data != null && data['weeklyGoalMinutes'] != null) {
+        // دعم الحقل القديم (إن وُجد)
         final mins = (data['weeklyGoalMinutes'] as num).toInt();
-        if (mins >= 160)
+        if (mins >= 180) {
           _selectedLevel = 'pro';
-        else if (mins >= 100)
+        } else if (mins >= 120) {
           _selectedLevel = 'active';
-        else
+        } else {
           _selectedLevel = 'beginner';
+        }
         setState(() {});
       }
-    } catch (_) {}
+    } catch (_) {
+      // ما نعرض خطأ للمستخدم هنا، الصفحة تشتغل عادي بدون هدف
+    }
   }
 
+  /// ✅ دقائق كل مستوى — متطابقة مع الوصف العربي
   int _minutesFor(String level) {
-    if (level.isEmpty) return 0;
-
     switch (level) {
       case 'beginner':
-        return 80;
+        return 60;
       case 'active':
-        return 180;
+        return 120;
       case 'pro':
-        return 360;
+        return 180;
       default:
         return 0;
     }
   }
 
   String _titleFor(String level) {
-    if (level.isEmpty) return ''; // لو فاضي، ارجع فاضي
-
     switch (level) {
+      case 'beginner':
+        return 'مستمع مبتدئ';
       case 'active':
         return 'مستمع نشيط';
       case 'pro':
         return 'مستمع محترف';
-      case 'beginner':
-        return 'مستمع مبتدئ';
       default:
         return '';
     }
@@ -83,76 +119,43 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
 
   String _descFor(String level) {
     if (level == 'beginner') return 'ساعة (٦٠ دقيقة) على الأقل أسبوعيًا';
-    if (level == 'active') return 'ساعتان (١٢٠ دقيقة) على الأقل أسبوعيًا';
+    if (level == 'active')   return 'ساعتان (١٢٠ دقيقة) على الأقل أسبوعيًا';
     return 'ثلاث ساعات (١٨٠ دقيقة) على الأقل أسبوعيًا';
   }
 
   Future<void> _save() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('سجّل الدخول أولًا.')));
+      _showSnack('سجّل الدخول أولًا.', icon: Icons.login_rounded);
       return;
     }
 
-    final userDoc = FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid);
+    final userDoc = FirebaseFirestore.instance.collection('users').doc(user.uid);
 
     if (_selectedLevel.isEmpty) {
-      // 🔥 نحذف الحقل من Firebase
-      await userDoc.update({'weeklyGoal': FieldValue.delete()}).catchError((
-        error,
-      ) {
-        // لو المستند مو موجود، نعمل set فاضي
+      // حذف الهدف
+      await userDoc.update({'weeklyGoal': FieldValue.delete()}).catchError((_) {
         return userDoc.set({}, SetOptions(merge: true));
       });
 
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('تم إلغاء هدف الاستماع 🎧')));
-
-      Navigator.pop(context, null);
-    } else {
-      // 🟢 المستخدم اختار هدف جديد
-      int minutes = _minutesFor(_selectedLevel);
-
-      await userDoc.set({
-        'weeklyGoal': {
-          'level': _selectedLevel,
-          'minutes': minutes,
-          'updatedAt': DateTime.now().toIso8601String(),
-        },
-      }, SetOptions(merge: true));
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.check_circle, color: Color(0xFFE7C4DA)), // 🌸 وردي فاتح
-              SizedBox(width: 8),
-              Text(
-                'تم حفظ هدف الاستماع 🎧',
-                style: TextStyle(
-                  color: Colors.white, // نص أبيض واضح
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: _midGreen, // 🌿 أخضر داكن (لون قبس)
-          duration: Duration(seconds: 3),
-        ),
-      );
-
-      Navigator.pop(context, minutes);
+      _showSnack('تم إلغاء هدف الاستماع 🎧', icon: Icons.info_rounded);
+      if (mounted) Navigator.pop<int?>(context, null);
+      return;
     }
+
+    // حفظ هدف جديد
+    final int minutes = _minutesFor(_selectedLevel);
+
+    await userDoc.set({
+      'weeklyGoal': {
+        'level': _selectedLevel,
+        'minutes': minutes,
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+    }, SetOptions(merge: true));
+
+    _showSnack('تم حفظ هدف الاستماع 🎧', icon: Icons.check_circle);
+    if (mounted) Navigator.pop<int>(context, minutes);
   }
 
   Widget _goalTile(String level) {
@@ -161,17 +164,10 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
     return InkWell(
       borderRadius: BorderRadius.circular(18),
       onTap: () {
-        print('Selected: $_selectedLevel');
-
         setState(() {
-          if (_selectedLevel == level) {
-            _selectedLevel = ''; // إلغاء التحديد
-          } else {
-            _selectedLevel = level; // تحديد جديد
-          }
+          _selectedLevel = selected ? '' : level;
         });
       },
-
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         height: 72,
@@ -185,33 +181,28 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
           ),
           boxShadow: selected
               ? [
-                  BoxShadow(
-                    color: _confirm.withOpacity(0.25),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
+            BoxShadow(
+              color: _confirm.withOpacity(0.25),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ]
               : [],
         ),
         child: Directionality(
-          textDirection:
-              TextDirection.rtl, // ضروري عشان النص والدائرة يكونوا يمين
+          textDirection: TextDirection.rtl,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // الدائرة أولاً على اليمين
               Icon(
                 selected ? Icons.radio_button_checked : Icons.radio_button_off,
                 color: selected ? _midGreen : _darkGreen,
                 size: 22,
               ),
               const SizedBox(width: 10),
-
-              // النص مباشرة بجانبها
               Expanded(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment
-                      .start, // ← يخلي النص يبدأ من يمين الأيقونة مباشرة
+                  crossAxisAlignment: CrossAxisAlignment.start, // يبدأ من يمين الأيقونة
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
@@ -255,15 +246,9 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
           Scaffold(
             backgroundColor: Colors.transparent,
             body: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
-                18,
-                200,
-                18,
-                40,
-              ), // ↓ نزلنا الصفحة
+              padding: const EdgeInsets.fromLTRB(18, 200, 18, 40),
               child: Column(
                 children: [
-                  // الكونتينر الأبيض (السهم ثم العنوان تحته، ثم الجملة التعريفية)
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
@@ -274,10 +259,8 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // زر الرجوع داخل الكونتينر — نفس ستايل الصفحات الثانية
                         Align(
-                          alignment: AlignmentDirectional
-                              .centerStart, // RTL: start = يمين
+                          alignment: AlignmentDirectional.centerStart,
                           child: IconButton(
                             tooltip: 'رجوع',
                             style: IconButton.styleFrom(
@@ -288,23 +271,19 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
                             onPressed: () => Navigator.pop(context),
                           ),
                         ),
-
                         const SizedBox(height: 6),
-
                         Align(
                           alignment: Alignment.centerRight,
-                          child: Text(
+                          child: const Text(
                             'حدد هدف الاستماع الأسبوعي',
                             textAlign: TextAlign.right,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.w700,
                               fontSize: 16.5,
                             ),
                           ),
                         ),
-
                         const SizedBox(height: 8),
-
                         Align(
                           alignment: Alignment.centerRight,
                           child: Text(
@@ -317,7 +296,6 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
                             ),
                           ),
                         ),
-
                         const SizedBox(height: 30),
 
                         _goalTile('beginner'),
@@ -326,7 +304,6 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
                         const SizedBox(height: 12),
                         _goalTile('pro'),
 
-                        // نزّل زر الحفظ شوي تحت
                         const SizedBox(height: 44),
 
                         SizedBox(
