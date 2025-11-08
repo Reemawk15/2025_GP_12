@@ -13,10 +13,53 @@ const PROCESSOR_ID = "63d2df301e9805cd";                // Processor ID
 const storage = new Storage();
 const docai = new DocumentProcessorServiceClient();
 
-// Path pattern: audiobooks/{bookId}/file.pdf
-function getBookIdFromPath(filePath: string): string | null {
+// ================== Path parsing for admin & user uploads ==================
+
+type UploadContext =
+  | {
+      kind: "admin";
+      bookId: string;
+      basePrefix: string; // e.g. audiobooks/{bookId}
+    }
+  | {
+      kind: "user";
+      userId: string;
+      docId: string;
+      basePrefix: string; // e.g. users/{uid}/mybooks/{docId}
+    };
+
+/**
+ * Determine whether the uploaded PDF belongs to:
+ *  - admin audiobooks: audiobooks/{bookId}/...
+ *  - user private library: users/{uid}/mybooks/{docId}/book.pdf
+ * and return a unified context describing where to store OCR output.
+ */
+function getUploadContext(filePath: string): UploadContext | null {
   const parts = filePath.split("/");
-  return parts.length >= 3 && parts[0] === "audiobooks" ? parts[1] : null;
+
+  // Admin public audiobooks: audiobooks/{bookId}/...
+  if (parts.length >= 2 && parts[0] === "audiobooks") {
+    const bookId = parts[1];
+    return {
+      kind: "admin",
+      bookId,
+      basePrefix: `audiobooks/${bookId}`,
+    };
+  }
+
+  // User private books: users/{uid}/mybooks/{docId}/book.pdf
+  if (parts.length >= 4 && parts[0] === "users" && parts[2] === "mybooks") {
+    const userId = parts[1];
+    const docId = parts[3];
+    return {
+      kind: "user",
+      userId,
+      docId,
+      basePrefix: `users/${userId}/mybooks/${docId}`,
+    };
+  }
+
+  return null;
 }
 
 async function runBatchOCR(gcsInputUri: string, outPrefix: string) {
@@ -451,31 +494,46 @@ export const ocrOnPdfUploadV2 = onObjectFinalized(
       return;
     }
 
-    const bookId = getBookIdFromPath(filePath);
-    if (!bookId) {
-      logger.info("Skip invalid path", { filePath });
+    // Determine whether this is an admin book or a user private book
+    const ctx = getUploadContext(filePath);
+    if (!ctx) {
+      logger.info("Skip invalid path (not admin nor user book)", { filePath });
       return;
     }
 
-    logger.info("Triggered OCR", { bookId, filePath });
+    const logId =
+      ctx.kind === "admin"
+        ? ctx.bookId
+        : `${ctx.userId}/${ctx.docId}`;
+
+    logger.info("Triggered OCR", {
+      filePath,
+      kind: ctx.kind,
+      id: logId,
+      basePrefix: ctx.basePrefix,
+    });
 
     // 1) Run Batch OCR on the uploaded PDF
     const gcsInputUri = `gs://${triggeredBucket}/${filePath}`;
-    const outPrefix = `audiobooks/${bookId}/ocr/${Date.now()}/`;
+    const outPrefix = `${ctx.basePrefix}/ocr/${Date.now()}/`;
     await runBatchOCR(gcsInputUri, outPrefix);
 
     // 2) Collect text page by page (already cleaned)
     const pages = await collectPages(outPrefix);
     if (!pages.length) {
-      logger.error("No text pages found after OCR", { bookId });
+      logger.error("No text pages found after OCR", {
+        id: logId,
+        kind: ctx.kind,
+        basePrefix: ctx.basePrefix,
+      });
       return;
     }
 
     // 3) Store:
     //    - book.txt as a continuous cleaned text (no explicit page numbers)
     //    - pages/page-xxx.txt for each cleaned page
-    const pagesFolder = `audiobooks/${bookId}/pages`;
-    const combinedPath = `audiobooks/${bookId}/book.txt`;
+    const pagesFolder = `${ctx.basePrefix}/pages`;
+    const combinedPath = `${ctx.basePrefix}/book.txt`;
 
     const combinedToken = uuidv4();
 
@@ -513,7 +571,8 @@ export const ocrOnPdfUploadV2 = onObjectFinalized(
       `${encodeURIComponent(combinedPath)}?alt=media&token=${combinedToken}`;
 
     logger.info("✅ book.txt created successfully", {
-      bookId,
+      id: logId,
+      kind: ctx.kind,
       pages: pages.length,
       publicUrl,
       pagesFolder,
