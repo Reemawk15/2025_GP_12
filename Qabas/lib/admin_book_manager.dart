@@ -44,16 +44,15 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
   bool _saving = false;
 
   // أقسام
-  final _categories = const [
-    'تطوير ذات',
-    'روايات',
-    'تقنية',
-    'دين',
-    'تاريخ',
-    'علم نفس',
-    'تعليمي',
-    'أعمال',
-    'أطفال',
+  final List<String> _categories = const [
+    'الأدب والشعر',
+    'التاريخ والجغرافيا',
+    'التقنية والكمبيوتر',
+    'القصة والرواية',
+    'الكتب الإسلامية والدينية',
+    'كتب الأطفال',
+    'معلومات عامة',
+    'تطوير الذات',
   ];
 
   // ✅ SnackBar الموحّد
