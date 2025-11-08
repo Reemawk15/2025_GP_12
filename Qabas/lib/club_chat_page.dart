@@ -13,12 +13,21 @@ class ClubChatPage extends StatefulWidget {
 }
 
 class _ClubChatPageState extends State<ClubChatPage> {
-  static const Color _midGreen   = Color(0xFF2F5145);
-  static const Color _confirm    = Color(0xFF6F8E63);
+  static const Color _midGreen    = Color(0xFF2F5145);
+  static const Color _confirm     = Color(0xFF6F8E63);
   static const Color _bubbleMe    = Color(0xFFE6F0E0);
   static const Color _bubbleOther = Color(0xFFFFEEF1);
+  static const Color _titleColor  = Color(0xFF0E3A2C);
 
   final _controller = TextEditingController();
+
+  late final Future<({String name, String? photoUrl})> _myProfileFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _myProfileFuture = _resolveCurrentUserProfile();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,16 +41,68 @@ class _ClubChatPageState extends State<ClubChatPage> {
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
-          toolbarHeight: 80,
-          leadingWidth: 56,
-          title: Text(widget.clubTitle, style: const TextStyle(color: Color(0xFF0E3A2C), fontWeight: FontWeight.bold)),
-          centerTitle: true,
+          toolbarHeight: 90,
+          centerTitle: false,
+          // لتقرّبين العنوان أكثر لليمين (حافة الـleading)
+          titleSpacing: -4,         // جرّبي -6 أو -8 إذا تبين أكثر
+          leadingWidth: 48,         // لا تكبّرينها عشان ما تزحلق العنوان لليسار
+          title: FutureBuilder<({String name, String? photoUrl})>(
+            future: _myProfileFuture,
+            builder: (context, snap) {
+              final userName = (snap.data?.name ?? '').trim().isEmpty
+                  ? 'ضيفنا الكريم'
+                  : snap.data!.name;
+
+              return Align(
+                alignment: Alignment.centerRight,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    // ✅ السطر الأول يسار شوي
+                    Transform.translate(
+                      offset: const Offset(-13, 0), // 👈 يسار
+                      child: Text(
+                        'حللت أهلاً ووطِئت سهلاً $userName',
+                        textAlign: TextAlign.right,
+                        style: const TextStyle(
+                          color: Color(0xFF0E3A2C),
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                          height: 1.2,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    // ✅ السطر الثاني يمين شوي
+                    Transform.translate(
+                      offset: const Offset(14, 0), // 👈 يمين
+                      child: Text(
+                        'مرحبًا بك في نادي ${widget.clubTitle}',
+                        textAlign: TextAlign.right,
+                        style: const TextStyle(
+                          color: Color(0xFF0E3A2C),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13.5,
+                          height: 1.2,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
           leading: Padding(
             padding: const EdgeInsets.only(top: 40, right: 8),
             child: IconButton(
               tooltip: 'رجوع',
               onPressed: () => Navigator.of(context).maybePop(),
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _midGreen, size: 20),
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF2F5145), size: 20),
             ),
           ),
         ),
@@ -78,7 +139,6 @@ class _ClubChatPageState extends State<ClubChatPage> {
                           String photoUrl = (m['photoUrl'] ?? '').toString().trim();
 
                           if (name.isEmpty && mine) {
-                            // fallback محلي لرسائلك انتي
                             final me = FirebaseAuth.instance.currentUser;
                             name = (me?.displayName ?? '').trim();
                           }
@@ -157,12 +217,11 @@ class _ClubChatPageState extends State<ClubChatPage> {
       final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
       if (doc.exists) {
         final data = doc.data()!;
-        // جرّبي الحقول الموجودة عندك في users: name, fullName, username, ...
         name = (data['name'] ?? data['fullName'] ?? data['username'] ?? name ?? '').toString().trim();
         photo = (data['photoUrl'] ?? data['avatarUrl'] ?? photo)?.toString();
       }
     } catch (_) {
-      // نتجاهل الخطأ ونكتفي بـ FirebaseAuth
+      // تجاهل الخطأ ونكتفي بـ FirebaseAuth
     }
 
     if (name.isEmpty) name = 'بدون اسم';
@@ -173,7 +232,6 @@ class _ClubChatPageState extends State<ClubChatPage> {
     final t = _controller.text.trim();
     if (t.isEmpty) return;
 
-    // نحدد الاسم والصورة بشكل موثوق
     final profile = await _resolveCurrentUserProfile();
 
     final user = FirebaseAuth.instance.currentUser!;

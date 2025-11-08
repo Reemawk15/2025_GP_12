@@ -121,7 +121,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int _index = 0;
   String? _displayName;
 
-  /// 👇 تقدر تتحكم هنا وتعمل Hot Reload وتشوف التغيير فورًا
+  /// تحكّم سريع
   double _topSpacingUnderHeader = 130; // مسافة نزول المحتوى تحت التعرّجات
   double coverW = 120; // عرض الغلاف
   double coverH = 140; // ارتفاع الغلاف
@@ -136,16 +136,17 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   List<String> _selectedCategories = [];
+
+  /// ✅ الكاتقورير الجديدة
   final List<String> _categories = const [
-    'تطوير ذات',
-    'روايات',
-    'تقنية',
-    'دين',
-    'تاريخ',
-    'علم نفس',
-    'تعليمي',
-    'أعمال',
-    'أطفال',
+    'الأدب والشعر',
+    'التاريخ والجغرافيا',
+    'التقنية والكمبيوتر',
+    'القصة والرواية',
+    'الكتب الإسلامية والدينية',
+    'كتب الأطفال',
+    'معلومات عامة',
+    'تطوير الذات',
   ];
 
   // (اختياري) كان عندنا اشتراك؛ نحتفظ به إن وُجد
@@ -156,7 +157,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _loadDisplayName();
 
-    // اشتراك حي (يبقى كما هو لو كان موجود عندك سابقًا)
+    // اشتراك حي
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       _profileSub = FirebaseFirestore.instance
@@ -164,22 +165,19 @@ class _HomeScreenState extends State<HomeScreen> {
           .doc(user.uid)
           .snapshots()
           .listen((doc) {
-            String? name;
-            if (doc.exists) {
-              final data = doc.data() ?? {};
-              name =
-                  (data['name'] ??
-                          data['fullName'] ??
-                          data['displayName'] ??
-                          '')
-                      as String?;
-              if ((name ?? '').trim().isEmpty) name = null;
-            }
-            name ??= user.displayName;
-            if (mounted) {
-              setState(() => _displayName = name);
-            }
-          }, onError: (_) {});
+        String? name;
+        if (doc.exists) {
+          final data = doc.data() ?? {};
+          name =
+          (data['name'] ?? data['fullName'] ?? data['displayName'] ?? '')
+          as String?;
+          if ((name ?? '').trim().isEmpty) name = null;
+        }
+        name ??= user.displayName;
+        if (mounted) {
+          setState(() => _displayName = name);
+        }
+      }, onError: (_) {});
     }
   }
 
@@ -195,8 +193,8 @@ class _HomeScreenState extends State<HomeScreen> {
       if (doc.exists) {
         final data = doc.data() ?? {};
         name =
-            (data['name'] ?? data['fullName'] ?? data['displayName'] ?? '')
-                as String;
+        (data['name'] ?? data['fullName'] ?? data['displayName'] ?? '')
+        as String;
         if (name.trim().isEmpty) name = null;
       }
     } catch (_) {}
@@ -219,13 +217,13 @@ class _HomeScreenState extends State<HomeScreen> {
         .doc(user.uid)
         .snapshots()
         .map((doc) {
-          final data = doc.data();
-          String? name =
-              (data?['name'] ?? data?['fullName'] ?? data?['displayName'])
-                  as String?;
-          if ((name ?? '').trim().isEmpty) name = null;
-          return name;
-        });
+      final data = doc.data();
+      String? name =
+      (data?['name'] ?? data?['fullName'] ?? data?['displayName'])
+      as String?;
+      if ((name ?? '').trim().isEmpty) name = null;
+      return name;
+    });
   }
 
   // part for Search
@@ -272,92 +270,89 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context, c) {
         final w = c.maxWidth;
         final visibleWidth = cardW * count + gap * (count - 1);
-        // 👇 تأكدنا أنه double
-        final double sidePad = ((w - visibleWidth) / 2)
-            .clamp(0.0, double.infinity)
-            .toDouble();
+        final double sidePad =
+        ((w - visibleWidth) / 2).clamp(0.0, double.infinity).toDouble();
 
         return SizedBox(
-          height: cardH + 30.0, // 👈 double
+          height: cardH + 30.0, // double
+          child: StreamBuilder<
+              List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+            stream: _booksStream(),
+            builder: (context, snap) {
+              if (snap.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (!snap.hasData || snap.data!.isEmpty) {
+                return const Center(child: Text('لا توجد نتائج مطابقة'));
+              }
+              final docs = snap.data!;
 
-          child:
-              StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
-                stream: _booksStream(),
-                builder: (context, snap) {
-                  if (snap.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  if (!snap.hasData || snap.data!.isEmpty) {
-                    return const Center(child: Text('لا توجد نتائج مطابقة'));
-                  }
-                  final docs = snap.data!;
+              return ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.symmetric(horizontal: sidePad),
+                itemCount: docs.length,
+                separatorBuilder: (_, __) => SizedBox(width: gap),
+                itemBuilder: (context, i) {
+                  final d = docs[i];
+                  final data = d.data() as Map<String, dynamic>? ?? {};
+                  final cover = (data['coverUrl'] ?? '') as String;
+                  final title = (data['title'] ?? '') as String;
 
-                  return ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    padding: EdgeInsets.symmetric(horizontal: sidePad),
-                    itemCount: docs.length,
-                    separatorBuilder: (_, __) => SizedBox(width: gap),
-                    itemBuilder: (context, i) {
-                      final d = docs[i];
-                      final data = d.data() as Map<String, dynamic>? ?? {};
-                      final cover = (data['coverUrl'] ?? '') as String;
-                      final title = (data['title'] ?? '') as String;
-
-                      return GestureDetector(
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => BookDetailsPage(bookId: d.id),
-                            ),
-                          );
-                        },
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              width: cardW,
-                              height: cardH,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(14),
-                                boxShadow: const [
-                                  BoxShadow(
-                                    color: Colors.black26,
-                                    blurRadius: 12,
-                                    offset: Offset(0, 6),
-                                  ),
-                                ],
-                                color: Colors.white,
-                              ),
-                              clipBehavior: Clip.antiAlias,
-                              child: cover.isNotEmpty
-                                  ? Image.network(cover, fit: BoxFit.cover)
-                                  : const Icon(
-                                      Icons.menu_book,
-                                      size: 48,
-                                      color: _HomeColors.unselected,
-                                    ),
-                            ),
-                            const SizedBox(height: 6),
-                            SizedBox(
-                              width: cardW,
-                              child: Text(
-                                title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => BookDetailsPage(bookId: d.id),
                         ),
                       );
                     },
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: cardW,
+                          height: cardH,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(14),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Colors.black26,
+                                blurRadius: 12,
+                                offset: Offset(0, 6),
+                              ),
+                            ],
+                            color: Colors.white,
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: cover.isNotEmpty
+                              ? Image.network(cover, fit: BoxFit.cover)
+                              : const Icon(
+                            Icons.menu_book,
+                            size: 48,
+                            color: _HomeColors.unselected,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        SizedBox(
+                          width: cardW,
+                          child: Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   );
                 },
-              ),
+              );
+            },
+          ),
         );
       },
     );
@@ -391,17 +386,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   final liveName = snap.data;
                   final fallbackName =
                       _displayName ??
-                      FirebaseAuth.instance.currentUser?.displayName ??
-                      'صديقي';
+                          FirebaseAuth.instance.currentUser?.displayName ??
+                          'صديقي';
                   final name = (liveName == null || liveName.trim().isEmpty)
                       ? fallbackName
                       : liveName;
 
                   return Transform.translate(
-                    offset: const Offset(
-                      0,
-                      -11,
-                    ), // 🔹 بالسالب = يرفع النص للأعلى
+                    offset: const Offset(0, -11), // بالسالب = يرفع النص للأعلى
                     child: Text(
                       'مساؤك سعيد $name',
                       style: const TextStyle(
@@ -437,7 +429,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     const Icon(Icons.search, color: _HomeColors.unselected),
                     const SizedBox(width: 8),
 
-                    // 🟩 تم تحويل النص إلى TextField فعلي للبحث
+                    // TextField للبحث
                     Expanded(
                       child: TextField(
                         textAlign: TextAlign.right,
@@ -533,7 +525,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 12),
 
-              // هنا مكان كروت التوصيات الحالية عندك…
+              // مكان كروت التوصيات…
             ],
           ),
         ],
@@ -564,11 +556,11 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // خاصه ب عند الضغط على زر الفلتر
+  // ==== ورقة الفلتر (نصف الشاشة + خلفية بيضاء + بوكسات متساوية + أزرار متماثلة) ====
   void _openFilterSheet() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFFC9DABF), // نفس خلفيتك الحالية
+      backgroundColor: Colors.white, // خلفية بيضاء
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -576,93 +568,126 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setStateSheet) {
-            return Padding(
-              padding: const EdgeInsets.all(20),
-              child: SizedBox(
-                height: MediaQuery.of(context).size.height * 0.7,
+            return FractionallySizedBox(
+              heightFactor: 0.6, // 👈 نصف الشاشة
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 20,
+                  right: 20,
+                  top: 12,
+                  bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+                ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // 🌿 العنوان
+                    // مقبض سحب صغير
+                    Container(
+                      width: 40,
+                      height: 5,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: _HomeColors.unselected.withOpacity(0.25),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+
+                    // العنوان + عدّاد المختار
                     const Text(
-                      'اختر عالمك القرائي المفضل:',
+                      'اختر عالمك القرائي المفضل',
+                      textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0E3A2C),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: _HomeColors.selected,
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 8),
+                    Text(
+                      _selectedCategories.isEmpty
+                          ? 'لم يتم اختيار أي فئة بعد'
+                          : 'تم اختيار ${_selectedCategories.length} فئات',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: _HomeColors.unselected.withOpacity(0.9),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
 
-                    // ✅ قائمة الفئات داخل صناديق أنيقة
+                    // شبكة بوكسات متساوية
                     Expanded(
-                      child: ListView(
-                        children: _categories.map((cat) {
+                      child: GridView.builder(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2, // عمودان
+                          mainAxisSpacing: 12,
+                          crossAxisSpacing: 12,
+                          childAspectRatio: 3.2, // نسبة العرض للارتفاع
+                        ),
+                        itemCount: _categories.length,
+                        itemBuilder: (context, i) {
+                          final cat = _categories[i];
                           final selected = _selectedCategories.contains(cat);
-                          return Container(
-                            margin: const EdgeInsets.symmetric(vertical: 6),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFDDE9CD),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: CheckboxListTile(
-                              checkboxShape: const CircleBorder(),
-                              activeColor: const Color(0xFF0E3A2C),
-                              title: Text(
-                                cat,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 16,
-                                  color: selected
-                                      ? const Color(
-                                          0xFFB85C8A,
-                                        ) // وردي ناعم عند التحديد
-                                      : const Color(0xFF0E3A2C),
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              value: selected,
-                              onChanged: (val) {
-                                setStateSheet(() {
-                                  if (val == true) {
-                                    _selectedCategories.add(cat);
-                                  } else {
-                                    _selectedCategories.remove(cat);
-                                  }
-                                });
-                              },
-                            ),
+                          return _CategoryBox(
+                            title: cat,
+                            selected: selected,
+                            onTap: () {
+                              setStateSheet(() {
+                                if (selected) {
+                                  _selectedCategories.remove(cat);
+                                } else {
+                                  _selectedCategories.add(cat);
+                                }
+                              });
+                            },
                           );
-                        }).toList(),
+                        },
                       ),
                     ),
 
-                    const SizedBox(height: 10),
-
-                    // ✅ زر التأكيد
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          setState(() {});
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0E3A2C),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                        child: const Text(
-                          'تخصيص',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                    // أزرار بنفس الحجم بالضبط
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              setStateSheet(() => _selectedCategories.clear());
+                            },
+                            icon: const Icon(Icons.clear),
+                            label: const Text('مسح الكل'),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize:
+                              const Size.fromHeight(48), // نفس الارتفاع
+                              foregroundColor: _HomeColors.selected,
+                              side: BorderSide(
+                                color: _HomeColors.selected.withOpacity(0.6),
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
                           ),
                         ),
-                      ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              setState(() {}); // لتحديث الفلترة في الصفحة
+                            },
+                            icon: const Icon(Icons.check_circle_outline),
+                            label: const Text('تطبيق التصفية'),
+                            style: ElevatedButton.styleFrom(
+                              minimumSize:
+                              const Size.fromHeight(48), // نفس الارتفاع
+                              backgroundColor: _HomeColors.selected,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -674,16 +699,51 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // نفس قائمة الكتوقري الأصلية (ما تغيرت)
+  // نفس قائمة الكاتقورير لو احتجتها في مكان آخر
   final List<String> _categoriess = [
-    'تطوير ذات',
-    'روايات',
-    'تقنية',
-    'دين',
-    'تاريخ',
-    'علم نفس',
-    'تعليمي',
-    'أعمال',
-    'أطفال',
+    'الأدب والشعر',
+    'التاريخ والجغرافيا',
+    'التقنية والكمبيوتر',
+    'القصة والرواية',
+    'الكتب الإسلامية والدينية',
+    'كتب الأطفال',
+    'معلومات عامة',
+    'تطوير الذات',
   ];
+}
+
+// ====== ويدجت البوكس المتساوي ======
+class _CategoryBox extends StatelessWidget {
+  final String title;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _CategoryBox({
+    required this.title,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? _HomeColors.selected : const Color(0xFFDDE9CD),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Center(
+          child: Text(
+            title,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 15,
+              color: selected ? Colors.white : _HomeColors.selected,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
