@@ -6,7 +6,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 
-import 'library_tab.dart'; // للعودة للـ Hub الخاص بالبرايفت
+import 'library_tab.dart'; // For returning to the private library hub
 import 'my_book_details_page.dart';
 
 const Color _darkGreen  = Color(0xFF0E3A2C);
@@ -25,29 +25,34 @@ class _MyBooksPageState extends State<MyBooksPage>
     with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
 
-  // حقول مطلوبة/اختيارية
+  // Required / optional fields
   final _titleCtrl = TextEditingController();
   File? _pdfFile;
   File? _coverFile;
 
   bool _saving = false;
 
-  // يفرض إظهار رسائل التحقق بدون لمس الحقول
+  // Force showing validation messages even before the fields are touched
   bool _forceValidate = false;
+
+  // Local TabController (nullable to avoid LateInitializationError on hot reload)
+  TabController? _tabController;
 
   @override
   void initState() {
     super.initState();
-    _titleCtrl.addListener(() => setState(() {})); // لتحديث حالة الزر
+    _titleCtrl.addListener(() => setState(() {})); // Update button state when title changes
+    _tabController = TabController(length: 2, vsync: this);
   }
 
   @override
   void dispose() {
     _titleCtrl.dispose();
+    _tabController?.dispose();
     super.dispose();
   }
 
-  // ✅ SnackBar موحّد — نفس الستايل الأخضر
+  // ✅ Unified SnackBar — same green style everywhere
   void _showSnack(String message, {IconData icon = Icons.check_circle}) {
     if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
@@ -76,7 +81,7 @@ class _MyBooksPageState extends State<MyBooksPage>
     );
   }
 
-  // جاهزية الزر: اسم + PDF وموب في وضع الحفظ
+  // Button is enabled only when: title is not empty + PDF selected + not currently saving
   bool get _isReadyToSave =>
       _titleCtrl.text.trim().isNotEmpty &&
           _pdfFile != null &&
@@ -104,7 +109,7 @@ class _MyBooksPageState extends State<MyBooksPage>
     if (result != null && result.files.single.path != null) {
       setState(() {
         _pdfFile = File(result.files.single.path!);
-        _forceValidate = true; // أظهري أخطاء الحقول المطلوبة فورًا
+        _forceValidate = true; // Immediately show required-field errors
       });
     }
   }
@@ -125,12 +130,12 @@ class _MyBooksPageState extends State<MyBooksPage>
       return;
     }
 
-    // فعّلي إظهار الأخطاء لو حاول يحفظ وفيه نقص
+    // Enable validation errors if user tries to save while required fields are missing
     if (_titleCtrl.text.trim().isEmpty || _pdfFile == null) {
       setState(() => _forceValidate = true);
     }
 
-    // طبقة أمان إضافية
+    // Extra safety layer to avoid incomplete submissions
     if (_titleCtrl.text.trim().isEmpty || _pdfFile == null) {
       _showSnack(_missingFriendlyMessage(), icon: Icons.info_outline);
       return;
@@ -144,23 +149,23 @@ class _MyBooksPageState extends State<MyBooksPage>
     try {
       setState(() => _saving = true);
 
-      // مرجع المستند في مسار المستخدم فقط
+      // Firestore document reference inside the current user's "mybooks" subcollection
       final docRef = FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .collection('mybooks')
           .doc();
 
-      // مسارات التخزين الخاصة بالمستخدم
+      // Storage path for this user's book
       final storage = FirebaseStorage.instance;
       final baseRef = storage.ref('users/${user.uid}/mybooks/${docRef.id}');
       final pdfRef = baseRef.child('book.pdf');
 
-      // ارفع PDF
+      // Upload PDF file
       final pdfTask = await pdfRef.putFile(_pdfFile!);
       final pdfUrl  = await pdfTask.ref.getDownloadURL();
 
-      // ارفع الغلاف (اختياري)
+      // Upload cover image (optional)
       String? coverUrl;
       if (_coverFile != null) {
         final coverRef = baseRef.child('cover.jpg');
@@ -168,7 +173,7 @@ class _MyBooksPageState extends State<MyBooksPage>
         coverUrl = await coverTask.ref.getDownloadURL();
       }
 
-      // خزّن البيانات الأساسية فقط (اسم + روابط)
+      // Store basic book data only (title + file URLs)
       await docRef.set({
         'title': _titleCtrl.text.trim(),
         'pdfUrl': pdfUrl,
@@ -177,7 +182,7 @@ class _MyBooksPageState extends State<MyBooksPage>
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // نظّف الحقول بعد الحفظ
+      // Reset form fields after saving
       _formKey.currentState!.reset();
       setState(() {
         _titleCtrl.clear();
@@ -188,8 +193,8 @@ class _MyBooksPageState extends State<MyBooksPage>
 
       if (mounted) {
         _showSnack('تمت إضافة الكتاب بنجاح', icon: Icons.check_circle);
-        // بدّل للتبويب الثاني (كتبي) مباشرة بعد الحفظ إن حبيتي
-        DefaultTabController.of(context)?.animateTo(1);
+        // Switch to "My Books" tab directly after saving
+        _tabController?.animateTo(1);
       }
     } catch (e) {
       if (mounted) {
@@ -265,7 +270,7 @@ class _MyBooksPageState extends State<MyBooksPage>
       final storage = FirebaseStorage.instance;
       final baseRef = storage.ref('users/${user.uid}/mybooks/${doc.id}');
 
-      // حذف الملفات (بهدوء لو مفقودة)
+      // Delete files quietly (ignore if missing)
       await Future.wait([
         baseRef.child('book.pdf').delete().catchError((_) {}),
         baseRef.child('cover.jpg').delete().catchError((_) {}),
@@ -283,25 +288,25 @@ class _MyBooksPageState extends State<MyBooksPage>
     }
   }
 
-  // نص تنبيه لطيف حسب الشيء الناقص (SnackBar فقط)
+  // Friendly missing-fields message used only in SnackBars
   String _missingFriendlyMessage() {
     final nameMissing = _titleCtrl.text.trim().isEmpty;
     final pdfMissing = _pdfFile == null;
     if (nameMissing && pdfMissing) {
-      return 'أضيفي اسم الكتاب واخترِي ملف PDF أولاً ✨';
+      return 'أضيف اسم الكتاب واخترِي ملف PDF أولاً ✨';
     } else if (nameMissing) {
-      return 'أضيفي اسم الكتاب أولاً ✍️';
+      return 'أضيف اسم الكتاب أولاً ✍️';
     } else {
-      return 'اختاري ملف الكتاب (PDF) أولاً 📄';
+      return 'اختار ملف الكتاب (PDF) أولاً 📄';
     }
   }
 
-  // ===== واجهة إضافة كتاب (اسم + PDF إجباري، غلاف اختياري) =====
+  // ===== Add Book tab UI (title + PDF are required, cover is optional) =====
   Widget _buildAddTab() {
     final nameMissing = _titleCtrl.text.trim().isEmpty;
     final pdfMissing  = _pdfFile == null;
 
-    // ✅ نعرض رسالة نقص الـPDF بمجرد ما الاسم يصير غير فاضي
+    // ✅ Show PDF validation message as soon as the title is not empty
     final showPdfValidation = _forceValidate || _titleCtrl.text.trim().isNotEmpty;
 
     return Directionality(
@@ -328,7 +333,7 @@ class _MyBooksPageState extends State<MyBooksPage>
                       children: [
                         const SizedBox(height: 8),
 
-                        // اسم الكتاب
+                        // Book title
                         _fieldContainer(
                           isError: _forceValidate && nameMissing,
                           child: TextFormField(
@@ -346,7 +351,7 @@ class _MyBooksPageState extends State<MyBooksPage>
                         ),
                         const SizedBox(height: 14),
 
-                        // ✅ اختيار PDF (إجباري)
+                        // ✅ PDF file selector (required)
                         _fileButton(
                           text: _pdfFile == null
                               ? 'اختيار ملف PDF *'
@@ -358,7 +363,7 @@ class _MyBooksPageState extends State<MyBooksPage>
                         ),
                         const SizedBox(height: 14),
 
-                        // الغلاف (اختياري)
+                        // Cover image selector (optional)
                         _fileButton(
                           text: _coverFile == null
                               ? 'اختيار صورة الغلاف (اختياري)'
@@ -369,7 +374,7 @@ class _MyBooksPageState extends State<MyBooksPage>
 
                         const SizedBox(height: 8),
 
-                        // زر الحفظ
+                        // Save button
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
@@ -400,7 +405,7 @@ class _MyBooksPageState extends State<MyBooksPage>
     );
   }
 
-  // ===== واجهة كتبي (تعرض فقط كتب المستخدم الحالي) =====
+  // ===== "My Books" tab UI (shows only current user's books) =====
   Widget _buildMyListTab() {
     final user = FirebaseAuth.instance.currentUser;
     return Directionality(
@@ -475,7 +480,7 @@ class _MyBooksPageState extends State<MyBooksPage>
 
                             const SizedBox(width: 12),
 
-                            // العنوان قابل للنقر → يفتح صفحة التفاصيل
+                            // Clickable title → opens book details page
                             Expanded(
                               child: InkWell(
                                 onTap: () {
@@ -525,71 +530,75 @@ class _MyBooksPageState extends State<MyBooksPage>
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Directionality(
-        textDirection: TextDirection.rtl,
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: Image.asset('assets/images/back_private.png', fit: BoxFit.cover),
-            ),
-            Scaffold(
+    // In very rare cases (during hot reload) _tabController might still be null for one frame
+    if (_tabController == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: Image.asset('assets/images/back_private.png', fit: BoxFit.cover),
+          ),
+          Scaffold(
+            backgroundColor: Colors.transparent,
+            extendBodyBehindAppBar: true,
+            appBar: AppBar(
               backgroundColor: Colors.transparent,
-              extendBodyBehindAppBar: true,
-              appBar: AppBar(
-                backgroundColor: Colors.transparent,
-                elevation: 0,
-                leadingWidth: 56,
-                toolbarHeight: 170,
-                leading: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsetsDirectional.only(start: 8, top: 55),
-                    child: IconButton(
-                      tooltip: 'رجوع',
-                      onPressed: () => _backToHub(context),
-                      icon: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        color: _midGreen,
-                        size: 22,
-                      ),
+              elevation: 0,
+              leadingWidth: 56,
+              toolbarHeight: 170,
+              leading: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsetsDirectional.only(start: 8, top: 55),
+                  child: IconButton(
+                    tooltip: 'رجوع',
+                    onPressed: () => _backToHub(context),
+                    icon: const Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      color: _midGreen,
+                      size: 22,
                     ),
                   ),
                 ),
-                bottom: const PreferredSize(
-                  preferredSize: Size.fromHeight(70),
-                  child: Column(
-                    children: [
-                      SizedBox(height: 70),
-                      TabBar(
-                        labelColor: _darkGreen,
-                        unselectedLabelColor: Colors.black54,
-                        indicatorColor: _darkGreen,
-                        tabs: [
-                          Tab(icon: Icon(Icons.add), text: 'إضافة كتاب'),
-                          Tab(icon: Icon(Icons.library_books), text: 'كتبي'),
-                        ],
-                      ),
-                      SizedBox(height: 8),
-                    ],
-                  ),
+              ),
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(70),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 70),
+                    TabBar(
+                      controller: _tabController,
+                      labelColor: _darkGreen,
+                      unselectedLabelColor: Colors.black54,
+                      indicatorColor: _darkGreen,
+                      tabs: const [
+                        Tab(icon: Icon(Icons.add), text: 'إضافة كتاب'),
+                        Tab(icon: Icon(Icons.library_books), text: 'كتبي'),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                 ),
               ),
-              body: TabBarView(
-                children: [
-                  _buildAddTab(),
-                  _buildMyListTab(),
-                ],
-              ),
             ),
-          ],
-        ),
+            body: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildAddTab(),
+                _buildMyListTab(),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-// ================== Widgets مساعدة ==================
+// ================== Helper Widgets ==================
 
 Widget _fieldContainer({required Widget child, bool isError = false}) {
   return Container(
@@ -612,7 +621,7 @@ Widget _fileButton({
   bool required = false,
   bool isMissing = false,
 }) {
-  // تمييز الاختياري/الإجباري بصريًا + رسالة صغيرة تحت الزر عند الحاجة
+  // Visually distinguish required/optional + show a small error label when needed
   return Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
