@@ -6,7 +6,7 @@ import 'club_chat_page.dart';
 import 'firestore_clubs_service.dart';
 
 /// =====================
-/// تحكّم بالمسافات
+/// Spacing controls
 /// =====================
 const double kBackArrowTopPadding = 55;
 const double kTabTopPadding = 30;
@@ -18,7 +18,7 @@ const double kFormTopPadding = 230;
 const double kMyRequestsTopPadding = 240;
 
 /// =====================
-/// ألوان الهوية
+/// Brand colors
 /// =====================
 const Color _darkGreen  = Color(0xFF0E3A2C);
 const Color _midGreen   = Color(0xFF2F5145);
@@ -73,7 +73,7 @@ class ClubsPage extends StatelessWidget {
 }
 
 /// =====================
-/// شريط التبويبات
+/// Tab bar shell
 /// =====================
 class _TabbarContainer extends StatelessWidget implements PreferredSizeWidget {
   final double topPadding;
@@ -122,9 +122,9 @@ class _TabbarContainer extends StatelessWidget implements PreferredSizeWidget {
 }
 
 /// =====================
-/// تبويب: الأندية (من Firestore)
-/// الترتيب: اسم النادي (أكبر) -> الوصف -> الفئة -> عدد الأعضاء
-/// زر الانضمام يسار ويتحول لـ "أنت جزء من النادي" إذا كنتِ عضوة
+/// Tab: Clubs list (from Firestore)
+/// Order: title -> description -> category -> members count
+/// Join button on left (RTL end), becomes dynamic per membership state
 /// =====================
 class _ClubsListTab extends StatelessWidget {
   final String background;
@@ -167,7 +167,7 @@ class _ClubsListTab extends StatelessWidget {
               itemBuilder: (_, i) {
                 final c = clubs[i];
 
-                // جلب عدد الأعضاء Realtime
+                // Live members count
                 return StreamBuilder<QuerySnapshot>(
                   stream: FirebaseFirestore.instance
                       .collection('clubs')
@@ -187,7 +187,7 @@ class _ClubsListTab extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // اسم النادي (أكبر)
+                          // Club name
                           Text(
                             c.title,
                             style: const TextStyle(
@@ -198,7 +198,7 @@ class _ClubsListTab extends StatelessWidget {
                           ),
                           const SizedBox(height: 6),
 
-                          // الوصف
+                          // Description
                           if ((c.description ?? '').isNotEmpty)
                             Text(
                               c.description!,
@@ -206,7 +206,7 @@ class _ClubsListTab extends StatelessWidget {
                             ),
                           const SizedBox(height: 6),
 
-                          // الفئة
+                          // Category
                           if ((c.category ?? '').isNotEmpty)
                             Text(
                               'الفئة: ${c.category!}',
@@ -214,7 +214,7 @@ class _ClubsListTab extends StatelessWidget {
                             ),
                           const SizedBox(height: 6),
 
-                          // عدد الأعضاء
+                          // Members count
                           Text(
                             'عدد الأعضاء: $membersCount',
                             style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w700),
@@ -222,7 +222,7 @@ class _ClubsListTab extends StatelessWidget {
 
                           const SizedBox(height: 12),
 
-                          // زر الانضمام يسار (في RTL: end = يسار)
+                          // Actions (RTL end = left)
                           Align(
                             alignment: AlignmentDirectional.centerEnd,
                             child: _JoinOrOpenButton(clubId: c.id, clubTitle: c.title),
@@ -243,8 +243,9 @@ class _ClubsListTab extends StatelessWidget {
   }
 }
 
-/// زر الانضمام/فتح الشات (ذكي)
-/// زر الانضمام/فتح الشات (ذكي) — ألوان حسب الحالة
+/// Join / Open / Leave smart button
+/// - If not a member: shows "انضم" and joins on tap.
+/// - If a member: shows two actions: "دخول النادي" (open chat) and "مغادرة".
 class _JoinOrOpenButton extends StatefulWidget {
   final String clubId;
   final String clubTitle;
@@ -256,6 +257,80 @@ class _JoinOrOpenButton extends StatefulWidget {
 
 class _JoinOrOpenButtonState extends State<_JoinOrOpenButton> {
   bool _busy = false;
+
+  Future<void> _leaveClub(String clubId, String uid) async {
+    // delete membership document
+    final memberRef = FirebaseFirestore.instance
+        .collection('clubs')
+        .doc(clubId)
+        .collection('members')
+        .doc(uid);
+    await memberRef.delete();
+  }
+
+  /// Confirmation dialog (Qabas style)
+  Future<bool> _confirmLeaveDialog(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+          child: Directionality(
+            textDirection: TextDirection.rtl,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'تأكيد مغادرة النادي',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: _darkGreen,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'هل أنت متأكد أنك تريد مغادرة هذا النادي؟',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 15, color: Colors.black87),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _confirm,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: const Text('تأكيد', style: TextStyle(fontSize: 16, color: Colors.white)),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.grey[300],
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('إلغاء', style: TextStyle(fontSize: 16, color: _darkGreen)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    return ok == true;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -273,11 +348,83 @@ class _JoinOrOpenButtonState extends State<_JoinOrOpenButton> {
       builder: (context, snap) {
         final isMember = (snap.data?.exists ?? false);
 
-        final String label = isMember ? 'أنت جزء من النادي' : 'انضم';
-        final Color bg      = isMember ? Colors.white : _confirm;
-        final BorderSide side =
-        isMember ? const BorderSide(color: _darkGreen, width: 1.2) : BorderSide.none;
+        if (isMember) {
+          // Show two buttons: Open club (chat) + Leave
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                height: 36,
+                child: TextButton(
+                  onPressed: _busy
+                      ? null
+                      : () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ClubChatPage(
+                          clubId: widget.clubId,
+                          clubTitle: widget.clubTitle,
+                        ),
+                      ),
+                    );
+                  },
+                  style: TextButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: _darkGreen,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      side: const BorderSide(color: _darkGreen, width: 1.2),
+                    ),
+                  ),
+                  child: const Text('دخول النادي', style: TextStyle(fontWeight: FontWeight.w800)),
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                height: 36,
+                child: TextButton(
+                  onPressed: _busy
+                      ? null
+                      : () async {
+                    // show confirmation before leaving
+                    final sure = await _confirmLeaveDialog(context);
+                    if (!sure) return;
 
+                    setState(() => _busy = true);
+                    try {
+                      await _leaveClub(widget.clubId, uid);
+                      // After leaving, UI auto-updates via stream -> button becomes "انضم"
+                    } finally {
+                      if (mounted) setState(() => _busy = false);
+                    }
+                  },
+                  style: TextButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: _danger,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      side: const BorderSide(color: _danger, width: 1.2),
+                    ),
+                  ),
+                  child: _busy
+                      ? const SizedBox(
+                    width: 21,
+                    height: 21,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 1,
+                      valueColor: AlwaysStoppedAnimation(_danger),
+                    ),
+                  )
+                      : const Text('مغادرة', style: TextStyle(fontWeight: FontWeight.w800)),
+                ),
+              ),
+            ],
+          );
+        }
+
+        // Not a member → single "Join" button (kept as before)
         return SizedBox(
           height: 36,
           child: TextButton(
@@ -286,12 +433,10 @@ class _JoinOrOpenButtonState extends State<_JoinOrOpenButton> {
                 : () async {
               setState(() => _busy = true);
               try {
-                if (!isMember) {
-                  await FirestoreClubsService.instance.joinClub(
-                    clubId: widget.clubId,
-                    uid: uid,
-                  );
-                }
+                await FirestoreClubsService.instance.joinClub(
+                  clubId: widget.clubId,
+                  uid: uid,
+                );
                 if (context.mounted) {
                   Navigator.of(context).push(
                     MaterialPageRoute(
@@ -307,12 +452,11 @@ class _JoinOrOpenButtonState extends State<_JoinOrOpenButton> {
               }
             },
             style: TextButton.styleFrom(
-              backgroundColor: bg,
-              foregroundColor: _darkGreen, // النص داكن (دارك قرين) بالحالتين
+              backgroundColor: _confirm,
+              foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 18),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
-                side: side,
               ),
             ),
             child: _busy
@@ -321,10 +465,10 @@ class _JoinOrOpenButtonState extends State<_JoinOrOpenButton> {
               height: 21,
               child: CircularProgressIndicator(
                 strokeWidth: 1,
-                valueColor: AlwaysStoppedAnimation(_darkGreen),
+                valueColor: AlwaysStoppedAnimation(Colors.white),
               ),
             )
-                : Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
+                : const Text('انضم', style: TextStyle(fontWeight: FontWeight.w800)),
           ),
         );
       },
@@ -333,7 +477,7 @@ class _JoinOrOpenButtonState extends State<_JoinOrOpenButton> {
 }
 
 /// =====================
-/// تبويب: طلب إنشاء نادي
+/// Tab: Create club request
 /// =====================
 class _CreateRequestTab extends StatefulWidget {
   final String background;
@@ -555,7 +699,7 @@ class _FieldLabel extends StatelessWidget {
 }
 
 /// =====================
-/// تبويب: طلباتي
+/// Tab: My requests
 /// =====================
 class _MyRequestsTab extends StatelessWidget {
   final String background;
@@ -609,8 +753,9 @@ class _MyRequestsTab extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                            'عنوان النادي: ${r.title}',
-                            style: const TextStyle(color: _darkGreen, fontWeight: FontWeight.w800)),
+                          'عنوان النادي: ${r.title}',
+                          style: const TextStyle(color: _darkGreen, fontWeight: FontWeight.w800),
+                        ),
                       ),
                       const SizedBox(width: 12),
                       _StatusPill(label: _statusLabel(r.status), color: _statusColor(r.status)),
@@ -650,7 +795,7 @@ class _StatusPill extends StatelessWidget {
 }
 
 /// =====================
-/// حقول النموذج
+/// Form inputs
 /// =====================
 class _OutlinedInput extends StatelessWidget {
   final String hint;

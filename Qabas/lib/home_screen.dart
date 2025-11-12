@@ -192,8 +192,8 @@ class _HomeScreenState extends State<HomeScreen> {
           .get();
       if (doc.exists) {
         final data = doc.data() ?? {};
-        name =
-        (data['name'] ?? data['fullName'] ?? data['displayName'] ?? '') as String;
+        name = (data['name'] ?? data['fullName'] ?? data['displayName'] ?? '')
+        as String;
         if (name.trim().isEmpty) name = null;
       }
     } catch (_) {}
@@ -526,7 +526,16 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Recommendations area placeholder...
+              // Recommendations area placeholder (message only for now)
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                alignment: Alignment.center,
+                child: const Text(
+                  'لا توجد كتب مقترحة لك حاليًا.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.black54),
+                ),
+              ),
             ],
           ),
         ],

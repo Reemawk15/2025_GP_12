@@ -147,7 +147,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     // كرت 2: إدارة الطلبات
                     _ActionCard(
                       title: 'إدارة الطلبات',
-                      subtitle: 'يمكنك متابعة طلبات إنشاء الكتب بالضغط على الزر أدناه.',
+                      subtitle: 'يمكنك متابعة طلبات إنشاء أندية الكتب بالضغط على الزر أدناه.',
                       buttonText: 'عرض الطلبات',
                       onPressed: () {
                         Navigator.push(
