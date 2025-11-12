@@ -209,22 +209,15 @@ function isPageNumberLine(line: string): boolean {
  * Remove inline page numbers embedded between sentences:
  * - After punctuation like ". ۱۲ الكلمة"
  * - Trailing small number at end of line, but ONLY if no other digits in that line.
- *
- * The goal is to capture page markers like "۱۱" without touching real numbers in context,
- * especially years (١٩٢٨) or measures (۱۸٠ درجة).
  */
 function removeInlinePageNumbers(text: string): string {
-  // 1) Remove patterns like ". ۱۲ الكلمة" or "؟ ۱۱ الفصل الثاني"
-  //    Punctuation (. ! ؟) + spaces + 1-3 digits + space + letter
+  // Remove patterns like: punctuation + spaces + 1-3 digits + space + letter
   text = text.replace(
     /([\.!\؟؟!])\s*[0-9\u0660-\u0669\u06F0-\u06F9]{1,3}\s+(?=[A-Za-zء-ي])/g,
     "$1 "
   );
 
-  // 2) For each line, remove trailing small number if the rest of the line has NO digits.
-  //    Example:
-  //      "ركز عينيه على الطريق ومضى في سبيله. ۱۱"
-  //    This is very likely a page number.
+  // For each line, remove trailing small number if the rest of the line has NO digits.
   text = text.replace(
     /^([^\n0-9\u0660-\u0669\u06F0-\u06F9]*?)\s[0-9\u0660-\u0669\u06F0-\u06F9]{1,3}\s*$/gm,
     "$1"
@@ -239,15 +232,14 @@ function removeInlinePageNumbers(text: string): string {
  * - Remove page-number lines ("7", "١١", "۱۱", "Page 3", "صفحة ٥")
  * - Remove repeating small headers/footers
  * - Remove TOC-like dotted lines
- * - Remove decorative-only lines (•, ... , ----- , _____)
- * - Remove inline little page numbers after punctuation or at line end (with safeguards)
+ * - Remove decorative-only lines
  */
 function cleanPages(rawPages: string[]): string[] {
   if (!rawPages.length) return [];
 
   const pagesLines = rawPages.map((p) => p.split(/\r?\n+/));
 
-  // 1) Detect common small header/footer lines that repeat across pages
+  // 1) Detect repeated small header/footer lines
   const freq = new Map<string, number>();
 
   for (const lines of pagesLines) {
@@ -256,9 +248,8 @@ function cleanPages(rawPages: string[]): string[] {
     for (const raw of [...top, ...bottom]) {
       const line = raw.trim();
       if (!line) continue;
-      // Skip page-number-like lines when building header/footer candidates
       if (isPageNumberLine(line)) continue;
-      if (line.length > 80) continue; // too long to be header/footer
+      if (line.length > 80) continue;
       const key = line;
       freq.set(key, (freq.get(key) || 0) + 1);
     }
@@ -297,7 +288,6 @@ function cleanPages(rawPages: string[]): string[] {
     );
 
     if (isTocPage || isPublisherPage) {
-      // Skip this page entirely
       continue;
     }
 
@@ -308,38 +298,143 @@ function cleanPages(rawPages: string[]): string[] {
       const line = rawLine.trim();
       if (!line) continue;
 
-      // Skip pure page-number style lines
       if (isPageNumberLine(line)) continue;
-
-      // Skip repeated small header/footer lines
       if (headerFooterCandidates.has(line)) continue;
 
-      // Skip obvious table-of-contents headers (safety if any remain)
       if (/^(الفهرس|المحتويات|فهرس المحتويات|table of contents|contents)\b/i.test(line)) {
         continue;
       }
 
-      // Skip lines that look like TOC entries with dotted leaders (عنوان .... ١٢)
+      // Dotted leaders (e.g., "Chapter .... 12")
       if (/\.{5,}/.test(line)) continue;
 
-      // Skip purely decorative lines: bullets or repeated punctuation
-      // • , ••• , ... , ----- , _____ , etc.
-      if (/^[\u2022•·]+$/.test(line)) continue;          // only bullet-like chars
-      if (/^[\.\-\_]{3,}$/.test(line)) continue;         // only dots/dashes/underscores
+      // Decorative-only lines
+      if (/^[\u2022•·]+$/.test(line)) continue;
+      if (/^[\.\-\_]{3,}$/.test(line)) continue;
 
       newLines.push(line);
     }
 
     let joined = newLines.join("\n").trim();
 
-    // Remove inline page numbers like ". ۱۲ الفصل الثاني" or trailing " ... ۱۱"
+    // Remove inline page numbers
     joined = removeInlinePageNumbers(joined).trim();
 
-    // Drop pages that become empty after cleaning (pure TOC/rights pages)
     if (joined) cleaned.push(joined);
   }
 
   return cleaned;
+}
+
+// =============== English stripping & page classification (UPDATED) ===============
+
+/** Strip inline English from text: words, URLs, emails, DOIs; keep Arabic. */
+function stripInlineEnglish(text: string): string {
+  // Remove URLs and DOIs first
+  let t = text.replace(/https?:\/\/\S+|www\.\S+|doi\.org\/\S+/gi, " ");
+
+  // Remove emails
+  t = t.replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, " ");
+
+  // Remove standalone Latin words/tokens (keep hyphenated/possessives)
+  t = t.replace(/\b[A-Za-z][A-Za-z\-']*\b/g, " ");
+
+  // Collapse extra spaces and tidy lines
+  t = t
+    .split(/\r?\n+/)
+    .map((ln) => ln.replace(/\s{2,}/g, " ").trim())
+    .filter((ln) => ln.length > 0) // drop empty lines after stripping
+    .join("\n");
+
+  return t.trim();
+}
+
+/** Quick counters */
+function countMatches(s: string, re: RegExp): number {
+  const m = s.match(re);
+  return m ? m.length : 0;
+}
+
+/** Detect 'References/المراجع' pages to skip completely. */
+function looksLikeReferencesPage(text: string): boolean {
+  const t = text.trim();
+  if (/^(المراجع|المصادر|المراجع\s*والمصادر)\b/.test(t)) return true;
+  if (/^references\b/i.test(t)) return true;
+
+  const lines = t.split(/\r?\n+/);
+  let refLike = 0;
+  for (const ln of lines.slice(0, 60)) {
+    const l = ln.trim();
+    if (!l) continue;
+    // APA-style year (.... (2018).) or Arabic-Indic years
+    if (/\(\s*\d{4}\s*\)\.?$/.test(l) || /[\u0660-\u0669]{4}\s*[\.\)]?$/.test(l)) refLike++;
+    if (/doi\.org|http|https|www\./i.test(l)) refLike++;
+    // Many Latin author names and commas
+    if (/[A-Za-z]{3,}.*,/.test(l)) refLike++;
+  }
+  return refLike >= 3;
+}
+
+/**
+ * Heuristic: skip whole page if it's mostly English or becomes noise after stripping.
+ * - If Latin letters are much more than Arabic letters and Arabic is short -> skip.
+ * - If after stripInlineEnglish the remainder is only numbers/punctuation/bullets -> skip.
+ */
+function shouldSkipAsMostlyEnglish(rawText: string): boolean {
+  const lettersOnly = rawText.replace(/[^A-Za-z\u0600-\u06FF]/g, "");
+  const latinCount = countMatches(lettersOnly, /[A-Za-z]/g);
+  const arabicCount = countMatches(lettersOnly, /[\u0600-\u06FF]/g);
+
+  // If Latin dominates heavily and Arabic is scarce, likely an English page.
+  if (latinCount >= Math.max(60, 3 * arabicCount) && arabicCount < 120) {
+    return true;
+  }
+
+  // After stripping English, check if what's left is just noise.
+  const arabicOnly = stripInlineEnglish(rawText);
+  if (!arabicOnly) return true;
+
+  // Remove digits, punctuation, bullets, dashes, underscores and spaces.
+  const core = arabicOnly.replace(/[0-9\u0660-\u0669\u06F0-\u06F9\s\.\,\-\_\:\;\(\)\[\]\{\}\/\\|~`'"!?…•٫٬؛،]+/g, "");
+  // If very few Arabic letters remain overall, treat as noise.
+  if (core.length < 20) return true;
+
+  // Also if the number of lines with real Arabic words is very small.
+  const arabicLines = arabicOnly
+    .split(/\r?\n+/)
+    .map(s => s.trim())
+    .filter(Boolean)
+    .filter(s => /[\u0600-\u06FF]{3,}/.test(s)).length;
+
+  if (arabicLines <= 1 && core.length < 40) return true;
+
+  return false;
+}
+
+/**
+ * Decide per-page: type + spoken text (Arabic only)
+ * IMPORTANT: We DO NOT skip a whole page just for containing some English.
+ * We only skip if the page is detected as references OR mostly English/noise.
+ */
+function processOnePageForSpeech(rawText: string) {
+  const base = rawText.trim();
+  if (!base) return { type: "empty" as const, spokenText: "" };
+
+  // Skip "References/المراجع" pages completely
+  if (looksLikeReferencesPage(base)) {
+    return { type: "references" as const, spokenText: "" };
+  }
+
+  // Skip pages that are mostly English or degrade into noise after stripping
+  if (shouldSkipAsMostlyEnglish(base)) {
+    return { type: "english" as const, spokenText: "" };
+  }
+
+  // Otherwise keep Arabic content only
+  const arabicOnly = stripInlineEnglish(base);
+  if (!arabicOnly) return { type: "empty" as const, spokenText: "" };
+
+  return { type: "text" as const, spokenText: arabicOnly };
 }
 
 // ========== Read all JSON files under outPrefix at any depth, and collect pages ==========
@@ -472,13 +567,12 @@ async function collectPages(outPrefix: string): Promise<string[]> {
 // ================== MAIN FUNCTION ==================
 export const ocrOnPdfUploadV2 = onObjectFinalized(
   {
-    // No "bucket" field here to avoid region issues with some CLIs
     region: "us-central1",
     timeoutSeconds: 540,
     memory: "2GiB",
   },
   async (event) => {
-    // Process only if the event comes from the expected bucket
+    // Only process PDFs from the expected bucket
     const triggeredBucket = event.data?.bucket;
     if (triggeredBucket !== APP_BUCKET) {
       logger.info("Skip different bucket", {
@@ -494,7 +588,7 @@ export const ocrOnPdfUploadV2 = onObjectFinalized(
       return;
     }
 
-    // Determine whether this is an admin book or a user private book
+    // Determine upload context (admin public book vs user private book)
     const ctx = getUploadContext(filePath);
     if (!ctx) {
       logger.info("Skip invalid path (not admin nor user book)", { filePath });
@@ -513,12 +607,12 @@ export const ocrOnPdfUploadV2 = onObjectFinalized(
       basePrefix: ctx.basePrefix,
     });
 
-    // 1) Run Batch OCR on the uploaded PDF
+    // 1) Run Batch OCR
     const gcsInputUri = `gs://${triggeredBucket}/${filePath}`;
     const outPrefix = `${ctx.basePrefix}/ocr/${Date.now()}/`;
     await runBatchOCR(gcsInputUri, outPrefix);
 
-    // 2) Collect text page by page (already cleaned)
+    // 2) Collect cleaned pages
     const pages = await collectPages(outPrefix);
     if (!pages.length) {
       logger.error("No text pages found after OCR", {
@@ -529,16 +623,20 @@ export const ocrOnPdfUploadV2 = onObjectFinalized(
       return;
     }
 
-    // 3) Store:
-    //    - book.txt as a continuous cleaned text (no explicit page numbers)
-    //    - pages/page-xxx.txt for each cleaned page
+    // 3) Classify each page and build combined text (Arabic only)
     const pagesFolder = `${ctx.basePrefix}/pages`;
     const combinedPath = `${ctx.basePrefix}/book.txt`;
-
     const combinedToken = uuidv4();
 
-    // Do NOT insert "PAGE N" markers, just separate pages by blank lines
-    const combinedText = pages.join("\n\n");
+    const processed = pages.map(processOnePageForSpeech);
+
+    // Build combined text: keep only Arabic text pages
+    const combinedParts: string[] = [];
+    for (const p of processed) {
+      if (p.type === "text") combinedParts.push(p.spokenText);
+      // references/english/empty produce nothing
+    }
+    const combinedText = combinedParts.join("\n\n");
 
     // Save combined file with a public download token
     await storage.bucket(APP_BUCKET).file(combinedPath).save(combinedText, {
@@ -552,14 +650,18 @@ export const ocrOnPdfUploadV2 = onObjectFinalized(
       },
     });
 
-    // Save per-page files (kept private by default)
-    for (let i = 0; i < pages.length; i++) {
+    // Save per-page files (store Arabic-only text, skip others)
+    for (let i = 0; i < processed.length; i++) {
       const n = String(i + 1).padStart(3, "0");
       const pPath = `${pagesFolder}/page-${n}.txt`;
+
+      const p = processed[i];
+      const payload = p.type === "text" ? p.spokenText : "";
+
       await storage
         .bucket(APP_BUCKET)
         .file(pPath)
-        .save(pages[i] + "\n", {
+        .save((payload ? payload + "\n" : ""), {
           resumable: false,
           contentType: "text/plain; charset=utf-8",
           metadata: { cacheControl: "no-cache" },
@@ -577,4 +679,5 @@ export const ocrOnPdfUploadV2 = onObjectFinalized(
       publicUrl,
       pagesFolder,
     });
-    });
+  }
+);
