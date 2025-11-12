@@ -126,7 +126,8 @@ class _SignInPageState extends State<SignInPage> {
       return;
     }
 
-    // 👇 غير كذا: نستمر لمسار Firebase
+
+    // Otherwise: continue to the Firebase path
     setState(() => _loading = true);
     try {
       final email = await _resolveEmail(idInput);
@@ -140,7 +141,7 @@ class _SignInPageState extends State<SignInPage> {
         password: passInput,
       );
 
-      // بعد تسجيل دخول Firebase نتحقق من دوره في Firestore
+      // After signing in with Firebase, check the user's role in Firestore
       final uid = cred.user?.uid;
       if (uid != null) {
         final snap = await FirebaseFirestore.instance.collection('users').doc(uid).get();

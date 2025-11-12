@@ -196,22 +196,23 @@ class _SignUpPageState extends State<SignUpPage> {
         return;
       }
 
-      // إنشاء مستخدم في Auth
+
       final cred = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(email: email, password: pass);
 
       final user = cred.user!;
 
-      // حفظ المستخدم في Firestore مع الحقول الموحّدة
+
+      // Save the user in Firestore with standardized fields
       await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
         'uid': user.uid,
         'name': name,
-        'nameLower': _normalize(name),         // ✅ مهم للبحث
+        'nameLower': _normalize(name),
         'email': email,
         'emailLower': email.toLowerCase(),
         'username': username,
-        'usernameLower': _normalize(username), // ✅ مهم للبحث
-        'photoUrl': '',                        // اختياري
+        'usernameLower': _normalize(username),
+        'photoUrl': '',
         'notificationsEnabled': _notifsEnabled,
         'createdAt': FieldValue.serverTimestamp(),
       });
