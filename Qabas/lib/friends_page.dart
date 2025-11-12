@@ -5,7 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'friend_details_page.dart';
 
 /// =====================
-/// تحكّم سريع بالمسافات
+/// Spacing quick controls
 /// =====================
 const double kFriendsTopPadding   = 260;
 const double kRequestsTopPadding  = 260;
@@ -18,7 +18,7 @@ class FriendsPage extends StatelessWidget {
   static const Color _darkGreen  = Color(0xFF0E3A2C);
   static const Color _midGreen   = Color(0xFF2F5145);
 
-  /// ✅ دالة SnackBar موحدة لنفس الصفحة
+  /// Unified SnackBar helper for this page
   static void _showAppSnack(BuildContext context, String message, {IconData icon = Icons.check_circle}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -127,7 +127,7 @@ class _FriendsTabBar extends StatelessWidget {
   }
 }
 
-// ======================== تبويب: أصدقائي ========================
+// ======================== Tab: My Friends ========================
 class _FriendsListTab extends StatelessWidget {
   final String background;
   const _FriendsListTab({required this.background});
@@ -182,7 +182,7 @@ class _FriendsListTab extends StatelessWidget {
   }
 }
 
-// ======================== تبويب: طلبات الإضافة ========================
+// ======================== Tab: Friend Requests ========================
 class _RequestsTab extends StatelessWidget {
   final String background;
   const _RequestsTab({required this.background});
@@ -279,7 +279,7 @@ class _RequestsTab extends StatelessWidget {
   }
 }
 
-// ======================== تبويب: البحث عن أصدقاء (مع Pending) ========================
+// ======================== Tab: Search Friends (with Pending) ========================
 class _SearchTab extends StatefulWidget {
   final String background;
   const _SearchTab({required this.background});
@@ -293,38 +293,47 @@ class _SearchTabState extends State<_SearchTab> {
   bool _loading = false;
   List<_FriendUser> _results = const [];
 
-  // 🔤 دالة تبسّط النصوص
+  // Tracks whether a search was performed with a non-empty query
+  bool _hasSearched = false;
+
+  // Normalize Arabic text for better matching
   String normalize(String s) => s
       .trim().toLowerCase()
       .replaceAll('ـ', '')
       .replaceAll('أ', 'ا').replaceAll('إ', 'ا').replaceAll('آ', 'ا')
       .replaceAll('ة', 'ه').replaceAll('ى', 'ي');
 
-  // 🧠 البحث الفعلي مع تحديد pending لو فيه طلب مرسل مني له
+  // Actual search logic with pending detection
   Future<void> _onSearch(String raw) async {
     final me = FirebaseAuth.instance.currentUser;
     if (me == null) return;
 
     final q = normalize(raw);
     if (q.isEmpty) {
-      setState(() => _results = const []);
+      setState(() {
+        _results = const [];
+        _hasSearched = false; // no query submitted
+      });
       return;
     }
 
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _hasSearched = true; // mark that a search attempt happened
+    });
 
     try {
       final fs = FirebaseFirestore.instance;
 
-      // أصدقائي الحاليون
+      // Current friends
       final myFriendsSnap = await fs.collection('users').doc(me.uid).collection('friends').get();
       final myFriends = myFriendsSnap.docs.map((d) => d.id).toSet();
 
-      // الطلبات الواردة لي
+      // Incoming requests to me
       final myIncomingReqsSnap = await fs.collection('users').doc(me.uid).collection('friendRequests').get();
       final incomingFrom = myIncomingReqsSnap.docs.map((d) => d.id).toSet();
 
-      // بحث prefix
+      // Prefix queries
       Future<QuerySnapshot<Map<String, dynamic>>> qBy(String field) {
         return fs.collection('users')
             .orderBy(field)
@@ -345,8 +354,8 @@ class _SearchTabState extends State<_SearchTab> {
       void addDoc(QueryDocumentSnapshot<Map<String, dynamic>> d) {
         final uid = d.id;
         if (uid == me.uid) return;
-        if (myFriends.contains(uid)) return;     // أصلاً صديق
-        if (incomingFrom.contains(uid)) return;  // عندي منه طلب وارد
+        if (myFriends.contains(uid)) return;     // already a friend
+        if (incomingFrom.contains(uid)) return;  // already sent me a request
 
         final data = d.data();
         final name     = (data['name'] ?? '') as String;
@@ -367,7 +376,7 @@ class _SearchTabState extends State<_SearchTab> {
         for (final d in s.docs) addDoc(d);
       }
 
-      // خطة احتياطية: فلترة داخلية لو ما فيه نتائج
+      // Fallback: client-side filter if nothing matched
       if (map.isEmpty) {
         final allSnap = await fs.collection('users').limit(200).get();
         for (final d in allSnap.docs) {
@@ -397,7 +406,7 @@ class _SearchTabState extends State<_SearchTab> {
         }
       }
 
-      // ✅ تعيين حالة "بانتظار القبول" (Outgoing) لكل نتيجة
+      // Mark "pending" (outgoing request) for results if exists
       final uids = map.keys.toList();
       if (uids.isNotEmpty) {
         final futures = uids.map((otherUid) {
@@ -423,7 +432,7 @@ class _SearchTabState extends State<_SearchTab> {
     }
   }
 
-  // ✉️ إرسال طلب صداقة (لا نحذف النتيجة — نبدّلها Pending)
+  // Send friend request (keep result item but toggle to pending)
   Future<void> _sendRequest(String toUid) async {
     final me = FirebaseAuth.instance.currentUser!;
     final reqRef = FirebaseFirestore.instance
@@ -467,11 +476,19 @@ class _SearchTabState extends State<_SearchTab> {
                         decoration: const InputDecoration(
                           hintText: 'ابحث بالاسم ', border: InputBorder.none,
                         ),
-                        onSubmitted: _onSearch, textInputAction: TextInputAction.search,
+                        onSubmitted: _onSearch,
+                        textInputAction: TextInputAction.search,
                       ),
                     ),
                     IconButton(
-                      onPressed: () { _controller.clear(); setState(() => _results = const []); },
+                      onPressed: () {
+                        // Clear query and results; also reset search state
+                        _controller.clear();
+                        setState(() {
+                          _results = const [];
+                          _hasSearched = false;
+                        });
+                      },
                       icon: const Icon(Icons.close, color: Colors.black38),
                       tooltip: 'مسح',
                     ),
@@ -485,7 +502,15 @@ class _SearchTabState extends State<_SearchTab> {
             else
               Expanded(
                 child: _results.isEmpty
-                    ? const Center(child: Text('ابدأ البحث عن أصدقائك ✨', style: TextStyle(color: Colors.black54)))
+                // Show a contextual message:
+                // - If the user has searched and found nothing: show classical Arabic message.
+                // - Otherwise: show the initial prompt.
+                    ? Center(
+                  child: Text(
+                    _hasSearched ? 'لا يوجد أحد بهذا الاسم.' : 'ابدأ البحث عن أصدقائك ✨',
+                    style: const TextStyle(color: Colors.black54),
+                  ),
+                )
                     : ListView.separated(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                   itemBuilder: (_, i) {
@@ -530,13 +555,13 @@ class _SearchTabState extends State<_SearchTab> {
   }
 }
 
-// ========= نموذج المستخدم في نتائج البحث (مع pending) =========
+// ========= Result user model (with pending) =========
 class _FriendUser {
   final String uid;
   final String name;
   final String handle;
   final String? photoUrl;
-  final bool pending; // ✅ هل فيه طلب مُرسل بانتظار القبول؟
+  final bool pending; // Whether there is an outgoing request awaiting approval
 
   _FriendUser({
     required this.uid,
@@ -555,7 +580,7 @@ class _FriendUser {
   );
 }
 
-// ======================== بطاقة صديق عامة (شكل فقط) ========================
+// ======================== Generic friend card (visual only) ========================
 class _FriendCard extends StatelessWidget {
   final String name;
   final String handle;
@@ -601,7 +626,7 @@ class _FriendCard extends StatelessWidget {
   }
 }
 
-/// يجلب بطاقة صديق بالـ UID مباشرة من Firestore ويستخدم نفس الشكل
+/// Fetch and render a friend card by UID directly from Firestore
 class _FriendTileFromUid extends StatelessWidget {
   final String friendUid;
   final Widget? trailing;
@@ -646,7 +671,7 @@ class _FriendTileFromUid extends StatelessWidget {
   }
 }
 
-// ======================== زر صغير (قبول / رفض / إضافة) ========================
+// ======================== Tiny action button (Accept / Decline / Add) ========================
 class _TinyActionButton extends StatelessWidget {
   final String label;
   final Color color;

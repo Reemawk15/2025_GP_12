@@ -1,4 +1,4 @@
-import 'dart:async'; // لإدارة الاشتراكات إن وُجدت
+import 'dart:async'; // Manage subscriptions if any
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -121,12 +121,12 @@ class _HomeScreenState extends State<HomeScreen> {
   int _index = 0;
   String? _displayName;
 
-  /// تحكّم سريع
-  double _topSpacingUnderHeader = 130; // مسافة نزول المحتوى تحت التعرّجات
-  double coverW = 120; // عرض الغلاف
-  double coverH = 140; // ارتفاع الغلاف
-  double coverGap = 12; // المسافة بين الأغلفة
-  int visibleCount = 3; // كم غلاف يظهر بالنص معًا
+  /// Quick controls
+  double _topSpacingUnderHeader = 130; // Content spacing under header curves
+  double coverW = 120; // Cover width
+  double coverH = 140; // Cover height
+  double coverGap = 12; // Gap between covers
+  int visibleCount = 3; // How many covers are centered at once
 
   final _items = const [
     BottomNavItem(Icons.home, 'الرئيسية'),
@@ -137,7 +137,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<String> _selectedCategories = [];
 
-  /// ✅ الكاتقورير الجديدة
+  /// Categories list
   final List<String> _categories = const [
     'الأدب والشعر',
     'التاريخ والجغرافيا',
@@ -149,7 +149,7 @@ class _HomeScreenState extends State<HomeScreen> {
     'تطوير الذات',
   ];
 
-  // (اختياري) كان عندنا اشتراك؛ نحتفظ به إن وُجد
+  // Optional: keep a live subscription if needed
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _profileSub;
 
   @override
@@ -157,7 +157,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _loadDisplayName();
 
-    // اشتراك حي
+    // Live subscription to user profile
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       _profileSub = FirebaseFirestore.instance
@@ -193,8 +193,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (doc.exists) {
         final data = doc.data() ?? {};
         name =
-        (data['name'] ?? data['fullName'] ?? data['displayName'] ?? '')
-        as String;
+        (data['name'] ?? data['fullName'] ?? data['displayName'] ?? '') as String;
         if (name.trim().isEmpty) name = null;
       }
     } catch (_) {}
@@ -208,7 +207,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  // ✅ ستريم اسم المستخدم مباشرة من Firestore (يُستخدم في الترحيب)
+  /// Live user name stream (used in greeting)
   Stream<String?> _userNameStream() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return Stream.value(null);
@@ -219,23 +218,23 @@ class _HomeScreenState extends State<HomeScreen> {
         .map((doc) {
       final data = doc.data();
       String? name =
-      (data?['name'] ?? data?['fullName'] ?? data?['displayName'])
-      as String?;
+      (data?['name'] ?? data?['fullName'] ?? data?['displayName']) as String?;
       if ((name ?? '').trim().isEmpty) name = null;
       return name;
     });
   }
 
-  // part for Search
+  // Search state
   String _searchQuery = '';
 
+  /// Books stream with local filtering (search + category)
   Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _booksStream() {
     final col = FirebaseFirestore.instance.collection('audiobooks');
 
     return col.orderBy('createdAt', descending: true).snapshots().map((snap) {
       var books = snap.docs;
 
-      // 🔍 فلترة البحث بالاسم
+      // Title search filter
       if (_searchQuery.isNotEmpty) {
         final queryLower = _searchQuery.toLowerCase();
         books = books.where((doc) {
@@ -245,7 +244,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }).toList();
       }
 
-      // 🎧 فلترة الفئة (category)
+      // Category filter
       if (_selectedCategories.isNotEmpty) {
         books = books.where((doc) {
           final data = doc.data();
@@ -254,12 +253,12 @@ class _HomeScreenState extends State<HomeScreen> {
         }).toList();
       }
 
-      // ✅ ترجع النتيجة النهائية بعد تطبيق البحث والفئة معًا
+      // Final filtered result
       return books;
     });
   }
 
-  // سطر الأغلفة بالمنتصف
+  /// Centered horizontal list of covers
   Widget _centeredCoversRail() {
     final cardW = coverW;
     final cardH = coverH;
@@ -274,7 +273,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ((w - visibleWidth) / 2).clamp(0.0, double.infinity).toDouble();
 
         return SizedBox(
-          height: cardH + 30.0, // double
+          height: cardH + 30.0,
           child: StreamBuilder<
               List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
             stream: _booksStream(),
@@ -358,28 +357,29 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// Home content stack (background + list)
   Widget _homeContent() {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Stack(
         children: [
-          // خلفيتك
+          // Background image
           Positioned.fill(
             child: Image.asset(
-              'assets/images/back.png', // عدّل المسار إذا لزم
+              'assets/images/back.png', // Adjust path if needed
               fit: BoxFit.cover,
               alignment: Alignment.topCenter,
             ),
           ),
 
-          // المحتوى فوق الخلفية
+          // Foreground content
           ListView(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
             children: [
-              // مسافة تحت التعرّجات
+              // Spacing under header curves
               SizedBox(height: _topSpacingUnderHeader),
 
-              // ✅ الترحيب — يُحدَّث لحظيًا من Firestore
+              // Greeting (live from Firestore)
               StreamBuilder<String?>(
                 stream: _userNameStream(),
                 builder: (context, snap) {
@@ -393,7 +393,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       : liveName;
 
                   return Transform.translate(
-                    offset: const Offset(0, -11), // بالسالب = يرفع النص للأعلى
+                    offset: const Offset(0, -11),
                     child: Text(
                       'مساؤك سعيد $name',
                       style: const TextStyle(
@@ -407,7 +407,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 26),
 
-              // ✅ مربع البحث المعدل
+              // Search box
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 14,
@@ -429,7 +429,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     const Icon(Icons.search, color: _HomeColors.unselected),
                     const SizedBox(width: 8),
 
-                    // TextField للبحث
+                    // Title search field
                     Expanded(
                       child: TextField(
                         textAlign: TextAlign.right,
@@ -448,6 +448,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
 
+                    // Filter button
                     GestureDetector(
                       onTap: _openFilterSheet,
                       child: const Icon(
@@ -461,7 +462,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
               const SizedBox(height: 16),
 
-              // البانر
+              // Promo banner
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
@@ -500,7 +501,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
               const SizedBox(height: 16),
 
-              // العنوان يمين
+              // Section title (new)
               const Align(
                 alignment: Alignment.centerRight,
                 child: Text(
@@ -510,12 +511,12 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 10),
 
-              // سطر الأغلفة (بالوسط)
+              // Centered covers rail
               _centeredCoversRail(),
 
               const SizedBox(height: 24),
 
-              // عنوان يمين
+              // Section title (recommendations placeholder)
               const Align(
                 alignment: Alignment.centerRight,
                 child: Text(
@@ -525,7 +526,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 12),
 
-              // مكان كروت التوصيات…
+              // Recommendations area placeholder...
             ],
           ),
         ],
@@ -556,11 +557,11 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ==== ورقة الفلتر (نصف الشاشة + خلفية بيضاء + بوكسات متساوية + أزرار متماثلة) ====
+  // ==== Filter bottom sheet (half-screen) ====
   void _openFilterSheet() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white, // خلفية بيضاء
+      backgroundColor: Colors.white, // White background
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -569,7 +570,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return StatefulBuilder(
           builder: (context, setStateSheet) {
             return FractionallySizedBox(
-              heightFactor: 0.6, // 👈 نصف الشاشة
+              heightFactor: 0.6, // Half of the screen
               child: Padding(
                 padding: EdgeInsets.only(
                   left: 20,
@@ -579,7 +580,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 child: Column(
                   children: [
-                    // مقبض سحب صغير
+                    // Drag handle
                     Container(
                       width: 40,
                       height: 5,
@@ -590,7 +591,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
 
-                    // العنوان + عدّاد المختار
+                    // Title + selected count
                     const Text(
                       'اختر عالمك القرائي المفضل',
                       textAlign: TextAlign.center,
@@ -612,16 +613,16 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // شبكة بوكسات متساوية
+                    // Equal-sized category boxes
                     Expanded(
                       child: GridView.builder(
                         padding: const EdgeInsets.only(bottom: 12),
                         gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2, // عمودان
+                          crossAxisCount: 2,
                           mainAxisSpacing: 12,
                           crossAxisSpacing: 12,
-                          childAspectRatio: 3.2, // نسبة العرض للارتفاع
+                          childAspectRatio: 3.2,
                         ),
                         itemCount: _categories.length,
                         itemBuilder: (context, i) {
@@ -631,6 +632,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             title: cat,
                             selected: selected,
                             onTap: () {
+                              // Local update for sheet visuals
                               setStateSheet(() {
                                 if (selected) {
                                   _selectedCategories.remove(cat);
@@ -638,25 +640,31 @@ class _HomeScreenState extends State<HomeScreen> {
                                   _selectedCategories.add(cat);
                                 }
                               });
+                              // Optional: if you want live filtering while toggling,
+                              // uncomment the next line to propagate to parent instantly.
+                              // if (mounted) setState(() {});
                             },
                           );
                         },
                       ),
                     ),
 
-                    // أزرار بنفس الحجم بالضبط
+                    // Buttons with equal sizes
                     Row(
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
                             onPressed: () {
+                              // Clear all selected categories in the sheet
                               setStateSheet(() => _selectedCategories.clear());
+                              // IMPORTANT: Immediately refresh the parent to show all books
+                              if (mounted) setState(() {});
                             },
                             icon: const Icon(Icons.clear),
                             label: const Text('مسح الكل'),
                             style: OutlinedButton.styleFrom(
                               minimumSize:
-                              const Size.fromHeight(48), // نفس الارتفاع
+                              const Size.fromHeight(48), // Same height
                               foregroundColor: _HomeColors.selected,
                               side: BorderSide(
                                 color: _HomeColors.selected.withOpacity(0.6),
@@ -672,13 +680,13 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: ElevatedButton.icon(
                             onPressed: () {
                               Navigator.pop(context);
-                              setState(() {}); // لتحديث الفلترة في الصفحة
+                              setState(() {}); // Apply filters on page
                             },
                             icon: const Icon(Icons.check_circle_outline),
                             label: const Text('تطبيق التصفية'),
                             style: ElevatedButton.styleFrom(
                               minimumSize:
-                              const Size.fromHeight(48), // نفس الارتفاع
+                              const Size.fromHeight(48), // Same height
                               backgroundColor: _HomeColors.selected,
                               foregroundColor: Colors.white,
                               shape: RoundedRectangleBorder(
@@ -699,7 +707,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // نفس قائمة الكاتقورير لو احتجتها في مكان آخر
+  // Same categories list if needed elsewhere
   final List<String> _categoriess = [
     'الأدب والشعر',
     'التاريخ والجغرافيا',
@@ -712,7 +720,7 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 }
 
-// ====== ويدجت البوكس المتساوي ======
+// ====== Equal-sized category box widget ======
 class _CategoryBox extends StatelessWidget {
   final String title;
   final bool selected;
