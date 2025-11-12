@@ -518,5 +518,4 @@ export const ocrOnPdfUploadV2 = onObjectFinalized(
       publicUrl,
       pagesFolder,
     });
-  }
-);
+    });
