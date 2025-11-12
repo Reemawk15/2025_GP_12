@@ -250,10 +250,10 @@ class _ShelfView extends StatefulWidget {
 
 class _ShelfViewState extends State<_ShelfView> {
   static const List<ShelfRect> _shelfRects = [
-    ShelfRect(leftFrac: 0.18, rightFrac: 0.18, topFrac: 0.10, heightFrac: 0.11),
-    ShelfRect(leftFrac: 0.18, rightFrac: 0.18, topFrac: 0.30, heightFrac: 0.11),
-    ShelfRect(leftFrac: 0.18, rightFrac: 0.18, topFrac: 0.50, heightFrac: 0.11),
-    ShelfRect(leftFrac: 0.18, rightFrac: 0.18, topFrac: 0.70, heightFrac: 0.11),
+    ShelfRect(leftFrac: 0.18, rightFrac: 0.18, topFrac: 0.08, heightFrac: 0.11),
+    ShelfRect(leftFrac: 0.18, rightFrac: 0.18, topFrac: 0.28, heightFrac: 0.11),
+    ShelfRect(leftFrac: 0.18, rightFrac: 0.18, topFrac: 0.48, heightFrac: 0.11),
+    ShelfRect(leftFrac: 0.18, rightFrac: 0.18, topFrac: 0.68, heightFrac: 0.11),
   ];
 
   static const int _perShelf = 4;
