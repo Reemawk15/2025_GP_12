@@ -279,7 +279,7 @@ class _RequestsTab extends StatelessWidget {
   }
 }
 
-// ======================== Tab: Search Friends (with Pending) ========================
+// ======================== Tab: Search Friends (with Pending + Friends) ========================
 class _SearchTab extends StatefulWidget {
   final String background;
   const _SearchTab({required this.background});
@@ -303,7 +303,7 @@ class _SearchTabState extends State<_SearchTab> {
       .replaceAll('أ', 'ا').replaceAll('إ', 'ا').replaceAll('آ', 'ا')
       .replaceAll('ة', 'ه').replaceAll('ى', 'ي');
 
-  // Actual search logic with pending detection
+  // Actual search logic with friend and pending detection
   Future<void> _onSearch(String raw) async {
     final me = FirebaseAuth.instance.currentUser;
     if (me == null) return;
@@ -354,8 +354,8 @@ class _SearchTabState extends State<_SearchTab> {
       void addDoc(QueryDocumentSnapshot<Map<String, dynamic>> d) {
         final uid = d.id;
         if (uid == me.uid) return;
-        if (myFriends.contains(uid)) return;     // already a friend
-        if (incomingFrom.contains(uid)) return;  // already sent me a request
+        // Still hide users who already sent me a request (shown in Requests tab)
+        if (incomingFrom.contains(uid)) return;
 
         final data = d.data();
         final name     = (data['name'] ?? '') as String;
@@ -382,7 +382,6 @@ class _SearchTabState extends State<_SearchTab> {
         for (final d in allSnap.docs) {
           final uid = d.id;
           if (uid == me.uid) continue;
-          if (myFriends.contains(uid)) continue;
           if (incomingFrom.contains(uid)) continue;
 
           final data = d.data();
@@ -405,6 +404,9 @@ class _SearchTabState extends State<_SearchTab> {
           }
         }
       }
+
+      // Mark which of the results are already friends
+      map.updateAll((uid, user) => user.copyWith(isFriend: myFriends.contains(uid)));
 
       // Mark "pending" (outgoing request) for results if exists
       final uids = map.keys.toList();
@@ -525,7 +527,22 @@ class _SearchTabState extends State<_SearchTab> {
                           MaterialPageRoute(builder: (_) => FriendDetailsPage(friendUid: f.uid)),
                         );
                       },
-                      trailing: f.pending
+                      trailing: f.isFriend
+                          ? Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF6F8E63).withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Text(
+                          'صديق',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF6F8E63),
+                          ),
+                        ),
+                      )
+                          : f.pending
                           ? Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
@@ -534,7 +551,10 @@ class _SearchTabState extends State<_SearchTab> {
                         ),
                         child: const Text(
                           'بانتظار القبول ⏳',
-                          style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF6F8E63)),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF6F8E63),
+                          ),
                         ),
                       )
                           : _TinyActionButton(
@@ -555,13 +575,14 @@ class _SearchTabState extends State<_SearchTab> {
   }
 }
 
-// ========= Result user model (with pending) =========
+// ========= Result user model (with pending + friend flag) =========
 class _FriendUser {
   final String uid;
   final String name;
   final String handle;
   final String? photoUrl;
-  final bool pending; // Whether there is an outgoing request awaiting approval
+  final bool pending;   // Whether there is an outgoing request awaiting approval
+  final bool isFriend;  // Whether this user is already a friend
 
   _FriendUser({
     required this.uid,
@@ -569,14 +590,16 @@ class _FriendUser {
     required this.handle,
     this.photoUrl,
     this.pending = false,
+    this.isFriend = false,
   });
 
-  _FriendUser copyWith({bool? pending}) => _FriendUser(
+  _FriendUser copyWith({bool? pending, bool? isFriend}) => _FriendUser(
     uid: uid,
     name: name,
     handle: handle,
     photoUrl: photoUrl,
     pending: pending ?? this.pending,
+    isFriend: isFriend ?? this.isFriend,
   );
 }
 

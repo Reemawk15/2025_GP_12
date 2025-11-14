@@ -20,12 +20,12 @@ const double kMyRequestsTopPadding = 240;
 /// =====================
 /// Brand colors
 /// =====================
-const Color _darkGreen  = Color(0xFF0E3A2C);
-const Color _midGreen   = Color(0xFF2F5145);
+const Color _darkGreen = Color(0xFF0E3A2C);
+const Color _midGreen = Color(0xFF2F5145);
 const Color _lightGreen = Color(0xFFC9DABF);
-const Color _confirm    = Color(0xFF6F8E63);
-const Color _danger     = Color(0xFFB64B4B);
-const Color _pending    = Color(0xFFB38A1B);
+const Color _confirm = Color(0xFF6F8E63);
+const Color _danger = Color(0xFFB64B4B);
+const Color _pending = Color(0xFFB38A1B);
 
 class ClubsPage extends StatelessWidget {
   const ClubsPage({super.key});
@@ -45,11 +45,18 @@ class ClubsPage extends StatelessWidget {
             toolbarHeight: 90,
             leadingWidth: 56,
             leading: Padding(
-              padding: const EdgeInsets.only(top: kBackArrowTopPadding, right: 8),
+              padding: const EdgeInsets.only(
+                top: kBackArrowTopPadding,
+                right: 8,
+              ),
               child: IconButton(
                 tooltip: 'رجوع',
                 onPressed: () => Navigator.of(context).maybePop(),
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _midGreen, size: 20),
+                icon: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: _midGreen,
+                  size: 20,
+                ),
               ),
             ),
             bottom: const _TabbarContainer(
@@ -88,7 +95,8 @@ class _TabbarContainer extends StatelessWidget implements PreferredSizeWidget {
   });
 
   @override
-  Size get preferredSize => Size.fromHeight(topPadding + barHeight + bottomPadding);
+  Size get preferredSize =>
+      Size.fromHeight(topPadding + barHeight + bottomPadding);
 
   @override
   Widget build(BuildContext context) {
@@ -99,7 +107,13 @@ class _TabbarContainer extends StatelessWidget implements PreferredSizeWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
-          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 3))],
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black12,
+              blurRadius: 8,
+              offset: Offset(0, 3),
+            ),
+          ],
         ),
         child: const TabBar(
           labelColor: _darkGreen,
@@ -108,8 +122,14 @@ class _TabbarContainer extends StatelessWidget implements PreferredSizeWidget {
             borderSide: BorderSide(width: 4, color: _darkGreen),
             insets: EdgeInsets.symmetric(horizontal: 24),
           ),
-          labelStyle: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
-          unselectedLabelStyle: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          labelStyle: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+          ),
+          unselectedLabelStyle: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
           tabs: [
             Tab(text: 'الأندية'),
             Tab(text: 'طلب إنشاء نادي'),
@@ -123,8 +143,6 @@ class _TabbarContainer extends StatelessWidget implements PreferredSizeWidget {
 
 /// =====================
 /// Tab: Clubs list (from Firestore)
-/// Order: title -> description -> category -> members count
-/// Join button on left (RTL end), becomes dynamic per membership state
 /// =====================
 class _ClubsListTab extends StatelessWidget {
   final String background;
@@ -134,7 +152,9 @@ class _ClubsListTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        Positioned.fill(child: Image.asset(background, fit: BoxFit.cover)),
+        Positioned.fill(
+          child: Image.asset(background, fit: BoxFit.cover),
+        ),
         StreamBuilder<List<PublicClub>>(
           stream: FirestoreClubsService.instance.streamPublicClubs(),
           builder: (context, snap) {
@@ -142,99 +162,123 @@ class _ClubsListTab extends StatelessWidget {
               return const Center(child: CircularProgressIndicator());
             }
             final clubs = snap.data ?? const [];
+
             if (clubs.isEmpty) {
-              return ListView(
-                padding: const EdgeInsets.fromLTRB(16, kListTopPadding, 16, 24),
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      color: _lightGreen.withOpacity(0.65),
-                      borderRadius: BorderRadius.circular(16),
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  16,
+                  kListTopPadding,
+                  16,
+                  24,
+                ),
+                child: ListView(
+                  padding: EdgeInsets.zero,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: _lightGreen.withOpacity(0.65),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: const Text(
+                        'لا توجد أندية منشورة حتى الآن.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.black87),
+                      ),
                     ),
-                    child: const Text(
-                      'لا توجد أندية منشورة حتى الآن.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.black87),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               );
             }
 
-            return ListView.separated(
-              padding: const EdgeInsets.fromLTRB(16, kListTopPadding, 16, 24),
-              itemBuilder: (_, i) {
-                final c = clubs[i];
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(
+                16,
+                kListTopPadding,
+                16,
+                24,
+              ),
+              child: ListView.separated(
+                padding: EdgeInsets.zero,
+                itemBuilder: (_, i) {
+                  final c = clubs[i];
 
-                // Live members count
-                return StreamBuilder<QuerySnapshot>(
-                  stream: FirebaseFirestore.instance
-                      .collection('clubs')
-                      .doc(c.id)
-                      .collection('members')
-                      .snapshots(),
-                  builder: (context, memberSnap) {
-                    final membersCount = memberSnap.data?.docs.length ?? 0;
+                  return StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('clubs')
+                        .doc(c.id)
+                        .collection('members')
+                        .snapshots(),
+                    builder: (context, memberSnap) {
+                      final membersCount = memberSnap.data?.docs.length ?? 0;
 
-                    return Container(
-                      decoration: BoxDecoration(
-                        color: _lightGreen.withOpacity(0.88),
-                        borderRadius: BorderRadius.circular(18),
-                        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4))],
-                      ),
-                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Club name
-                          Text(
-                            c.title,
-                            style: const TextStyle(
-                              color: _darkGreen,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
+                      return Container(
+                        decoration: BoxDecoration(
+                          color: _lightGreen.withOpacity(0.88),
+                          borderRadius: BorderRadius.circular(18),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Colors.black12,
+                              blurRadius: 8,
+                              offset: Offset(0, 4),
                             ),
-                          ),
-                          const SizedBox(height: 6),
-
-                          // Description
-                          if ((c.description ?? '').isNotEmpty)
+                          ],
+                        ),
+                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                             Text(
-                              c.description!,
-                              style: const TextStyle(color: Colors.black87, height: 1.35),
+                              c.title,
+                              style: const TextStyle(
+                                color: _darkGreen,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                              ),
                             ),
-                          const SizedBox(height: 6),
-
-                          // Category
-                          if ((c.category ?? '').isNotEmpty)
+                            const SizedBox(height: 6),
+                            if ((c.description ?? '').isNotEmpty)
+                              Text(
+                                c.description!,
+                                style: const TextStyle(
+                                  color: Colors.black87,
+                                  height: 1.35,
+                                ),
+                              ),
+                            const SizedBox(height: 6),
+                            if ((c.category ?? '').isNotEmpty)
+                              Text(
+                                'الفئة: ${c.category!}',
+                                style: const TextStyle(
+                                  color: Colors.black87,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            const SizedBox(height: 6),
                             Text(
-                              'الفئة: ${c.category!}',
-                              style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w700),
+                              'عدد الأعضاء: $membersCount',
+                              style: const TextStyle(
+                                color: Colors.black87,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
-                          const SizedBox(height: 6),
-
-                          // Members count
-                          Text(
-                            'عدد الأعضاء: $membersCount',
-                            style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w700),
-                          ),
-
-                          const SizedBox(height: 12),
-
-                          // Actions (RTL end = left)
-                          Align(
-                            alignment: AlignmentDirectional.centerEnd,
-                            child: _JoinOrOpenButton(clubId: c.id, clubTitle: c.title),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                );
-              },
-              separatorBuilder: (_, __) => const SizedBox(height: 14),
-              itemCount: clubs.length,
+                            const SizedBox(height: 12),
+                            Align(
+                              alignment: AlignmentDirectional.centerEnd,
+                              child: _JoinOrOpenButton(
+                                clubId: c.id,
+                                clubTitle: c.title,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
+                separatorBuilder: (_, __) => const SizedBox(height: 14),
+                itemCount: clubs.length,
+              ),
             );
           },
         ),
@@ -244,12 +288,13 @@ class _ClubsListTab extends StatelessWidget {
 }
 
 /// Join / Open / Leave smart button
-/// - If not a member: shows "انضم" and joins on tap.
-/// - If a member: shows two actions: "دخول النادي" (open chat) and "مغادرة".
 class _JoinOrOpenButton extends StatefulWidget {
   final String clubId;
   final String clubTitle;
-  const _JoinOrOpenButton({required this.clubId, required this.clubTitle});
+  const _JoinOrOpenButton({
+    required this.clubId,
+    required this.clubTitle,
+  });
 
   @override
   State<_JoinOrOpenButton> createState() => _JoinOrOpenButtonState();
@@ -259,7 +304,6 @@ class _JoinOrOpenButtonState extends State<_JoinOrOpenButton> {
   bool _busy = false;
 
   Future<void> _leaveClub(String clubId, String uid) async {
-    // delete membership document
     final memberRef = FirebaseFirestore.instance
         .collection('clubs')
         .doc(clubId)
@@ -268,13 +312,14 @@ class _JoinOrOpenButtonState extends State<_JoinOrOpenButton> {
     await memberRef.delete();
   }
 
-  /// Confirmation dialog (Qabas style)
   Future<bool> _confirmLeaveDialog(BuildContext context) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => Dialog(
         backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
           child: Directionality(
@@ -295,7 +340,10 @@ class _JoinOrOpenButtonState extends State<_JoinOrOpenButton> {
                 const Text(
                   'هل أنت متأكد أنك تريد مغادرة هذا النادي؟',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 15, color: Colors.black87),
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: Colors.black87,
+                  ),
                 ),
                 const SizedBox(height: 24),
                 SizedBox(
@@ -303,11 +351,16 @@ class _JoinOrOpenButtonState extends State<_JoinOrOpenButton> {
                   child: FilledButton(
                     style: FilledButton.styleFrom(
                       backgroundColor: _confirm,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                     onPressed: () => Navigator.pop(ctx, true),
-                    child: const Text('تأكيد', style: TextStyle(fontSize: 16, color: Colors.white)),
+                    child: const Text(
+                      'تأكيد',
+                      style: TextStyle(fontSize: 16, color: Colors.white),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -315,12 +368,18 @@ class _JoinOrOpenButtonState extends State<_JoinOrOpenButton> {
                   width: double.infinity,
                   child: FilledButton(
                     style: FilledButton.styleFrom(
-                      backgroundColor: Colors.grey[300],
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      backgroundColor: const Color(0xFFF2F2F2),
+
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                     onPressed: () => Navigator.pop(ctx, false),
-                    child: const Text('إلغاء', style: TextStyle(fontSize: 16, color: _darkGreen)),
+                    child: const Text(
+                      'إلغاء',
+                      style: TextStyle(fontSize: 16, color: _darkGreen),
+                    ),
                   ),
                 ),
               ],
@@ -349,7 +408,6 @@ class _JoinOrOpenButtonState extends State<_JoinOrOpenButton> {
         final isMember = (snap.data?.exists ?? false);
 
         if (isMember) {
-          // Show two buttons: Open club (chat) + Leave
           return Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -374,10 +432,16 @@ class _JoinOrOpenButtonState extends State<_JoinOrOpenButton> {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
-                      side: const BorderSide(color: _darkGreen, width: 1.2),
+                      side: const BorderSide(
+                        color: _darkGreen,
+                        width: 1.2,
+                      ),
                     ),
                   ),
-                  child: const Text('دخول النادي', style: TextStyle(fontWeight: FontWeight.w800)),
+                  child: const Text(
+                    'دخول النادي',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
@@ -387,16 +451,16 @@ class _JoinOrOpenButtonState extends State<_JoinOrOpenButton> {
                   onPressed: _busy
                       ? null
                       : () async {
-                    // show confirmation before leaving
                     final sure = await _confirmLeaveDialog(context);
                     if (!sure) return;
 
                     setState(() => _busy = true);
                     try {
                       await _leaveClub(widget.clubId, uid);
-                      // After leaving, UI auto-updates via stream -> button becomes "انضم"
                     } finally {
-                      if (mounted) setState(() => _busy = false);
+                      if (mounted) {
+                        setState(() => _busy = false);
+                      }
                     }
                   },
                   style: TextButton.styleFrom(
@@ -405,7 +469,10 @@ class _JoinOrOpenButtonState extends State<_JoinOrOpenButton> {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
-                      side: const BorderSide(color: _danger, width: 1.2),
+                      side: const BorderSide(
+                        color: _danger,
+                        width: 1.2,
+                      ),
                     ),
                   ),
                   child: _busy
@@ -417,14 +484,16 @@ class _JoinOrOpenButtonState extends State<_JoinOrOpenButton> {
                       valueColor: AlwaysStoppedAnimation(_danger),
                     ),
                   )
-                      : const Text('مغادرة', style: TextStyle(fontWeight: FontWeight.w800)),
+                      : const Text(
+                    'مغادرة',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
                 ),
               ),
             ],
           );
         }
 
-        // Not a member → single "Join" button (kept as before)
         return SizedBox(
           height: 36,
           child: TextButton(
@@ -448,7 +517,9 @@ class _JoinOrOpenButtonState extends State<_JoinOrOpenButton> {
                   );
                 }
               } finally {
-                if (mounted) setState(() => _busy = false);
+                if (mounted) {
+                  setState(() => _busy = false);
+                }
               }
             },
             style: TextButton.styleFrom(
@@ -468,7 +539,10 @@ class _JoinOrOpenButtonState extends State<_JoinOrOpenButton> {
                 valueColor: AlwaysStoppedAnimation(Colors.white),
               ),
             )
-                : const Text('انضم', style: TextStyle(fontWeight: FontWeight.w800)),
+                : const Text(
+              'انضم',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
           ),
         );
       },
@@ -488,10 +562,10 @@ class _CreateRequestTab extends StatefulWidget {
 }
 
 class _CreateRequestTabState extends State<_CreateRequestTab> {
-  final _titleCtrl  = TextEditingController();
-  final _descCtrl   = TextEditingController();
+  final _titleCtrl = TextEditingController();
+  final _descCtrl = TextEditingController();
   final _mentorCtrl = TextEditingController();
-  final _notesCtrl  = TextEditingController();
+  final _notesCtrl = TextEditingController();
 
   final _formKey = GlobalKey<FormState>();
   String? _category;
@@ -516,7 +590,9 @@ class _CreateRequestTabState extends State<_CreateRequestTab> {
     final ok = _titleCtrl.text.trim().isNotEmpty &&
         _descCtrl.text.trim().isNotEmpty &&
         (_category != null && _category!.trim().isNotEmpty);
-    if (ok != _isValid) setState(() => _isValid = ok);
+    if (ok != _isValid) {
+      setState(() => _isValid = ok);
+    }
   }
 
   void _showSnack(String message, {IconData icon = Icons.check_circle}) {
@@ -527,7 +603,9 @@ class _CreateRequestTabState extends State<_CreateRequestTab> {
         backgroundColor: _midGreen,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
         content: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -535,7 +613,11 @@ class _CreateRequestTabState extends State<_CreateRequestTab> {
             const SizedBox(width: 8),
             Text(
               message,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
             ),
           ],
         ),
@@ -548,107 +630,145 @@ class _CreateRequestTabState extends State<_CreateRequestTab> {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        Positioned.fill(child: Image.asset(widget.background, fit: BoxFit.cover)),
-        SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, kFormTopPadding, 16, 24),
-          child: Form(
-            key: _formKey,
-            autovalidateMode: AutovalidateMode.onUserInteraction,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const _RequiredNote(),
-
-                const _FieldLabel(text: 'عنوان النادي', requiredMark: true),
-                _OutlinedInput(
-                  hint: 'مثال: نادي القراءة الأسبوعي',
-                  controller: _titleCtrl,
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'هذا الحقل إجباري' : null,
-                ),
-                const SizedBox(height: 14),
-
-                const _FieldLabel(text: 'وصف قصير', requiredMark: true),
-                _OutlinedInput(
-                  hint: 'عرّف النادي وهدفه بإيجاز',
-                  controller: _descCtrl,
-                  maxLines: 3,
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'هذا الحقل إجباري' : null,
-                ),
-                const SizedBox(height: 14),
-
-                const _FieldLabel(text: 'الفئة', requiredMark: true),
-                _DropdownInput(
-                  value: _category,
-                  hint: 'اختر فئة',
-                  items: _categories,
-                  onChanged: (v) {
-                    setState(() => _category = v);
-                    _recomputeValid();
-                  },
-                  validator: (v) => (v == null || v.isEmpty) ? 'الرجاء اختيار فئة' : null,
-                ),
-                const SizedBox(height: 14),
-
-                const _FieldLabel(text: 'اسم المشرف (اختياري)'),
-                _OutlinedInput(
-                  hint: 'يمكن تركه فارغًا',
-                  controller: _mentorCtrl,
-                ),
-                const SizedBox(height: 14),
-
-                const _FieldLabel(text: 'ملاحظات (اختياري)'),
-                _OutlinedInput(
-                  hint: 'أي تفاصيل إضافية',
-                  controller: _notesCtrl,
-                  maxLines: 3,
-                ),
-
-                const SizedBox(height: 18),
-
-                SizedBox(
-                  height: 46,
-                  width: double.infinity,
-                  child: TextButton(
-                    onPressed: _isValid
-                        ? () async {
-                      if (!(_formKey.currentState?.validate() ?? false)) return;
-
-                      final uid = FirebaseAuth.instance.currentUser!.uid;
-                      await FirestoreClubsService.instance.submitRequest(
-                        uid: uid,
-                        title: _titleCtrl.text,
-                        description: _descCtrl.text,
-                        category: _category!,
-                        ownerName: _mentorCtrl.text.isEmpty ? null : _mentorCtrl.text,
-                        notes: _notesCtrl.text.isEmpty ? null : _notesCtrl.text,
-                      );
-
-                      _showSnack('تم إرسال الطلب ✅');
-                      _titleCtrl.clear();
-                      _descCtrl.clear();
-                      _mentorCtrl.clear();
-                      _notesCtrl.clear();
-                      setState(() {
-                        _category = null;
-                        _isValid = false;
-                      });
-                    }
+        Positioned.fill(
+          child: Image.asset(widget.background, fit: BoxFit.cover),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            16,
+            kFormTopPadding,
+            16,
+            24,
+          ),
+          child: SingleChildScrollView(
+            padding: EdgeInsets.zero,
+            child: Form(
+              key: _formKey,
+              autovalidateMode: AutovalidateMode.onUserInteraction,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const _RequiredNote(),
+                  const _FieldLabel(
+                    text: 'عنوان النادي',
+                    requiredMark: true,
+                  ),
+                  _OutlinedInput(
+                    hint: 'مثال: نادي القراءة الأسبوعي',
+                    controller: _titleCtrl,
+                    validator: (v) =>
+                    (v == null || v.trim().isEmpty)
+                        ? 'هذا الحقل إجباري'
                         : null,
-                    style: ButtonStyle(
-                      backgroundColor: MaterialStateProperty.resolveWith(
-                            (states) => states.contains(MaterialState.disabled)
-                            ? Colors.grey.shade400
-                            : _confirm,
+                  ),
+                  const SizedBox(height: 14),
+                  const _FieldLabel(
+                    text: 'وصف قصير',
+                    requiredMark: true,
+                  ),
+                  _OutlinedInput(
+                    hint: 'عرّف النادي وهدفه بإيجاز',
+                    controller: _descCtrl,
+                    maxLines: 3,
+                    validator: (v) =>
+                    (v == null || v.trim().isEmpty)
+                        ? 'هذا الحقل إجباري'
+                        : null,
+                  ),
+                  const SizedBox(height: 14),
+                  const _FieldLabel(
+                    text: 'الفئة',
+                    requiredMark: true,
+                  ),
+                  _DropdownInput(
+                    value: _category,
+                    hint: 'اختر فئة',
+                    items: _categories,
+                    onChanged: (v) {
+                      setState(() => _category = v);
+                      _recomputeValid();
+                    },
+                    validator: (v) =>
+                    (v == null || v.isEmpty)
+                        ? 'الرجاء اختيار فئة'
+                        : null,
+                  ),
+                  const SizedBox(height: 14),
+                  const _FieldLabel(text: 'اسم المشرف (اختياري)'),
+                  _OutlinedInput(
+                    hint: 'يمكن تركه فارغًا',
+                    controller: _mentorCtrl,
+                  ),
+                  const SizedBox(height: 14),
+                  const _FieldLabel(text: 'ملاحظات (اختياري)'),
+                  _OutlinedInput(
+                    hint: 'أي تفاصيل إضافية',
+                    controller: _notesCtrl,
+                    maxLines: 3,
+                  ),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    height: 46,
+                    width: double.infinity,
+                    child: TextButton(
+                      onPressed: _isValid
+                          ? () async {
+                        if (!(_formKey.currentState?.validate() ??
+                            false)) {
+                          return;
+                        }
+
+                        final uid = FirebaseAuth
+                            .instance.currentUser!.uid;
+                        await FirestoreClubsService.instance
+                            .submitRequest(
+                          uid: uid,
+                          title: _titleCtrl.text,
+                          description: _descCtrl.text,
+                          category: _category!,
+                          ownerName: _mentorCtrl.text.isEmpty
+                              ? null
+                              : _mentorCtrl.text,
+                          notes: _notesCtrl.text.isEmpty
+                              ? null
+                              : _notesCtrl.text,
+                        );
+
+                        _showSnack('تم إرسال الطلب');
+                        _titleCtrl.clear();
+                        _descCtrl.clear();
+                        _mentorCtrl.clear();
+                        _notesCtrl.clear();
+                        setState(() {
+                          _category = null;
+                          _isValid = false;
+                        });
+                      }
+                          : null,
+                      style: ButtonStyle(
+                        backgroundColor:
+                        MaterialStateProperty.resolveWith(
+                              (states) => states.contains(
+                              MaterialState.disabled)
+                              ? Colors.grey.shade400
+                              : _confirm,
+                        ),
+                        foregroundColor:
+                        MaterialStateProperty.all(Colors.white),
+                        shape: MaterialStateProperty.all(
+                          RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
                       ),
-                      foregroundColor: MaterialStateProperty.all(Colors.white),
-                      shape: MaterialStateProperty.all(
-                        RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      child: const Text(
+                        'إرسال الطلب',
+                        style: TextStyle(fontWeight: FontWeight.w800),
                       ),
                     ),
-                    child: const Text('إرسال الطلب', style: TextStyle(fontWeight: FontWeight.w800)),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -684,15 +804,32 @@ class _RequiredNote extends StatelessWidget {
 class _FieldLabel extends StatelessWidget {
   final String text;
   final bool requiredMark;
-  const _FieldLabel({required this.text, this.requiredMark = false});
+  const _FieldLabel({
+    required this.text,
+    this.requiredMark = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Text(text, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _darkGreen)),
+        Text(
+          text,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: _darkGreen,
+          ),
+        ),
         if (requiredMark)
-          const Text(' *', style: TextStyle(color: Colors.red, fontSize: 14, fontWeight: FontWeight.bold)),
+          const Text(
+            ' *',
+            style: TextStyle(
+              color: Colors.red,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
       ],
     );
   }
@@ -707,17 +844,23 @@ class _MyRequestsTab extends StatelessWidget {
 
   Color _statusColor(RequestStatus s) {
     switch (s) {
-      case RequestStatus.accepted: return _confirm;
-      case RequestStatus.rejected: return _danger;
-      case RequestStatus.pending:  return _pending;
+      case RequestStatus.accepted:
+        return _confirm;
+      case RequestStatus.rejected:
+        return _danger;
+      case RequestStatus.pending:
+        return _pending;
     }
   }
 
   String _statusLabel(RequestStatus s) {
     switch (s) {
-      case RequestStatus.accepted: return 'مقبول';
-      case RequestStatus.rejected: return 'مرفوض';
-      case RequestStatus.pending:  return 'معلق';
+      case RequestStatus.accepted:
+        return 'مقبول';
+      case RequestStatus.rejected:
+        return 'مرفوض';
+      case RequestStatus.pending:
+        return 'معلق';
     }
   }
 
@@ -727,7 +870,9 @@ class _MyRequestsTab extends StatelessWidget {
 
     return Stack(
       children: [
-        Positioned.fill(child: Image.asset(background, fit: BoxFit.cover)),
+        Positioned.fill(
+          child: Image.asset(background, fit: BoxFit.cover),
+        ),
         StreamBuilder<List<ClubRequest>>(
           stream: FirestoreClubsService.instance.streamMyRequests(uid),
           builder: (context, snap) {
@@ -736,35 +881,57 @@ class _MyRequestsTab extends StatelessWidget {
             }
             final list = snap.data ?? const [];
             if (list.isEmpty) {
-              return const Center(child: Text('لا توجد طلبات حتى الآن'));
+              return const Center(
+                child: Text('لا توجد طلبات حتى الآن'),
+              );
             }
-            return ListView.separated(
-              padding: const EdgeInsets.fromLTRB(16, kMyRequestsTopPadding, 16, 24),
-              itemBuilder: (_, i) {
-                final r = list[i];
-                return Container(
-                  decoration: BoxDecoration(
-                    color: _lightGreen.withOpacity(0.88),
-                    borderRadius: BorderRadius.circular(18),
-                    boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4))],
-                  ),
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'عنوان النادي: ${r.title}',
-                          style: const TextStyle(color: _darkGreen, fontWeight: FontWeight.w800),
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(
+                16,
+                kMyRequestsTopPadding,
+                16,
+                24,
+              ),
+              child: ListView.separated(
+                padding: EdgeInsets.zero,
+                itemBuilder: (_, i) {
+                  final r = list[i];
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: _lightGreen.withOpacity(0.88),
+                      borderRadius: BorderRadius.circular(18),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Colors.black12,
+                          blurRadius: 8,
+                          offset: Offset(0, 4),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      _StatusPill(label: _statusLabel(r.status), color: _statusColor(r.status)),
-                    ],
-                  ),
-                );
-              },
-              separatorBuilder: (_, __) => const SizedBox(height: 14),
-              itemCount: list.length,
+                      ],
+                    ),
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'عنوان النادي: ${r.title}',
+                            style: const TextStyle(
+                              color: _darkGreen,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        _StatusPill(
+                          label: _statusLabel(r.status),
+                          color: _statusColor(r.status),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+                separatorBuilder: (_, __) => const SizedBox(height: 14),
+                itemCount: list.length,
+              ),
             );
           },
         ),
@@ -776,7 +943,10 @@ class _MyRequestsTab extends StatelessWidget {
 class _StatusPill extends StatelessWidget {
   final String label;
   final Color color;
-  const _StatusPill({required this.label, required this.color});
+  const _StatusPill({
+    required this.label,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -787,9 +957,21 @@ class _StatusPill extends StatelessWidget {
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(10),
-        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 2))],
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black12,
+            blurRadius: 6,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
-      child: Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
     );
   }
 }
@@ -822,7 +1004,10 @@ class _OutlinedInput extends StatelessWidget {
         controller: controller,
         maxLines: maxLines,
         validator: validator,
-        decoration: InputDecoration(hintText: hint, border: InputBorder.none),
+        decoration: InputDecoration(
+          hintText: hint,
+          border: InputBorder.none,
+        ),
         textAlign: TextAlign.right,
       ),
     );
@@ -856,7 +1041,14 @@ class _DropdownInput extends StatelessWidget {
         value: value,
         decoration: const InputDecoration(border: InputBorder.none),
         hint: Text(hint),
-        items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+        items: items
+            .map(
+              (e) => DropdownMenuItem(
+            value: e,
+            child: Text(e),
+          ),
+        )
+            .toList(),
         onChanged: onChanged,
         validator: validator,
       ),
