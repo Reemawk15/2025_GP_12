@@ -11,7 +11,7 @@ class ChatBotPlaceholderPage extends StatelessWidget {
         appBar: AppBar(title: const Text('مساعد قبس (قريباً)')),
         body: const Center(
           child: Text(
-            'ستتم إضافة محادثة الذكاء الاصطناعي في السبرنت القادم 👨🏻‍💻✨',
+            '',
             textAlign: TextAlign.center,
           ),
         ),
