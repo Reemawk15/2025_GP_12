@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/services.dart';
 
 import 'firebase_options.dart';
 import 'sign_up_page.dart';
@@ -9,17 +10,29 @@ import 'splash_logo_page.dart';
 
 /// درجات ألوان قَبَس
 class QabasColors {
-  static const primary     = Color(0xFF0E3A2C); // أخضر داكن للنصوص
-  static const background  = Color(0xFFC6DABA); // ← خلفية البداية الجديدة (#c6daba)
+  static const primary    = Color(0xFF0E3A2C); // أخضر داكن للنصوص
+  static const background = Color(0xFFC6DABA); // ← خلفية البداية الجديدة (#c6daba)
 
   // ألوان الأزرار بنفس روح الصورة:
-  static const btnSolid    = Color(0xFFDDE9C6); // الزر العلوي
-  static const btnLight    = Color(0xFFF0F7DF); // الزر السفلي
-  static const btnText     = primary;           // نص أخضر داكن
+  static const btnSolid   = Color(0xFFDDE9C6); // الزر العلوي
+  static const btnLight   = Color(0xFFF0F7DF); // الزر السفلي
+  static const btnText    = primary;           // نص أخضر داكن
 }
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // توحيد ألوان شريط الحالة + شريط التنقّل السفلي على أخضر قَبَس
+  const navBg = QabasColors.background;
+  final baseStyle = const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.dark,
+    systemNavigationBarIconBrightness: Brightness.dark,
+  );
+  SystemChrome.setSystemUIOverlayStyle(
+    baseStyle.copyWith(systemNavigationBarColor: navBg),
+  );
+
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const QabasApp());
 }
@@ -90,65 +103,76 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          // الخلفية: الصورة الجديدة
-          Image.asset(
-            'assets/images/First.png', // ← اسم الصورة
-            fit: BoxFit.cover,
-          ),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        systemNavigationBarColor: Colors.white,         // ⬅️ شريط التنقل أبيض
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
+      child: Scaffold(
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            // الخلفية: الصورة الجديدة
+            Image.asset(
+              'assets/images/First.png', // ← اسم الصورة
+              fit: BoxFit.cover,
+            ),
 
-          // الأزرار فوق الخلفية
-          SafeArea(
-            child: Align(
-              alignment: Alignment.bottomCenter,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // زر "تسجيل الدخول" (العلوي) – لون أغمق قليلًا مثل المثال
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: QabasColors.btnSolid,
-                          foregroundColor: QabasColors.btnText,
-                          shape: const StadiumBorder(),
+            // الأزرار فوق الخلفية
+            SafeArea(
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 24, vertical: 32),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // زر "تسجيل الدخول"
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: QabasColors.btnSolid,
+                            foregroundColor: QabasColors.btnText,
+                            shape: const StadiumBorder(),
+                          ),
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const SignInPage()),
+                          ),
+                          child: const Text('تسجيل الدخول'),
                         ),
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const SignInPage()),
-                        ),
-                        child: const Text('تسجيل الدخول'),
                       ),
-                    ),
-                    const SizedBox(height: 16),
+                      const SizedBox(height: 16),
 
-                    // زر "إنشاء حساب جديد" (السفلي) – أفتح
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: QabasColors.btnLight,
-                          foregroundColor: QabasColors.btnText,
-                          shape: const StadiumBorder(),
+                      // زر "إنشاء حساب جديد"
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: QabasColors.btnLight,
+                            foregroundColor: QabasColors.btnText,
+                            shape: const StadiumBorder(),
+                          ),
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const SignUpPage()),
+                          ),
+                          child: const Text('إنشاء حساب جديد'),
                         ),
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const SignUpPage()),
-                        ),
-                        child: const Text('إنشاء حساب جديد'),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
