@@ -16,34 +16,34 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
     with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
 
-  // ألوان ثابتة
-  static const _confirmColor = Color(0xFF6F8E63); // زر حفظ وتأكيد + SnackBar
-  static const _titleColor   = Color(0xFF0E3A2C); // أخضر داكن للنصوص
-  static const _fillGreen    = Color(0xFFC9DABF); // أخضر فاتح لحقول الإدخال
+  // Brand colors
+  static const _confirmColor = Color(0xFF6F8E63); // Confirm buttons + SnackBar
+  static const _titleColor   = Color(0xFF0E3A2C); // Dark green for texts
+  static const _fillGreen    = Color(0xFFC9DABF); // Light green for fields
 
-  // أبعاد
+  // Layout constants
   static const double _kFieldH = 56;
   static const double _kGap    = 14;
   static const double _kDescH  = 120;
 
-  // حقول الكتاب (لتبويب الإضافة)
+  // Book fields (Add tab)
   final _titleCtrl  = TextEditingController();
   final _authorCtrl = TextEditingController();
   String? _category;
-  final _descCtrl   = TextEditingController();
+  final _descCtrl   = TextEditingController(); // optional description
 
   // FocusNodes
   final _titleF  = FocusNode();
   final _authorF = FocusNode();
   final _descF   = FocusNode();
 
-  // الملفات
+  // Picked files
   File? _pdfFile;
   File? _coverFile;
 
   bool _saving = false;
 
-  // أقسام
+  // Categories
   final List<String> _categories = const [
     'الأدب والشعر',
     'التاريخ والجغرافيا',
@@ -55,7 +55,7 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
     'تطوير الذات',
   ];
 
-  // ✅ SnackBar الموحّد
+  // Unified SnackBar helper
   void _showSnack(String message, {IconData icon = Icons.check_circle}) {
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
@@ -83,8 +83,29 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
     );
   }
 
+  // ---- Lifecycle ----
+  @override
+  // Helper to mark required fields
+  String _req(String label) => '$label *';
+
+  void initState() {
+    super.initState();
+    // Listen to text changes so the Save button state is updated
+    _titleCtrl.addListener(_onAddFormChanged);
+    _authorCtrl.addListener(_onAddFormChanged);
+    _descCtrl.addListener(_onAddFormChanged);
+  }
+
+  void _onAddFormChanged() {
+    setState(() {}); // rebuild to re-check _isAddFormReady
+  }
+
   @override
   void dispose() {
+    _titleCtrl.removeListener(_onAddFormChanged);
+    _authorCtrl.removeListener(_onAddFormChanged);
+    _descCtrl.removeListener(_onAddFormChanged);
+
     _titleCtrl.dispose();
     _authorCtrl.dispose();
     _descCtrl.dispose();
@@ -94,6 +115,18 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
     super.dispose();
   }
 
+  // Required fields for adding a book:
+  // title, author, category, pdf file, cover file
+  bool get _isAddFormReady {
+    return _titleCtrl.text.trim().isNotEmpty &&
+        _authorCtrl.text.trim().isNotEmpty &&
+        _category != null &&
+        _category!.trim().isNotEmpty &&
+        _pdfFile != null &&
+        _coverFile != null;
+  }
+
+  // ---- File pickers ----
   Future<void> _pickPdf() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -113,6 +146,7 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
     }
   }
 
+  // ---- Add new book ----
   Future<void> _saveBook() async {
     if (!_formKey.currentState!.validate()) {
       _showSnack('فضلاً أكمل الحقول المطلوبة', icon: Icons.info_outline);
@@ -171,6 +205,7 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
     }
   }
 
+  // ---- Delete book + all related data ----
   Future<void> _deleteBook(DocumentSnapshot doc) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -234,25 +269,78 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
 
     if (ok != true) return;
 
+    final String bookId = doc.id;
+
     try {
+      final firestore = FirebaseFirestore.instance;
       final storage  = FirebaseStorage.instance;
-      final pdfRef   = storage.ref('audiobooks/${doc.id}/book.pdf');
-      final coverRef = storage.ref('audiobooks/${doc.id}/cover.jpg');
 
-      await Future.wait([
-        pdfRef.delete().catchError((_) {}),
-        coverRef.delete().catchError((_) {}),
-      ]);
+      // Collect all delete operations
+      final List<Future> deletions = [];
 
-      await doc.reference.delete();
+      // 1) Delete main book files from Storage (pdf, cover)
+      deletions.add(
+        storage
+            .ref('audiobooks/$bookId/book.pdf')
+            .delete()
+            .catchError((_) {}),
+      );
+      deletions.add(
+        storage
+            .ref('audiobooks/$bookId/cover.jpg')
+            .delete()
+            .catchError((_) {}),
+      );
+
+      // 2) Delete possible OCR text files (safe even if they do not exist)
+      deletions.add(
+        storage
+            .ref('audiobooks/$bookId/ocr.txt')
+            .delete()
+            .catchError((_) {}),
+      );
+      deletions.add(
+        storage
+            .ref('ocr/$bookId.txt')
+            .delete()
+            .catchError((_) {}),
+      );
+
+      // 3) Delete OCR result document in Firestore (if you store it there)
+      deletions.add(
+        firestore
+            .collection('ocr_results')
+            .doc(bookId)
+            .delete()
+            .catchError((_) {}),
+      );
+
+      // 4) Delete all reviews for this book from each user's "reviews" subcollection
+      final usersSnap = await firestore.collection('users').get();
+      for (final userDoc in usersSnap.docs) {
+        final reviewsSnap = await userDoc.reference
+            .collection('reviews')
+            .where('bookId', isEqualTo: bookId)
+            .get();
+
+        for (final reviewDoc in reviewsSnap.docs) {
+          deletions.add(reviewDoc.reference.delete());
+        }
+      }
+
+      // 5) Delete the audiobook document itself
+      deletions.add(doc.reference.delete());
+
+      await Future.wait(deletions);
 
       if (mounted) _showSnack('تم حذف الكتاب بنجاح');
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('Error deleting book $bookId: $e\n$st');
       if (mounted) _showSnack('تعذّر الحذف: $e', icon: Icons.error_outline);
     }
   }
 
-  // ===== تفعيل القلم: يفتح صفحة التعديل =====
+  // Open edit page (pencil icon)
   void _openEdit(DocumentSnapshot doc, Map<String, dynamic> data) {
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => _EditBookPage(
@@ -263,7 +351,7 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
     ));
   }
 
-  // ================== واجهات التبويبات ==================
+  // ================== Tabs content ==================
 
   Widget _buildAddTab() {
     return Directionality(
@@ -285,12 +373,23 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
                     child: Column(
                       children: [
                         const SizedBox(height: 8),
-                        // اسم الكتاب
+                        const Align(
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            'الحقول المشار إليها بـ * مطلوبة',
+                            style: TextStyle(
+                              color: Colors.black54,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        // Book title (required)
                         _sizedField(
                           height: _kFieldH,
                           child: _styledField(
                             controller: _titleCtrl,
-                            label: 'اسم الكتاب',
+                            label: _req('اسم الكتاب'),
                             validator: (v) => (v == null || v.trim().isEmpty)
                                 ? 'اسم الكتاب مطلوب' : null,
                             focusNode: _titleF,
@@ -298,12 +397,12 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
                         ),
                         const SizedBox(height: _kGap),
 
-                        // اسم المؤلف
+                        // Author name (required)
                         _sizedField(
                           height: _kFieldH,
                           child: _styledField(
                             controller: _authorCtrl,
-                            label: 'اسم المؤلف',
+                            label: _req('اسم المؤلف'),
                             validator: (v) => (v == null || v.trim().isEmpty)
                                 ? 'اسم المؤلف مطلوب' : null,
                             focusNode: _authorF,
@@ -311,7 +410,7 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
                         ),
                         const SizedBox(height: _kGap),
 
-                        // التصنيف
+                        // Category (required)
                         _sizedField(
                           height: _kFieldH,
                           child: Container(
@@ -325,21 +424,25 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
                               dropdownColor: _fillGreen,
                               decoration: const InputDecoration(
                                 border: InputBorder.none,
-                                labelText: 'التصنيف',
+                              ).copyWith(
+                                labelText: _req('التصنيف'),
                               ),
+
                               items: _categories
                                   .map((c) => DropdownMenuItem(
                                 value: c,
                                 child: Text(c),
                               ))
                                   .toList(),
-                              onChanged: (v) => setState(() => _category = v),
+                              onChanged: (v) {
+                                setState(() => _category = v);
+                              },
                             ),
                           ),
                         ),
                         const SizedBox(height: _kGap),
 
-                        // وصف مختصر
+                        // Description (optional)
                         _sizedField(
                           height: _kDescH,
                           child: _styledField(
@@ -351,26 +454,28 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
                         ),
                         const SizedBox(height: _kGap),
 
-                        // PDF
+                        // PDF file (required)
                         _sizedField(
                           height: _kFieldH,
                           child: _fileButton(
                             text: _pdfFile == null
-                                ? 'اختيار ملف PDF'
+                                ? _req('اختيار ملف PDF')
                                 : 'تم اختيار: ${_pdfFile!.path.split('/').last}',
+
                             icon: Icons.picture_as_pdf,
                             onPressed: _pickPdf,
                           ),
                         ),
                         const SizedBox(height: _kGap),
 
-                        // الغلاف
+                        // Cover image (required)
                         _sizedField(
                           height: _kFieldH,
                           child: _fileButton(
                             text: _coverFile == null
-                                ? 'اختيار صورة الغلاف'
-                                : 'تم اختيار الغلاف',
+                                ? _req('اختيار صورة الغلاف')
+                                : 'تم اختيار: ${_coverFile!.path.split('/').last}',
+
                             icon: Icons.image,
                             onPressed: _pickCover,
                           ),
@@ -378,11 +483,12 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
 
                         const SizedBox(height: 24),
 
-                        // زر الحفظ
+                        // Save button: disabled if saving OR required fields are not filled
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
-                            onPressed: _saving ? null : _saveBook,
+                            onPressed:
+                            (_saving || !_isAddFormReady) ? null : _saveBook,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: _confirmColor,
                               padding: const EdgeInsets.symmetric(vertical: 14),
@@ -468,6 +574,7 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
                     final author = (data['author'] ?? '') as String;
 
                     return Container(
+
                       decoration: BoxDecoration(
                         color: _fillGreen,
                         borderRadius: BorderRadius.circular(16),
@@ -483,7 +590,7 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          // النصوص (يسار)
+                          // Texts (left)
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -514,7 +621,7 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
                             ),
                           ),
 
-                          // الأيقونات (يمين)
+                          // Icons (right)
                           Row(
                             children: [
                               IconButton(
@@ -596,7 +703,6 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
                   ),
                 ),
               ),
-              // ✅ شلّينا const عشان يتحدث المحتوى مع تغيّر _saving
               body: TabBarView(
                 children: [
                   _AddTabHost(),
@@ -611,14 +717,14 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
   }
 }
 
-// ================== Widgets مساعدة ==================
+// ================== Helper widgets ==================
 
-// غلاف لضبط ارتفاع أي ويدجت (ما يغيّر السلوك)
+// Wrapper to control height for a child widget
 Widget _sizedField({required double height, required Widget child}) {
   return SizedBox(height: height, child: child);
 }
 
-// حقل إدخال مصمم (يدعم hintText للـ placeholders)
+// Styled text field widget (supports hintText for placeholders)
 Widget _styledField({
   required TextEditingController controller,
   required String label,
@@ -651,7 +757,7 @@ Widget _styledField({
   );
 }
 
-// زر اختيار ملف/صورة
+// File/image picker button
 Widget _fileButton({
   required String text,
   required IconData icon,
@@ -660,7 +766,11 @@ Widget _fileButton({
   return OutlinedButton.icon(
     onPressed: onPressed,
     icon: Icon(icon, color: const Color(0xFF0E3A2C)),
-    label: Text(text, style: const TextStyle(color: Color(0xFF0E3A2C))),
+    label: Text(
+      text,
+      overflow: TextOverflow.ellipsis,
+      style: const TextStyle(color: Color(0xFF0E3A2C)),
+    ),
     style: OutlinedButton.styleFrom(
       side: const BorderSide(color: Color(0xFF0E3A2C)),
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
@@ -670,7 +780,7 @@ Widget _fileButton({
   );
 }
 
-// التفاف بسيط لأن TabBarView يحتاج Widgets ثابتة
+// Simple wrappers because TabBarView needs constant widgets
 class _AddTabHost extends StatelessWidget {
   const _AddTabHost();
 
@@ -691,8 +801,8 @@ class _ListTabHost extends StatelessWidget {
   }
 }
 
-// ================== صفحة تعديل الكتاب ==================
-// (بدون تغيير في المنطق – فقط توحيد SnackBar بنفس الستايل)
+// ================== Edit book page ==================
+
 class _EditBookPage extends StatefulWidget {
   final String docId;
   final Map<String, dynamic> initialData;
@@ -738,7 +848,7 @@ class _EditBookPageState extends State<_EditBookPage> {
   String? _currentPdfUrl;
   String? _currentCoverUrl;
 
-  // ✅ SnackBar موحد محليًا
+  // Local unified SnackBar
   void _showSnack(String message, {IconData icon = Icons.check_circle}) {
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
@@ -960,7 +1070,9 @@ class _EditBookPageState extends State<_EditBookPage> {
                               ],
                             ),
                           ),
+
                           const SizedBox(height: _kGap),
+
                           _sizedField(
                             height: _kFieldH,
                             child: _styledField(

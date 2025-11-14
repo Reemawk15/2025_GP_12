@@ -52,7 +52,7 @@ class _MyBooksPageState extends State<MyBooksPage>
     super.dispose();
   }
 
-  // ✅ Unified SnackBar — same green style everywhere
+  //  Unified SnackBar — same green style everywhere
   void _showSnack(String message, {IconData icon = Icons.check_circle}) {
     if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
@@ -226,8 +226,10 @@ class _MyBooksPageState extends State<MyBooksPage>
                 ),
                 const SizedBox(height: 10),
                 const Text(
-                    'هل أنت متأكد أنك تريد حذف هذا الكتاب من مكتبتك؟',
-                    textAlign: TextAlign.center, style: TextStyle(fontSize: 15)),
+                  'هل أنت متأكد أنك تريد حذف هذا الكتاب من مكتبتك؟',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 15),
+                ),
                 const SizedBox(height: 24),
                 SizedBox(
                   width: double.infinity,
@@ -238,7 +240,8 @@ class _MyBooksPageState extends State<MyBooksPage>
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                     onPressed: () => Navigator.pop(ctx, true),
-                    child: const Text('تأكيد', style: TextStyle(fontSize: 16, color: Colors.white)),
+                    child: const Text('تأكيد',
+                        style: TextStyle(fontSize: 16, color: Colors.white)),
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -251,7 +254,8 @@ class _MyBooksPageState extends State<MyBooksPage>
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                     onPressed: () => Navigator.pop(ctx, false),
-                    child: const Text('إلغاء', style: TextStyle(fontSize: 16, color: _darkGreen)),
+                    child: const Text('إلغاء',
+                        style: TextStyle(fontSize: 16, color: _darkGreen)),
                   ),
                 ),
               ],
@@ -293,11 +297,11 @@ class _MyBooksPageState extends State<MyBooksPage>
     final nameMissing = _titleCtrl.text.trim().isEmpty;
     final pdfMissing = _pdfFile == null;
     if (nameMissing && pdfMissing) {
-      return 'أضيف اسم الكتاب واخترِي ملف PDF أولاً ✨';
+      return 'أضيف اسم الكتاب واختاري ملف PDF أولاً ';
     } else if (nameMissing) {
-      return 'أضيف اسم الكتاب أولاً ✍️';
+      return 'أضيف اسم الكتاب أولاً ✍';
     } else {
-      return 'اختار ملف الكتاب (PDF) أولاً 📄';
+      return 'اختار ملف الكتاب (PDF) أولاً ';
     }
   }
 
@@ -306,7 +310,7 @@ class _MyBooksPageState extends State<MyBooksPage>
     final nameMissing = _titleCtrl.text.trim().isEmpty;
     final pdfMissing  = _pdfFile == null;
 
-    // ✅ Show PDF validation message as soon as the title is not empty
+    //  Show PDF validation message as soon as the title is not empty
     final showPdfValidation = _forceValidate || _titleCtrl.text.trim().isNotEmpty;
 
     return Directionality(
@@ -333,6 +337,19 @@ class _MyBooksPageState extends State<MyBooksPage>
                       children: [
                         const SizedBox(height: 8),
 
+                        // الجملة الرمادية للتوضيح
+                        const Align(
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            'الحقول المشار إليها بـ * مطلوبة',
+                            style: TextStyle(
+                              color: Colors.black54,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+
                         // Book title
                         _fieldContainer(
                           isError: _forceValidate && nameMissing,
@@ -342,16 +359,16 @@ class _MyBooksPageState extends State<MyBooksPage>
                             decoration: const InputDecoration(
                               labelText: 'اسم الكتاب *',
                               border: InputBorder.none,
-                              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              contentPadding:
+                              EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                               labelStyle: TextStyle(color: _darkGreen),
                             ),
-                            validator: (v) =>
-                            (v == null || v.trim().isEmpty) ? 'اسم الكتاب مطلوب' : null,
+
                           ),
                         ),
                         const SizedBox(height: 14),
 
-                        // ✅ PDF file selector (required)
+                        // PDF file selector (required)
                         _fileButton(
                           text: _pdfFile == null
                               ? 'اختيار ملف PDF *'
@@ -384,12 +401,16 @@ class _MyBooksPageState extends State<MyBooksPage>
                               disabledBackgroundColor: _confirm.withOpacity(0.45),
                               disabledForegroundColor: Colors.white70,
                               padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
                             ),
                             child: Text(
                               _saving ? 'جارٍ الحفظ...' : 'حفظ',
                               style: const TextStyle(
-                                  color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ),
@@ -461,7 +482,8 @@ class _MyBooksPageState extends State<MyBooksPage>
                             ),
                           ],
                         ),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         child: Row(
                           children: [
                             if (coverUrl.isNotEmpty)
@@ -472,12 +494,12 @@ class _MyBooksPageState extends State<MyBooksPage>
                                   width: 44,
                                   height: 60,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => const SizedBox(width: 44, height: 60),
+                                  errorBuilder: (_, __, ___) =>
+                                  const SizedBox(width: 44, height: 60),
                                 ),
                               )
                             else
                               const SizedBox(width: 44, height: 60),
-
                             const SizedBox(width: 12),
 
                             // Clickable title → opens book details page
@@ -486,7 +508,8 @@ class _MyBooksPageState extends State<MyBooksPage>
                                 onTap: () {
                                   Navigator.of(context).push(
                                     MaterialPageRoute(
-                                      builder: (_) => MyBookDetailsPage(bookId: doc.id),
+                                      builder: (_) =>
+                                          MyBookDetailsPage(bookId: doc.id),
                                     ),
                                   );
                                 },
@@ -510,7 +533,8 @@ class _MyBooksPageState extends State<MyBooksPage>
                               children: [
                                 IconButton(
                                   tooltip: 'حذف',
-                                  icon: const Icon(Icons.delete_forever, color: Colors.red),
+                                  icon: const Icon(Icons.delete_forever,
+                                      color: Colors.red),
                                   onPressed: () => _deleteBook(doc),
                                 ),
                               ],
@@ -605,10 +629,7 @@ Widget _fieldContainer({required Widget child, bool isError = false}) {
     decoration: BoxDecoration(
       color: _fillGreen,
       borderRadius: BorderRadius.circular(12),
-      border: Border.all(
-        color: isError ? Colors.red : Colors.transparent,
-        width: isError ? 1.2 : 0,
-      ),
+
     ),
     child: child,
   );
@@ -621,33 +642,16 @@ Widget _fileButton({
   bool required = false,
   bool isMissing = false,
 }) {
-  // Visually distinguish required/optional + show a small error label when needed
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      OutlinedButton.icon(
-        onPressed: onPressed,
-        icon: Icon(icon, color: _darkGreen),
-        label: Text(
-          text,
-          style: const TextStyle(color: _darkGreen),
-        ),
-        style: OutlinedButton.styleFrom(
-          side: BorderSide(color: isMissing ? Colors.red : _darkGreen),
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          backgroundColor: _fillGreen,
-        ),
-      ),
-      if (required && isMissing)
-        const Padding(
-          padding: EdgeInsetsDirectional.only(top: 6, start: 6, end: 6),
-          child: Text(
-            'هذا الحقل مطلوب',
-            textAlign: TextAlign.right,
-            style: TextStyle(color: Colors.red, fontSize: 12),
-          ),
-        ),
-    ],
+  return OutlinedButton.icon(
+    onPressed: onPressed,
+    icon: Icon(icon, color: _darkGreen),
+    label: Text(text, style: const TextStyle(color: _darkGreen)),
+    style: OutlinedButton.styleFrom(
+      side: const BorderSide(color: _darkGreen),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      backgroundColor: _fillGreen,
+    ),
   );
 }
+
