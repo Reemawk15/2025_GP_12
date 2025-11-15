@@ -43,9 +43,9 @@ class _ClubChatPageState extends State<ClubChatPage> {
           elevation: 0,
           toolbarHeight: 90,
           centerTitle: false,
-          // لتقرّبين العنوان أكثر لليمين (حافة الـleading)
-          titleSpacing: -4,         // جرّبي -6 أو -8 إذا تبين أكثر
-          leadingWidth: 48,         // لا تكبّرينها عشان ما تزحلق العنوان لليسار
+          // To move the title closer to the right (near the leading edge)
+          titleSpacing: -4,         // Try -6 or -8 if you want it even more
+          leadingWidth: 48,         // Keep it small so it doesn't push the title to the left
           title: FutureBuilder<({String name, String? photoUrl})>(
             future: _myProfileFuture,
             builder: (context, snap) {
@@ -59,9 +59,9 @@ class _ClubChatPageState extends State<ClubChatPage> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    // ✅ السطر الأول يسار شوي
+                    // First line slightly to the left
                     Transform.translate(
-                      offset: const Offset(-13, 0), // 👈 يسار
+                      offset: const Offset(-13, 0), // Left offset
                       child: Text(
                         'حللت أهلاً ووطِئت سهلاً $userName',
                         textAlign: TextAlign.right,
@@ -76,9 +76,9 @@ class _ClubChatPageState extends State<ClubChatPage> {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    // ✅ السطر الثاني يمين شوي
+                    // Second line slightly to the right
                     Transform.translate(
-                      offset: const Offset(14, 0), // 👈 يمين
+                      offset: const Offset(14, 0), // Right offset
                       child: Text(
                         'مرحبًا بك في نادي ${widget.clubTitle}',
                         textAlign: TextAlign.right,
@@ -114,7 +114,7 @@ class _ClubChatPageState extends State<ClubChatPage> {
               children: [
                 const SizedBox(height: 140),
 
-                // الرسائل realtime
+                // Messages in realtime
                 Expanded(
                   child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                     stream: FirestoreClubsService.instance.streamMessages(widget.clubId),
@@ -134,7 +134,7 @@ class _ClubChatPageState extends State<ClubChatPage> {
                           final mine = m['uid'] == uid;
                           final text = (m['text'] ?? '') as String;
 
-                          // قد تكون رسائل قديمة بدون اسم/صورة — نعطي fallback منطقي
+                          // Older messages might not have name/photo — provide a reasonable fallback
                           String name = (m['displayName'] ?? '').toString().trim();
                           String photoUrl = (m['photoUrl'] ?? '').toString().trim();
 
@@ -156,7 +156,7 @@ class _ClubChatPageState extends State<ClubChatPage> {
                   ),
                 ),
 
-                // شريط الإدخال
+                // Input bar
                 SafeArea(
                   top: false,
                   child: Padding(
@@ -207,7 +207,7 @@ class _ClubChatPageState extends State<ClubChatPage> {
     );
   }
 
-  // تجيب اسم وصورة المستخدم من users/{uid} كأولوية، ثم من FirebaseAuth كـ fallback
+  // Fetch user's name & photo from users/{uid} first, then use FirebaseAuth as a fallback
   Future<({String name, String? photoUrl})> _resolveCurrentUserProfile() async {
     final user = FirebaseAuth.instance.currentUser!;
     String name = (user.displayName ?? '').trim();
@@ -221,7 +221,7 @@ class _ClubChatPageState extends State<ClubChatPage> {
         photo = (data['photoUrl'] ?? data['avatarUrl'] ?? photo)?.toString();
       }
     } catch (_) {
-      // تجاهل الخطأ ونكتفي بـ FirebaseAuth
+      // Ignore any error and fall back to FirebaseAuth only
     }
 
     if (name.isEmpty) name = 'بدون اسم';

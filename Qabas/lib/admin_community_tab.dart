@@ -9,7 +9,7 @@ class AdminCommunityTab extends StatefulWidget {
 }
 
 class _AdminCommunityTabState extends State<AdminCommunityTab> {
-  // ألوان
+  // Colors
   static const Color _darkGreen  = Color(0xFF0E3A2C);
   static const Color _midGreen   = Color(0xFF2F5145);
   static const Color _lightCard  = Color(0xFFE6F0E0);
@@ -21,8 +21,14 @@ class _AdminCommunityTabState extends State<AdminCommunityTab> {
     final bg  = accepted ? _confirm : _danger;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(msg, textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+        content: Text(
+          msg,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         backgroundColor: bg,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
@@ -48,7 +54,7 @@ class _AdminCommunityTabState extends State<AdminCommunityTab> {
     if (decision == null) return;
     final accept = decision == _Decision.accepted;
 
-    // ✅ قرار + إنشاء نادي عند القبول
+    // ✅ Handle decision + create club when accepted
     await FirestoreClubsService.instance.decide(request: r, accept: accept);
     _showSnack(accept);
   }
@@ -59,7 +65,12 @@ class _AdminCommunityTabState extends State<AdminCommunityTab> {
       textDirection: TextDirection.rtl,
       child: Stack(
         children: [
-          Positioned.fill(child: Image.asset('assets/images/clubs1.png', fit: BoxFit.cover)),
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/clubs1.png',
+              fit: BoxFit.cover,
+            ),
+          ),
           Scaffold(
             backgroundColor: Colors.transparent,
             extendBodyBehindAppBar: true,
@@ -73,7 +84,11 @@ class _AdminCommunityTabState extends State<AdminCommunityTab> {
                   child: IconButton(
                     tooltip: 'رجوع',
                     onPressed: () => Navigator.of(context).maybePop(),
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _darkGreen, size: 20),
+                    icon: const Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      color: _darkGreen,
+                      size: 20,
+                    ),
                   ),
                 ),
               ),
@@ -89,7 +104,13 @@ class _AdminCommunityTabState extends State<AdminCommunityTab> {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(24),
-                          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 12, offset: Offset(0, 6))],
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Colors.black12,
+                              blurRadius: 12,
+                              offset: Offset(0, 6),
+                            )
+                          ],
                         ),
                         child: Column(
                           children: [
@@ -107,16 +128,20 @@ class _AdminCommunityTabState extends State<AdminCommunityTab> {
                             Expanded(
                               child: TabBarView(
                                 children: [
-                                  // الطلبات الحالية
+                                  // Current requests
                                   StreamBuilder<List<ClubRequest>>(
                                     stream: FirestoreClubsService.instance.streamPending(),
                                     builder: (context, snap) {
                                       if (snap.connectionState == ConnectionState.waiting) {
-                                        return const Center(child: CircularProgressIndicator());
+                                        return const Center(
+                                          child: CircularProgressIndicator(),
+                                        );
                                       }
                                       final list = snap.data ?? const [];
                                       if (list.isEmpty) {
-                                        return const Center(child: Text('لا توجد طلبات حالية'));
+                                        return const Center(
+                                          child: Text('لا توجد طلبات حالية'),
+                                        );
                                       }
                                       return ListView.separated(
                                         padding: const EdgeInsets.all(16),
@@ -131,8 +156,14 @@ class _AdminCommunityTabState extends State<AdminCommunityTab> {
                                             child: Column(
                                               crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
-                                                Text('عنوان النادي: ${r.title}',
-                                                    style: const TextStyle(color: _darkGreen, fontWeight: FontWeight.w700, fontSize: 16)),
+                                                Text(
+                                                  'عنوان النادي: ${r.title}',
+                                                  style: const TextStyle(
+                                                    color: _darkGreen,
+                                                    fontWeight: FontWeight.w700,
+                                                    fontSize: 16,
+                                                  ),
+                                                ),
                                                 const SizedBox(height: 12),
                                                 Align(
                                                   alignment: Alignment.centerRight,
@@ -140,8 +171,13 @@ class _AdminCommunityTabState extends State<AdminCommunityTab> {
                                                     style: FilledButton.styleFrom(
                                                       backgroundColor: _confirm,
                                                       foregroundColor: Colors.white,
-                                                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                                      padding: const EdgeInsets.symmetric(
+                                                        horizontal: 18,
+                                                        vertical: 10,
+                                                      ),
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius: BorderRadius.circular(12),
+                                                      ),
                                                     ),
                                                     onPressed: () => _openDetails(r),
                                                     child: const Text('عرض التفاصيل'),
@@ -157,16 +193,20 @@ class _AdminCommunityTabState extends State<AdminCommunityTab> {
                                     },
                                   ),
 
-                                  // الطلبات السابقة
+                                  // Previous requests
                                   StreamBuilder<List<ClubRequest>>(
                                     stream: FirestoreClubsService.instance.streamHistory(),
                                     builder: (context, snap) {
                                       if (snap.connectionState == ConnectionState.waiting) {
-                                        return const Center(child: CircularProgressIndicator());
+                                        return const Center(
+                                          child: CircularProgressIndicator(),
+                                        );
                                       }
                                       final list = snap.data ?? const [];
                                       if (list.isEmpty) {
-                                        return const Center(child: Text('لا توجد طلبات سابقة'));
+                                        return const Center(
+                                          child: Text('لا توجد طلبات سابقة'),
+                                        );
                                       }
                                       return ListView.separated(
                                         padding: const EdgeInsets.all(16),
@@ -182,21 +222,36 @@ class _AdminCommunityTabState extends State<AdminCommunityTab> {
                                             child: Column(
                                               crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
-                                                Text('عنوان النادي: ${r.title}',
-                                                    style: const TextStyle(color: _darkGreen, fontWeight: FontWeight.w700, fontSize: 16)),
+                                                Text(
+                                                  'عنوان النادي: ${r.title}',
+                                                  style: const TextStyle(
+                                                    color: _darkGreen,
+                                                    fontWeight: FontWeight.w700,
+                                                    fontSize: 16,
+                                                  ),
+                                                ),
                                                 const SizedBox(height: 10),
                                                 Row(
                                                   children: [
-                                                    const Text('حالة الطلب: ', style: TextStyle(color: Colors.black87)),
+                                                    const Text(
+                                                      'حالة الطلب: ',
+                                                      style: TextStyle(color: Colors.black87),
+                                                    ),
                                                     Container(
-                                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                                      padding: const EdgeInsets.symmetric(
+                                                        horizontal: 12,
+                                                        vertical: 6,
+                                                      ),
                                                       decoration: BoxDecoration(
                                                         color: isAccepted ? _confirm : _danger,
                                                         borderRadius: BorderRadius.circular(999),
                                                       ),
                                                       child: Text(
                                                         isAccepted ? 'مقبول' : 'مرفوض',
-                                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                                                        style: const TextStyle(
+                                                          color: Colors.white,
+                                                          fontWeight: FontWeight.w600,
+                                                        ),
                                                       ),
                                                     ),
                                                   ],
@@ -228,7 +283,7 @@ class _AdminCommunityTabState extends State<AdminCommunityTab> {
   }
 }
 
-// ======== صفحة تفاصيل الطلب ========
+// ======== Request details page ========
 enum _Decision { accepted, rejected }
 
 class _RequestDetailsPage extends StatelessWidget {
@@ -250,7 +305,12 @@ class _RequestDetailsPage extends StatelessWidget {
       textDirection: TextDirection.rtl,
       child: Stack(
         children: [
-          Positioned.fill(child: Image.asset('assets/images/clubs1.png', fit: BoxFit.cover)),
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/clubs1.png',
+              fit: BoxFit.cover,
+            ),
+          ),
           Scaffold(
             backgroundColor: Colors.transparent,
             appBar: AppBar(
@@ -262,7 +322,11 @@ class _RequestDetailsPage extends StatelessWidget {
                 child: IconButton(
                   tooltip: 'رجوع',
                   onPressed: () => Navigator.of(context).maybePop(),
-                  icon: Icon(Icons.arrow_back_ios_new_rounded, color: darkGreen, size: 20),
+                  icon: Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    color: darkGreen,
+                    size: 20,
+                  ),
                 ),
               ),
             ),
@@ -274,7 +338,13 @@ class _RequestDetailsPage extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(24),
-                    boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 12, offset: Offset(0, 6))],
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Colors.black12,
+                        blurRadius: 12,
+                        offset: Offset(0, 6),
+                      )
+                    ],
                   ),
                   child: Column(
                     children: [
@@ -296,7 +366,9 @@ class _RequestDetailsPage extends StatelessWidget {
                                 side: BorderSide(color: danger, width: 2),
                                 foregroundColor: danger,
                                 minimumSize: const Size.fromHeight(48),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
                               ),
                               onPressed: () => Navigator.pop(context, _Decision.rejected),
                               child: const Text('رفض'),
@@ -309,7 +381,9 @@ class _RequestDetailsPage extends StatelessWidget {
                                 backgroundColor: confirm,
                                 foregroundColor: Colors.white,
                                 minimumSize: const Size.fromHeight(48),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
                               ),
                               onPressed: () => Navigator.pop(context, _Decision.accepted),
                               child: const Text('قبول'),
@@ -334,14 +408,28 @@ class _RequestDetailsPage extends StatelessWidget {
       children: [
         Align(
           alignment: Alignment.centerRight,
-          child: Text(label, style: const TextStyle(fontSize: 13, color: Colors.black87), textAlign: TextAlign.right),
+          child: Text(
+            label,
+            style: const TextStyle(fontSize: 13, color: Colors.black87),
+            textAlign: TextAlign.right,
+          ),
         ),
         const SizedBox(height: 6),
         Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-          decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
-          child: Text(value, textAlign: TextAlign.right, style: TextStyle(color: textColor, fontWeight: FontWeight.w600)),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              color: textColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
       ],
     );

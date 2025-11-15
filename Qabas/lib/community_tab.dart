@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'friends_page.dart';
 import 'clubs_page.dart';
 
-// نفس ألوان الهوية المستخدمة في مكتبتك
+// Same identity colors used in your library theme
 const Color _darkGreen  = Color(0xFF0E3A2C);
 const Color _midGreen   = Color(0xFF2F5145);
 const Color _lightGreen = Color(0xFFC9DABF);
@@ -18,10 +18,10 @@ class CommunityTab extends StatelessWidget {
       textDirection: TextDirection.rtl,
       child: Stack(
         children: [
-          // الخلفية
+          // Background image
           Positioned.fill(
             child: Image.asset(
-              'assets/images/community.png', // ← عدّليه لو الاسم مختلف
+              'assets/images/community.png', // ← Update if the filename is different
               fit: BoxFit.cover,
             ),
           ),
@@ -30,7 +30,7 @@ class CommunityTab extends StatelessWidget {
             appBar: AppBar(
               backgroundColor: Colors.transparent,
               elevation: 0,
-              toolbarHeight: 8, // نفس شريط رفيع بدون عنوان
+              toolbarHeight: 8, // Thin top bar with no title
             ),
             body: SafeArea(
               child: Center(
@@ -74,7 +74,7 @@ class CommunityTab extends StatelessWidget {
   }
 }
 
-// ===== كرت الإجراء (نفس شكل مكتبي/إضافة كتب تمامًا) =====
+// ===== Action Card (same exact style as My Books / Add Book card) =====
 class _ActionCard extends StatelessWidget {
   final String title;
   final String subtitle;
@@ -91,11 +91,11 @@ class _ActionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 160, // نفس الارتفاع
+      height: 160, // Same card height
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(22, 20, 22, 16),
       decoration: BoxDecoration(
-        color: _lightGreen.withOpacity(0.88), // نفس اللون والشفافية
+        color: _lightGreen.withOpacity(0.88), // Same color & opacity style
         borderRadius: BorderRadius.circular(28),
         boxShadow: const [
           BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 6)),
@@ -135,7 +135,7 @@ class _ActionCard extends StatelessWidget {
             child: ElevatedButton(
               onPressed: onPressed,
               style: ElevatedButton.styleFrom(
-                backgroundColor: _confirmColor, // نفس لون الزر
+                backgroundColor: _confirmColor, // Same button color
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),

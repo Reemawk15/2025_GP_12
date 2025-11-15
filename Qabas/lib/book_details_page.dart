@@ -4,14 +4,14 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import 'chatbot_placeholder.dart';
 
-// ألوان الثيم
-const _primary   = Color(0xFF0E3A2C); // نصوص/أيقونات داكنة
-const _accent    = Color(0xFF6F8E63); // زر محادثة + SnackBar
-const _pillGreen = Color(0xFFE6F0E0); // خلفيات فاتحة ناعمة
-const _chipRose  = Color(0xFFFFEFF0); // صندوق التعليقات
+// Theme colors
+const _primary   = Color(0xFF0E3A2C); // Dark text/icons
+const _accent    = Color(0xFF6F8E63); // Chat button + SnackBar
+const _pillGreen = Color(0xFFE6F0E0); // Soft light backgrounds
+const _chipRose  = Color(0xFFFFEFF0); // Review bubbles background
 const Color _darkGreen  = Color(0xFF0E3A2C);
 
-/// ✅ SnackBar موحّد بنفس ستايلك
+/// Unified SnackBar with app style
 void _showSnack(BuildContext context, String message, {IconData icon = Icons.check_circle}) {
   final messenger = ScaffoldMessenger.of(context);
   messenger.hideCurrentSnackBar();
@@ -49,7 +49,7 @@ class BookDetailsPage extends StatelessWidget {
       textDirection: TextDirection.rtl,
       child: Stack(
         children: [
-          // الخلفية الموحّدة
+          // Shared background
           Positioned.fill(
             child: Image.asset(
               'assets/images/back_private.png',
@@ -57,7 +57,7 @@ class BookDetailsPage extends StatelessWidget {
             ),
           ),
 
-          // المحتوى فوق الخلفية
+          // Content above the background
           Scaffold(
             backgroundColor: Colors.transparent,
             appBar: AppBar(
@@ -68,10 +68,17 @@ class BookDetailsPage extends StatelessWidget {
               toolbarHeight: 150,
               leading: IconButton(
                 tooltip: 'رجوع',
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _primary, size: 22, ),
+                icon: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: _primary,
+                  size: 22,
+                ),
                 onPressed: () => Navigator.of(context).maybePop(),
               ),
-              title: const Text('تفاصيل الكتاب', style: TextStyle(color: _primary)),
+              title: const Text(
+                'تفاصيل الكتاب',
+                style: TextStyle(color: _primary),
+              ),
             ),
             body: StreamBuilder<DocumentSnapshot>(
               stream: FirebaseFirestore.instance
@@ -98,7 +105,7 @@ class BookDetailsPage extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // الغلاف
+                      // Cover
                       Center(
                         child: Container(
                           width: 220,
@@ -107,22 +114,26 @@ class BookDetailsPage extends StatelessWidget {
                             borderRadius: BorderRadius.circular(20),
                             boxShadow: const [
                               BoxShadow(
-                                  color: Colors.black26,
-                                  blurRadius: 20,
-                                  offset: Offset(0, 8))
+                                color: Colors.black26,
+                                blurRadius: 20,
+                                offset: Offset(0, 8),
+                              )
                             ],
                             color: Colors.white,
                           ),
                           clipBehavior: Clip.antiAlias,
                           child: cover.isNotEmpty
                               ? Image.network(cover, fit: BoxFit.cover)
-                              : const Icon(Icons.menu_book,
-                              size: 80, color: _primary),
+                              : const Icon(
+                            Icons.menu_book,
+                            size: 80,
+                            color: _primary,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 16),
 
-                      // التصنيف
+                      // Category pill
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -130,72 +141,82 @@ class BookDetailsPage extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
-                                color: _pillGreen,
-                                borderRadius: BorderRadius.circular(16)),
-                            child:
-                            Text(category.isEmpty ? 'غير مصنّف' : category),
+                              color: _pillGreen,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Text(
+                              category.isEmpty ? 'غير مصنّف' : category,
+                            ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 10),
 
-                      // العنوان
+                      // Title
                       Center(
                         child: Text(
                           title,
                           textAlign: TextAlign.center,
                           style: const TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w800,
-                              color: _primary),
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            color: _primary,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 6),
 
-                      // تقييم شكلي + الكاتب
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Icon(Icons.mic_none, size: 18, color: _primary),
-                          SizedBox(width: 6),
-                          _Stars(rating: 4),
-                        ],
-                      ),
+                      _AverageRatingRow(bookId: bookId),
                       const SizedBox(height: 4),
+
+                      // Author
                       Center(
-                          child: Text('الكاتب: $author',
-                              style: const TextStyle(color: Colors.black54))),
+                        child: Text(
+                          'الكاتب: $author',
+                          style: const TextStyle(color: Colors.black54),
+                        ),
+                      ),
 
                       const SizedBox(height: 18),
 
-                      // نبذة
+                      // Description
                       _PillCard(
                         title: 'نبذة عن الكتاب :',
-                        child: Text(desc.isEmpty
-                            ? 'لا توجد نبذة متاحة حالياً.'
-                            : desc),
+                        child: Text(
+                          desc.isEmpty
+                              ? 'لا توجد نبذة متاحة حالياً.'
+                              : desc,
+                        ),
                       ),
                       const SizedBox(height: 12),
 
-                      // أزرار صوتية شكلية
+                      // Audio action buttons (UI only for now)
                       const _AudioPillButton(
-                          icon: Icons.record_voice_over, label: 'ملخص عن الكتاب'),
+                        icon: Icons.record_voice_over,
+                        label: 'ملخص عن الكتاب',
+                      ),
                       const SizedBox(height: 10),
                       const _AudioPillButton(
-                          icon: Icons.play_arrow, label: 'بدء الاستماع'),
+                        icon: Icons.play_arrow,
+                        label: 'بدء الاستماع',
+                      ),
 
                       const SizedBox(height: 18),
 
-                      const Text('التعليقات حول الكتاب:',
-                          style: TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.w700)),
+                      const Text(
+                        'التعليقات حول الكتاب:',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                       const SizedBox(height: 8),
                       _ReviewsList(bookId: bookId),
 
                       const SizedBox(height: 12),
                       const Divider(height: 1),
 
-                      // ✅ الخيارات الثلاثة (غير ثابتة — تحت التعليقات مباشرة)
+                      // Inline actions row just under reviews
                       const SizedBox(height: 8),
                       _InlineActionsRow(
                         onAddToList: () => _showAddToListSheet(
@@ -205,9 +226,13 @@ class BookDetailsPage extends StatelessWidget {
                           author: author,
                           cover: cover,
                         ),
-                        onDownload: null, // شكل فقط حالياً
-                        onReview: () =>
-                            _showAddReviewSheet(context, bookId, title, cover),
+                        onDownload: null, // UI only for now
+                        onReview: () => _showAddReviewSheet(
+                          context,
+                          bookId,
+                          title,
+                          cover,
+                        ),
                       ),
 
                       const SizedBox(height: 90),
@@ -217,14 +242,20 @@ class BookDetailsPage extends StatelessWidget {
               },
             ),
 
-            // ✅ زر الشات بوت داخل الـ Scaffold وليس بعده
+            // Chatbot FAB inside Scaffold
             floatingActionButton: FloatingActionButton(
               backgroundColor: _accent,
               onPressed: () {
-                Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => const ChatBotPlaceholderPage()));
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const ChatBotPlaceholderPage(),
+                  ),
+                );
               },
-              child: const Icon(Icons.chat_bubble_outline, color: Colors.white),
+              child: const Icon(
+                Icons.chat_bubble_outline,
+                color: Colors.white,
+              ),
             ),
           ),
         ],
@@ -232,7 +263,7 @@ class BookDetailsPage extends StatelessWidget {
     );
   }
 
-  // === شيت "إضافة إلى قائمة" ===
+  // === Bottom sheet: "Add to list" ===
   void _showAddToListSheet(
       BuildContext context, {
         required String bookId,
@@ -242,32 +273,59 @@ class BookDetailsPage extends StatelessWidget {
       }) {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => _AddToListSheet(bookId: bookId, title: title, author: author, cover: cover),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => _AddToListSheet(
+        bookId: bookId,
+        title: title,
+        author: author,
+        cover: cover,
+      ),
     );
   }
 
-  // شيت التعليقات (موجود عندك)
-  void _showAddReviewSheet(BuildContext context, String bookId, String title, String cover) {
+  // Bottom sheet: add review
+  void _showAddReviewSheet(
+      BuildContext context,
+      String bookId,
+      String title,
+      String cover,
+      ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => _AddReviewSheet(bookId: bookId, bookTitle: title, bookCover: cover),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => _AddReviewSheet(
+        bookId: bookId,
+        bookTitle: title,
+        bookCover: cover,
+      ),
     );
   }
 }
 
-/// صف خيارات أسفل التعليقات (ألوان من الثيم)
+/// Row of inline actions under reviews (colors from theme)
 class _InlineActionsRow extends StatelessWidget {
   final VoidCallback? onAddToList;
   final VoidCallback? onDownload;
   final VoidCallback? onReview;
-  const _InlineActionsRow({this.onAddToList, this.onDownload, this.onReview});
+  const _InlineActionsRow({
+    this.onAddToList,
+    this.onDownload,
+    this.onReview,
+  });
 
   @override
   Widget build(BuildContext context) {
-    Widget item(IconData icon, String l1, String l2, VoidCallback? onTap) {
+    Widget item(
+        IconData icon,
+        String l1,
+        String l2,
+        VoidCallback? onTap,
+        ) {
       final enabled = onTap != null;
       return Expanded(
         child: InkWell(
@@ -308,7 +366,7 @@ class _InlineActionsRow extends StatelessWidget {
       children: [
         item(Icons.folder_copy_rounded, 'إضافة', 'إلى قائمة', onAddToList),
         const _DividerV(),
-        item(Icons.download_rounded, 'تحميل الكتاب', ' ', onDownload), // شكل فقط
+        item(Icons.download_rounded, 'تحميل الكتاب', ' ', onDownload),
         const _DividerV(),
         item(Icons.star_rate_rounded, 'أضف', 'تقييماً', onReview),
       ],
@@ -316,7 +374,7 @@ class _InlineActionsRow extends StatelessWidget {
   }
 }
 
-/// فاصل عمودي رفيع
+/// Thin vertical divider
 class _DividerV extends StatelessWidget {
   const _DividerV();
   @override
@@ -324,12 +382,14 @@ class _DividerV extends StatelessWidget {
     return const SizedBox(
       width: 1,
       height: 44,
-      child: DecoratedBox(decoration: BoxDecoration(color: Color(0xFFEEEEEE))),
+      child: DecoratedBox(
+        decoration: BoxDecoration(color: Color(0xFFEEEEEE)),
+      ),
     );
   }
 }
 
-/// بطاقة خضراء
+/// Green pill card (for description section)
 class _PillCard extends StatelessWidget {
   final String title;
   final Widget child;
@@ -339,7 +399,10 @@ class _PillCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: _pillGreen, borderRadius: BorderRadius.circular(16)),
+      decoration: BoxDecoration(
+        color: _pillGreen,
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -352,7 +415,7 @@ class _PillCard extends StatelessWidget {
   }
 }
 
-/// زر صوتي شكلي
+/// Audio-style button (UI only)
 class _AudioPillButton extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -366,7 +429,9 @@ class _AudioPillButton extends StatelessWidget {
         style: ElevatedButton.styleFrom(
           backgroundColor: _pillGreen,
           foregroundColor: _primary,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
           elevation: 0,
         ),
         onPressed: null,
@@ -377,22 +442,125 @@ class _AudioPillButton extends StatelessWidget {
   }
 }
 
-/// نجوم تقييم شكلية
+/// Stars widget with half-star support (rounded to nearest 0.5)
 class _Stars extends StatelessWidget {
-  final int rating; // 0..5
+  final double rating; // 0..5 (supports fractions)
   const _Stars({required this.rating});
 
   @override
   Widget build(BuildContext context) {
+    // Convert rating to half-star steps (0..10), rounded
+    final int halfSteps = (rating * 2).round();
+
     return Row(
-      children: List.generate(5, (i) {
-        return Icon(i < rating ? Icons.star : Icons.star_border, size: 16, color: Colors.amber[700]);
+      children: List.generate(5, (index) {
+        // Threshold for this star: 2,4,6,8,10 (each step = half-star)
+        final int starThreshold = (index + 1) * 2;
+
+        IconData icon;
+        if (halfSteps >= starThreshold) {
+          icon = Icons.star; // Full star
+        } else if (halfSteps == starThreshold - 1) {
+          icon = Icons.star_half; // Half star
+        } else {
+          icon = Icons.star_border; // Empty star
+        }
+
+        return Icon(
+          icon,
+          size: 16,
+          color: Colors.amber[700],
+        );
       }),
     );
   }
 }
 
-/// قائمة التعليقات (كما كانت)
+/// Overall rating row (average stars + number of reviewers)
+class _AverageRatingRow extends StatelessWidget {
+  final String bookId;
+  const _AverageRatingRow({required this.bookId});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('audiobooks')
+          .doc(bookId)
+          .collection('reviews')
+          .snapshots(),
+      builder: (context, snapshot) {
+        // Loading state
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: const [
+              Icon(Icons.mic_none, size: 18, color: _primary),
+              SizedBox(width: 6),
+              _Stars(rating: 0.0),
+            ],
+          );
+        }
+
+        final docs = snapshot.data?.docs ?? [];
+
+        // No reviews yet -> all stars empty
+        if (docs.isEmpty) {
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: const [
+              Icon(Icons.mic_none, size: 18, color: _primary),
+              SizedBox(width: 6),
+              _Stars(rating: 0.0),
+            ],
+          );
+        }
+
+        // There are reviews -> calculate average (double)
+        double sum = 0;
+        for (final d in docs) {
+          final data = d.data() as Map<String, dynamic>? ?? {};
+          final r = data['rating'];
+          if (r is int) {
+            sum += r.toDouble();
+          } else if (r is double) {
+            sum += r;
+          }
+        }
+
+        final avg = sum / docs.length; // Example: 3.3, 4.5, etc.
+
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.mic_none, size: 18, color: _primary),
+            const SizedBox(width: 6),
+            _Stars(rating: avg),
+            const SizedBox(width: 6),
+            Text(
+              avg.toStringAsFixed(1), // e.g. 3.3
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(width: 2),
+            Text(
+              '(${docs.length})', // number of reviewers
+              style: const TextStyle(
+                fontSize: 12,
+                color: Colors.black54,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Reviews list (for a specific book)
 class _ReviewsList extends StatelessWidget {
   final String bookId;
   const _ReviewsList({required this.bookId});
@@ -401,7 +569,8 @@ class _ReviewsList extends StatelessWidget {
   Widget build(BuildContext context) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
-          .collection('audiobooks').doc(bookId)
+          .collection('audiobooks')
+          .doc(bookId)
           .collection('reviews')
           .orderBy('createdAt', descending: true)
           .snapshots(),
@@ -420,7 +589,10 @@ class _ReviewsList extends StatelessWidget {
           children: items.map((d) {
             final m = d.data() as Map<String, dynamic>? ?? {};
             final userName = (m['userName'] ?? 'قارئ') as String;
-            final rating = (m['rating'] ?? 0) as int;
+            final rating = (m['rating'] ?? 0);
+            final ratingDouble = rating is int
+                ? rating.toDouble()
+                : (rating as double? ?? 0.0);
             final text = (m['text'] ?? '') as String;
 
             return Container(
@@ -435,7 +607,11 @@ class _ReviewsList extends StatelessWidget {
                 children: [
                   CircleAvatar(
                     backgroundColor: _accent.withOpacity(0.25),
-                    child: Text(userName.isNotEmpty ? userName.characters.first : 'ق'),
+                    child: Text(
+                      userName.isNotEmpty
+                          ? userName.characters.first
+                          : 'ق',
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -444,8 +620,15 @@ class _ReviewsList extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            Expanded(child: Text(userName, style: const TextStyle(fontWeight: FontWeight.w700))),
-                            _Stars(rating: rating),
+                            Expanded(
+                              child: Text(
+                                userName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            _Stars(rating: ratingDouble),
                           ],
                         ),
                         const SizedBox(height: 4),
@@ -463,33 +646,52 @@ class _ReviewsList extends StatelessWidget {
   }
 }
 
-/// شيت إضافة إلى قائمة (يحفظ في users/{uid}/library/{bookId})
+/// Bottom sheet: Add book to user's list
+/// Saves in users/{uid}/library/{bookId}
 class _AddToListSheet extends StatelessWidget {
   final String bookId, title, author, cover;
-  const _AddToListSheet({required this.bookId, required this.title, required this.author, required this.cover});
+  const _AddToListSheet({
+    required this.bookId,
+    required this.title,
+    required this.author,
+    required this.cover,
+  });
 
   Future<void> _setStatus(BuildContext context, String status) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      _showSnack(context, 'الرجاء تسجيل الدخول أولاً', icon: Icons.info_outline);
+      _showSnack(
+        context,
+        'الرجاء تسجيل الدخول أولاً',
+        icon: Icons.info_outline,
+      );
       return;
     }
     final ref = FirebaseFirestore.instance
-        .collection('users').doc(user.uid)
-        .collection('library').doc(bookId);
+        .collection('users')
+        .doc(user.uid)
+        .collection('library')
+        .doc(bookId);
 
-    await ref.set({
-      'bookId'   : bookId,
-      'status'   : status, // listen_now | want
-      'title'    : title,
-      'author'   : author,
-      'coverUrl' : cover,
-      'addedAt'  : FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    await ref.set(
+      {
+        'bookId': bookId,
+        'status': status, // listen_now | want
+        'title': title,
+        'author': author,
+        'coverUrl': cover,
+        'addedAt': FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
 
     if (context.mounted) {
       Navigator.pop(context);
-      _showSnack(context, 'تمت الإضافة إلى قائمتك', icon: Icons.check_circle);
+      _showSnack(
+        context,
+        'تمت الإضافة إلى قائمتك',
+        icon: Icons.check_circle,
+      );
     }
   }
 
@@ -502,9 +704,22 @@ class _AddToListSheet extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(height: 4, width: 40, decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(2))),
+            Container(
+              height: 4,
+              width: 40,
+              decoration: BoxDecoration(
+                color: Colors.black26,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
             const SizedBox(height: 16),
-            const Text('إضافة إلى أي قائمة؟', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+            const Text(
+              'إضافة إلى أي قائمة؟',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
             const SizedBox(height: 12),
             ListTile(
               leading: const Icon(Icons.play_circle_fill, color: _primary),
@@ -516,7 +731,7 @@ class _AddToListSheet extends StatelessWidget {
               title: const Text('أرغب بالاستماع لها'),
               onTap: () => _setStatus(context, 'want'),
             ),
-            // ✅ تم حذف خيار "استمعت لها"
+            // "Listened" option intentionally removed as per design
           ],
         ),
       ),
@@ -524,12 +739,16 @@ class _AddToListSheet extends StatelessWidget {
   }
 }
 
-/// ======= شيت إضافة تعليق (كما عندك) =======
+/// ======= Bottom sheet: Add review =======
 class _AddReviewSheet extends StatefulWidget {
   final String bookId;
   final String bookTitle;
   final String bookCover;
-  const _AddReviewSheet({required this.bookId, required this.bookTitle, required this.bookCover});
+  const _AddReviewSheet({
+    required this.bookId,
+    required this.bookTitle,
+    required this.bookCover,
+  });
 
   @override
   State<_AddReviewSheet> createState() => _AddReviewSheetState();
@@ -543,21 +762,35 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
   Future<void> _save() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      _showSnack(context, 'الرجاء تسجيل الدخول أولاً', icon: Icons.info_outline);
+      _showSnack(
+        context,
+        'الرجاء تسجيل الدخول أولاً',
+        icon: Icons.info_outline,
+      );
       return;
     }
     if (_ctrl.text.trim().isEmpty) {
-      _showSnack(context, 'فضلاً اكتب تعليقاً مختصراً', icon: Icons.info_outline);
+      _showSnack(
+        context,
+        'فضلاً اكتب تعليقاً مختصراً',
+        icon: Icons.info_outline,
+      );
       return;
     }
     setState(() => _saving = true);
 
     String userName = user.displayName ?? 'قارئ';
     try {
-      final u = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      final u = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
       if (u.exists) {
         final data = u.data() ?? {};
-        final candidate = (data['name'] ?? data['fullName'] ?? data['displayName'] ?? '') as String;
+        final candidate = (data['name'] ??
+            data['fullName'] ??
+            data['displayName'] ??
+            '') as String;
         if (candidate.trim().isNotEmpty) userName = candidate;
       }
     } catch (_) {}
@@ -565,12 +798,16 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
     final batch = FirebaseFirestore.instance.batch();
 
     final bookReviewRef = FirebaseFirestore.instance
-        .collection('audiobooks').doc(widget.bookId)
-        .collection('reviews').doc();
+        .collection('audiobooks')
+        .doc(widget.bookId)
+        .collection('reviews')
+        .doc();
 
     final userReviewRef = FirebaseFirestore.instance
-        .collection('users').doc(user.uid)
-        .collection('reviews').doc(bookReviewRef.id);
+        .collection('users')
+        .doc(user.uid)
+        .collection('reviews')
+        .doc(bookReviewRef.id);
 
     final payload = {
       'userId': user.uid,
@@ -584,13 +821,20 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
     };
 
     await Future.wait([
-      // تنفيذ الدُفعة
-          () async { batch.set(bookReviewRef, payload); batch.set(userReviewRef, payload); await batch.commit(); }(),
+          () async {
+        batch.set(bookReviewRef, payload);
+        batch.set(userReviewRef, payload);
+        await batch.commit();
+      }(),
     ]);
 
     if (!mounted) return;
     Navigator.pop(context);
-    _showSnack(context, 'تم إضافة تعليقك بنجاح', icon: Icons.check_circle);
+    _showSnack(
+      context,
+      'تم إضافة تعليقك بنجاح',
+      icon: Icons.check_circle,
+    );
   }
 
   @override
@@ -605,9 +849,22 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(height: 4, width: 40, decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(2))),
+              Container(
+                height: 4,
+                width: 40,
+                decoration: BoxDecoration(
+                  color: Colors.black26,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
               const SizedBox(height: 12),
-              const Text('إضافة تعليق', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+              const Text(
+                'إضافة تعليق',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                ),
+              ),
               const SizedBox(height: 10),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -615,14 +872,20 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
                   final filled = i < _rating;
                   return IconButton(
                     onPressed: () => setState(() => _rating = i + 1),
-                    icon: Icon(filled ? Icons.star : Icons.star_border, color: Colors.amber[700]),
+                    icon: Icon(
+                      filled ? Icons.star : Icons.star_border,
+                      color: Colors.amber[700],
+                    ),
                   );
                 }),
               ),
               TextField(
                 controller: _ctrl,
                 maxLines: 3,
-                decoration: const InputDecoration(hintText: 'اكتب رأيك حول الكتاب...', border: OutlineInputBorder()),
+                decoration: const InputDecoration(
+                  hintText: 'اكتب رأيك حول الكتاب...',
+                  border: OutlineInputBorder(),
+                ),
               ),
               const SizedBox(height: 10),
               SizedBox(

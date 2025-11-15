@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:firebase_auth/firebase_auth.dart';          // ✅ Auth
-import 'package:cloud_firestore/cloud_firestore.dart';       // ✅ Firestore
-import 'package:firebase_storage/firebase_storage.dart';     // ✅ Storage
+import 'package:firebase_auth/firebase_auth.dart';          // Auth
+import 'package:cloud_firestore/cloud_firestore.dart';       // Firestore
+import 'package:firebase_storage/firebase_storage.dart';     // Storage
 
 class EditProfilePage extends StatefulWidget {
   const EditProfilePage({super.key});
@@ -35,7 +35,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _load();
   }
 
-  // ✅ SnackBar موحّد بنفس الستايل المطلوب
+  // Unified SnackBar with the same desired style
   void _showSnack(String message, {IconData icon = Icons.check_circle}) {
     if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
@@ -170,7 +170,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
   }
 
-  // رسائل أخطاء Firebase بالعربي
+  // Firebase Auth error messages (Arabic text in UI)
   String _authErrorAr(FirebaseAuthException e) {
     switch (e.code) {
       case 'requires-recent-login':
@@ -186,10 +186,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
   }
 
-  // فحص بسيط لتنسيق كلمة المرور (اختياري)
+  // Simple password format validation (optional)
   String? _validatePassword(String? v) {
     final t = (v ?? '').trim();
-    if (t.isEmpty) return null; // اختيارية
+    if (t.isEmpty) return null; // optional
     final hasUpper   = t.contains(RegExp(r'[A-Z]'));
     final hasLower   = t.contains(RegExp(r'[a-z]'));
     final hasDigit   = t.contains(RegExp(r'\d'));
@@ -210,8 +210,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
     final currentPhoto = _user.photoURL ?? '';
 
     final newName   = _name.text.trim();
-    final newUser   = _username.text.trim();  // غير قابل للتعديل
-    final newEmail  = _email.text.trim();     // غير قابل للتعديل
+    final newUser   = _username.text.trim();  // not editable
+    final newEmail  = _email.text.trim();     // not editable
     final newPass   = _password.text.trim();
     final newPhoto  = _photoUrl ?? '';
 
@@ -223,7 +223,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     bool anyError   = false;
 
     try {
-      // 1) Firestore
+      // 1) Firestore document update
       final profilePayload = <String, dynamic>{
         if (nameChanged) ...{
           'name': newName,
@@ -243,7 +243,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         anySuccess = true;
       }
 
-      // 2) Auth: الاسم/الصورة
+      // 2) Auth: display name / photo
       if (nameChanged) {
         await _user.updateDisplayName(newName);
       }
@@ -254,7 +254,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         await _user.reload();
       }
 
-      // 3) كلمة المرور (اختيارية)
+      // 3) Password update (optional)
       if (passProvided) {
         final passError = _validatePassword(newPass);
         if (passError != null) {
@@ -272,7 +272,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         }
       }
 
-      // ✅ الرسالة النهائية/التنقّل
+      // Final message / navigation
       if (anySuccess && !anyError) {
         _showSnack('تم حفظ التعديلات ✅', icon: Icons.check_circle);
         if (mounted) Navigator.pop(context);
@@ -402,7 +402,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                   _field(
                                     controller: _username,
                                     hint: '@username',
-                                    enabled: false, // ⛔️ غير قابل للتعديل
+                                    enabled: false, // ⛔️ Not editable
                                     suffixIcon: const Icon(Icons.lock_outline, size: 18),
                                   ),
                                   const SizedBox(height: 12),
@@ -412,7 +412,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                     controller: _email,
                                     keyboard: TextInputType.emailAddress,
                                     hint: 'name@example.com',
-                                    enabled: false, // ⛔️ غير قابل للتعديل
+                                    enabled: false, // ⛔️ Not editable
                                     suffixIcon: const Icon(Icons.lock_outline, size: 18),
                                     validator: (_) => null,
                                   ),

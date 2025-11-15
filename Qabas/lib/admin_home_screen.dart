@@ -78,24 +78,25 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       textDirection: TextDirection.rtl,
       child: Stack(
         children: [
-          // ✅ نفس أسلوب البروفايل: الخلفية تغطي الشاشة كاملة
+          // Background image covering the full screen
           Positioned.fill(
             child: Image.asset(
-              'assets/images/back.png', // عدّلي المسار حسب مشروعك
+              'assets/images/back.png',
               fit: BoxFit.cover,
             ),
           ),
 
-          // ✅ Scaffold شفاف فوق الخلفية
+          // Transparent scaffold layered above the background
           Scaffold(
             backgroundColor: Colors.transparent,
             extendBody: true,
             extendBodyBehindAppBar: true,
-// ⬇️ هذا ينزل العنوان وزر الخروج لتحت شوي
+
+            // This pushes the AppBar down a bit
             appBar: PreferredSize(
-              preferredSize: const Size.fromHeight(190), // ارتفاع أكبر
+              preferredSize: const Size.fromHeight(190),
               child: Padding(
-                padding: const EdgeInsets.only(top: 150), // ← عدلي الرقم تنزل أكثر أو أقل
+                padding: const EdgeInsets.only(top: 150),
                 child: AppBar(
                   backgroundColor: Colors.transparent,
                   elevation: 0,
@@ -130,7 +131,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // كرت 1: إدارة الكتب الصوتية
+                    // Card 1: Audiobooks manager
                     _ActionCard(
                       title: 'إدارة الكتب الصوتية',
                       subtitle: 'يمكنك إثراء مكتبة قَبَس بإضافة الكتب الصوتية بالضغط على الزر أدناه.',
@@ -144,7 +145,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // كرت 2: إدارة الطلبات
+                    // Card 2: Club creation requests
                     _ActionCard(
                       title: 'إدارة الطلبات',
                       subtitle: 'يمكنك متابعة طلبات إنشاء أندية الكتب بالضغط على الزر أدناه.',
@@ -158,7 +159,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // كرت 3: احصائيات قَبَس
+                    // Card 3: Statistics
                     _ActionCard(
                       title: 'احصائيات قَبَس',
                       subtitle: 'يمكنك متابعة نشاط قَبَس بالضغط على الزر أدناه.',
@@ -181,7 +182,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   }
 }
 
-// كرت قابل للنقر بالكامل + زر
+// Reusable clickable card widget with a button
 class _ActionCard extends StatelessWidget {
   final String title;
   final String subtitle;
@@ -236,7 +237,7 @@ class _ActionCard extends StatelessWidget {
   }
 }
 
-// صفحة الإحصائيات (قالب)
+// Statistics page template
 class AdminStatsPage extends StatelessWidget {
   const AdminStatsPage({super.key});
 
@@ -251,11 +252,12 @@ class AdminStatsPage extends StatelessWidget {
           ),
           Scaffold(
             backgroundColor: Colors.transparent,
-            // 👇 هذا يخلي العنوان وسهم الرجوع ينزلون شوي لتحت
+
+            // Pushes the AppBar content down slightly
             appBar: PreferredSize(
-              preferredSize: const Size.fromHeight(190), // ← ترفع ارتفاع الـAppBar
+              preferredSize: const Size.fromHeight(190),
               child: Padding(
-                padding: const EdgeInsets.only(top: 150), // ← عدلي الرقم تنزل أكثر أو أقل
+                padding: const EdgeInsets.only(top: 150),
                 child: AppBar(
                   backgroundColor: Colors.transparent,
                   elevation: 0,
