@@ -12,7 +12,7 @@ const LOCATION = "us";                                  // Processor location
 const PROCESSOR_ID = "63d2df301e9805cd";                // Processor ID;
 
 // Maximum pages per part when splitting a large PDF
-const MAX_PAGES_PER_PART = 120;
+const MAX_PAGES_PER_PART = 100;
 
 const storage = new Storage();
 const docai = new DocumentProcessorServiceClient();
