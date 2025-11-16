@@ -83,11 +83,11 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
     );
   }
 
-  // ---- Lifecycle ----
-  @override
   // Helper to mark required fields
   String _req(String label) => '$label *';
 
+  // ---- Lifecycle ----
+  @override
   void initState() {
     super.initState();
     // Listen to text changes so the Save button state is updated
@@ -315,9 +315,10 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
             .catchError((_) {}),
       );
 
-      // 4) Delete all reviews for this book from each user's "reviews" subcollection
+      // 4) Delete reviews AND shelves entries from every user
       final usersSnap = await firestore.collection('users').get();
       for (final userDoc in usersSnap.docs) {
+        // 4.a) Delete all reviews for this book from "reviews" subcollection
         final reviewsSnap = await userDoc.reference
             .collection('reviews')
             .where('bookId', isEqualTo: bookId)
@@ -326,9 +327,19 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
         for (final reviewDoc in reviewsSnap.docs) {
           deletions.add(reviewDoc.reference.delete());
         }
+
+        // 4.b) Delete this book from user's shelves ("library" subcollection)
+        final librarySnap = await userDoc.reference
+            .collection('library')
+            .where('bookId', isEqualTo: bookId)
+            .get();
+
+        for (final libDoc in librarySnap.docs) {
+          deletions.add(libDoc.reference.delete());
+        }
       }
 
-      // 5) Delete the audiobook document itself
+      // 5) Finally delete the audiobook document itself
       deletions.add(doc.reference.delete());
 
       await Future.wait(deletions);
@@ -427,7 +438,6 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
                               ).copyWith(
                                 labelText: _req('التصنيف'),
                               ),
-
                               items: _categories
                                   .map((c) => DropdownMenuItem(
                                 value: c,
@@ -461,7 +471,6 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
                             text: _pdfFile == null
                                 ? _req('اختيار ملف PDF')
                                 : 'تم اختيار: ${_pdfFile!.path.split('/').last}',
-
                             icon: Icons.picture_as_pdf,
                             onPressed: _pickPdf,
                           ),
@@ -475,7 +484,6 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
                             text: _coverFile == null
                                 ? _req('اختيار صورة الغلاف')
                                 : 'تم اختيار: ${_coverFile!.path.split('/').last}',
-
                             icon: Icons.image,
                             onPressed: _pickCover,
                           ),
@@ -501,10 +509,13 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: const [
                                 SizedBox(
-                                  width: 18, height: 18,
+                                  width: 18,
+                                  height: 18,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2.2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    valueColor:
+                                    AlwaysStoppedAnimation<Color>(
+                                        Colors.white),
                                   ),
                                 ),
                                 SizedBox(width: 10),
@@ -574,7 +585,6 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
                     final author = (data['author'] ?? '') as String;
 
                     return Container(
-
                       decoration: BoxDecoration(
                         color: _fillGreen,
                         borderRadius: BorderRadius.circular(16),
@@ -1154,7 +1164,8 @@ class _EditBookPageState extends State<_EditBookPage> {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: const [
                                   SizedBox(
-                                    width: 18, height: 18,
+                                    width: 18,
+                                    height: 18,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2.2,
                                       valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
