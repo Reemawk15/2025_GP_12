@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'firestore_clubs_service.dart';
+import 'friend_details_page.dart';
 
 class ClubChatPage extends StatefulWidget {
   final String clubId;
@@ -43,9 +44,10 @@ class _ClubChatPageState extends State<ClubChatPage> {
           elevation: 0,
           toolbarHeight: 90,
           centerTitle: false,
-          // To move the title closer to the right (near the leading edge)
-          titleSpacing: -4,         // Try -6 or -8 if you want it even more
-          leadingWidth: 48,         // Keep it small so it doesn't push the title to the left
+          // Move the title closer to the right (near the leading edge)
+          titleSpacing: -4,
+          // Keep it small so it does not push the title to the left
+          leadingWidth: 48,
           title: FutureBuilder<({String name, String? photoUrl})>(
             future: _myProfileFuture,
             builder: (context, snap) {
@@ -61,12 +63,12 @@ class _ClubChatPageState extends State<ClubChatPage> {
                   children: [
                     // First line slightly to the left
                     Transform.translate(
-                      offset: const Offset(-13, 0), // Left offset
+                      offset: const Offset(-13, 0),
                       child: Text(
                         'حللت أهلاً ووطِئت سهلاً $userName',
                         textAlign: TextAlign.right,
                         style: const TextStyle(
-                          color: Color(0xFF0E3A2C),
+                          color: _titleColor,
                           fontWeight: FontWeight.w800,
                           fontSize: 16,
                           height: 1.2,
@@ -78,12 +80,12 @@ class _ClubChatPageState extends State<ClubChatPage> {
                     const SizedBox(height: 2),
                     // Second line slightly to the right
                     Transform.translate(
-                      offset: const Offset(14, 0), // Right offset
+                      offset: const Offset(14, 0),
                       child: Text(
                         'مرحبًا بك في نادي ${widget.clubTitle}',
                         textAlign: TextAlign.right,
                         style: const TextStyle(
-                          color: Color(0xFF0E3A2C),
+                          color: _titleColor,
                           fontWeight: FontWeight.w600,
                           fontSize: 13.5,
                           height: 1.2,
@@ -108,13 +110,14 @@ class _ClubChatPageState extends State<ClubChatPage> {
         ),
         body: Stack(
           children: [
-            Positioned.fill(child: Image.asset('assets/images/clubs2.png', fit: BoxFit.cover)),
-
+            Positioned.fill(
+              child: Image.asset('assets/images/clubs2.png', fit: BoxFit.cover),
+            ),
             Column(
               children: [
                 const SizedBox(height: 140),
 
-                // Messages in realtime
+                // Messages in real time
                 Expanded(
                   child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                     stream: FirestoreClubsService.instance.streamMessages(widget.clubId),
@@ -133,8 +136,9 @@ class _ClubChatPageState extends State<ClubChatPage> {
                           final m = docs[i].data();
                           final mine = m['uid'] == uid;
                           final text = (m['text'] ?? '') as String;
+                          final senderUid = (m['uid'] ?? '') as String;
 
-                          // Older messages might not have name/photo — provide a reasonable fallback
+                          // Older messages might not have name/photo — use a fallback
                           String name = (m['displayName'] ?? '').toString().trim();
                           String photoUrl = (m['photoUrl'] ?? '').toString().trim();
 
@@ -145,6 +149,7 @@ class _ClubChatPageState extends State<ClubChatPage> {
 
                           return _ChatRow(
                             mine: mine,
+                            uid: senderUid,
                             name: name.isEmpty ? 'مستخدم' : name,
                             text: text,
                             photoUrl: photoUrl.isEmpty ? null : photoUrl,
@@ -173,7 +178,10 @@ class _ClubChatPageState extends State<ClubChatPage> {
                               padding: const EdgeInsets.symmetric(horizontal: 16),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
-                            child: const Text('إرسال', style: TextStyle(fontWeight: FontWeight.w800)),
+                            child: const Text(
+                              'إرسال',
+                              style: TextStyle(fontWeight: FontWeight.w800),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -183,13 +191,22 @@ class _ClubChatPageState extends State<ClubChatPage> {
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(22),
-                              boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 3))],
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Colors.black12,
+                                  blurRadius: 8,
+                                  offset: Offset(0, 3),
+                                ),
+                              ],
                             ),
                             child: TextField(
                               controller: _controller,
                               minLines: 1,
                               maxLines: 4,
-                              decoration: const InputDecoration(hintText: 'اكتب رسالتك...', border: InputBorder.none),
+                              decoration: const InputDecoration(
+                                hintText: 'اكتب رسالتك...',
+                                border: InputBorder.none,
+                              ),
                               textInputAction: TextInputAction.send,
                               onSubmitted: (_) => _send(),
                             ),
@@ -207,7 +224,7 @@ class _ClubChatPageState extends State<ClubChatPage> {
     );
   }
 
-  // Fetch user's name & photo from users/{uid} first, then use FirebaseAuth as a fallback
+  // Fetch user's name and photo from users/{uid} first, then fall back to FirebaseAuth data
   Future<({String name, String? photoUrl})> _resolveCurrentUserProfile() async {
     final user = FirebaseAuth.instance.currentUser!;
     String name = (user.displayName ?? '').trim();
@@ -217,11 +234,13 @@ class _ClubChatPageState extends State<ClubChatPage> {
       final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
       if (doc.exists) {
         final data = doc.data()!;
-        name = (data['name'] ?? data['fullName'] ?? data['username'] ?? name ?? '').toString().trim();
+        name = (data['name'] ?? data['fullName'] ?? data['username'] ?? name ?? '')
+            .toString()
+            .trim();
         photo = (data['photoUrl'] ?? data['avatarUrl'] ?? photo)?.toString();
       }
     } catch (_) {
-      // Ignore any error and fall back to FirebaseAuth only
+      // Ignore errors and keep FirebaseAuth data only
     }
 
     if (name.isEmpty) name = 'بدون اسم';
@@ -254,6 +273,7 @@ class _ClubChatPageState extends State<ClubChatPage> {
 
 class _ChatRow extends StatelessWidget {
   final bool mine;
+  final String uid;
   final String name;
   final String text;
   final String? photoUrl;
@@ -261,6 +281,7 @@ class _ChatRow extends StatelessWidget {
 
   const _ChatRow({
     required this.mine,
+    required this.uid,
     required this.name,
     required this.text,
     required this.bubbleColor,
@@ -281,16 +302,40 @@ class _ChatRow extends StatelessWidget {
           : null,
     );
 
+    // Avatar is tappable only for other users, not for the current user
+    final tappableAvatar = GestureDetector(
+      onTap: () {
+        // Do nothing if this is my own message or uid is empty
+        if (mine || uid.isEmpty) return;
+
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => FriendDetailsPage(friendUid: uid),
+          ),
+        );
+      },
+      child: avatar,
+    );
+
     final bubble = Container(
       constraints: const BoxConstraints(maxWidth: 280),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(color: bubbleColor, borderRadius: BorderRadius.circular(16)),
+      decoration: BoxDecoration(
+        color: bubbleColor,
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(name, style: const TextStyle(fontSize: 11, color: Colors.black54)),
+          Text(
+            name,
+            style: const TextStyle(fontSize: 11, color: Colors.black54),
+          ),
           const SizedBox(height: 2),
-          Text(text, style: const TextStyle(color: Colors.black87)),
+          Text(
+            text,
+            style: const TextStyle(color: Colors.black87),
+          ),
         ],
       ),
     );
@@ -300,7 +345,17 @@ class _ChatRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: mine ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
-        children: mine ? [bubble, const SizedBox(width: 8), avatar] : [avatar, const SizedBox(width: 8), bubble],
+        children: mine
+            ? [
+          bubble,
+          const SizedBox(width: 8),
+          tappableAvatar,
+        ]
+            : [
+          tappableAvatar,
+          const SizedBox(width: 8),
+          bubble,
+        ],
       ),
     );
   }
