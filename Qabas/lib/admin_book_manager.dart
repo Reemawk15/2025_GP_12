@@ -193,9 +193,16 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
         _category = null;
       });
 
-      if (mounted) {
-        _showSnack('تمت إضافة الكتاب بنجاح');
-      }
+      // Show success message and "refresh" the whole screen
+      if (!mounted) return;
+      _showSnack('تم حفظ الكتاب بنجاح');
+
+      // Replace current screen with a fresh instance so everything resets
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => const AdminBookManagerScreen(),
+        ),
+      );
     } catch (e) {
       if (mounted) {
         _showSnack('حدث خطأ أثناء الحفظ: $e', icon: Icons.error_outline);
