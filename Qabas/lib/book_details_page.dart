@@ -112,18 +112,14 @@ class BookDetailsPage extends StatelessWidget {
                           height: 270,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(20),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Colors.black26,
-                                blurRadius: 20,
-                                offset: Offset(0, 8),
-                              )
-                            ],
                             color: Colors.white,
                           ),
                           clipBehavior: Clip.antiAlias,
                           child: cover.isNotEmpty
-                              ? Image.network(cover, fit: BoxFit.cover)
+                              ? Image.network(
+                            cover,
+                            fit: BoxFit.contain,
+                          )
                               : const Icon(
                             Icons.menu_book,
                             size: 80,

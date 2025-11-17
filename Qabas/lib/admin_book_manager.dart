@@ -989,11 +989,18 @@ class _EditBookPageState extends State<_EditBookPage> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ Show full image (no cropping) inside fixed 80x100 box
     Widget coverPreview;
     if (_newCoverFile != null) {
-      coverPreview = Image.file(_newCoverFile!, fit: BoxFit.cover);
+      coverPreview = Image.file(
+        _newCoverFile!,
+        fit: BoxFit.contain, // ← يعرض كل الصورة بدون قص
+      );
     } else if (_currentCoverUrl != null) {
-      coverPreview = Image.network(_currentCoverUrl!, fit: BoxFit.cover);
+      coverPreview = Image.network(
+        _currentCoverUrl!,
+        fit: BoxFit.contain, // ← نفس الشي للرابط الحالي
+      );
     } else {
       coverPreview = Container(
         color: Colors.white24,
@@ -1058,6 +1065,8 @@ class _EditBookPageState extends State<_EditBookPage> {
                       child: Column(
                         children: [
                           SizedBox(height: kFormTopOffset),
+
+                          // Cover + change button
                           Container(
                             decoration: BoxDecoration(
                               color: _fillGreen,
@@ -1071,7 +1080,7 @@ class _EditBookPageState extends State<_EditBookPage> {
                                   child: SizedBox(
                                     width: 80,
                                     height: 100,
-                                    child: coverPreview,
+                                    child: coverPreview, // 👈 الصورة بنفس المقاس وتظهر كاملة
                                   ),
                                 ),
                                 const SizedBox(width: 12),
@@ -1095,21 +1104,31 @@ class _EditBookPageState extends State<_EditBookPage> {
                             child: _styledField(
                               controller: _titleCtrl,
                               label: 'اسم الكتاب',
-                              hintText: (_titleCtrl.text.trim().isEmpty) ? 'لا يوجد عنوان' : null,
-                              validator: (v) => (v == null || v.trim().isEmpty) ? 'اسم الكتاب مطلوب' : null,
+                              hintText: (_titleCtrl.text.trim().isEmpty)
+                                  ? 'لا يوجد عنوان'
+                                  : null,
+                              validator: (v) => (v == null || v.trim().isEmpty)
+                                  ? 'اسم الكتاب مطلوب'
+                                  : null,
                             ),
                           ),
                           const SizedBox(height: _kGap),
+
                           _sizedField(
                             height: _kFieldH,
                             child: _styledField(
                               controller: _authorCtrl,
                               label: 'اسم المؤلف',
-                              hintText: (_authorCtrl.text.trim().isEmpty) ? 'لا يوجد مؤلف' : null,
-                              validator: (v) => (v == null || v.trim().isEmpty) ? 'اسم المؤلف مطلوب' : null,
+                              hintText: (_authorCtrl.text.trim().isEmpty)
+                                  ? 'لا يوجد مؤلف'
+                                  : null,
+                              validator: (v) => (v == null || v.trim().isEmpty)
+                                  ? 'اسم المؤلف مطلوب'
+                                  : null,
                             ),
                           ),
                           const SizedBox(height: _kGap),
+
                           _sizedField(
                             height: _kFieldH,
                             child: Container(
@@ -1119,7 +1138,9 @@ class _EditBookPageState extends State<_EditBookPage> {
                               ),
                               padding: const EdgeInsets.symmetric(horizontal: 12),
                               child: DropdownButtonFormField<String>(
-                                value: (widget.categories.contains(_category)) ? _category : null,
+                                value: (widget.categories.contains(_category))
+                                    ? _category
+                                    : null,
                                 dropdownColor: _fillGreen,
                                 decoration: const InputDecoration(
                                   border: InputBorder.none,
@@ -1135,17 +1156,23 @@ class _EditBookPageState extends State<_EditBookPage> {
                               ),
                             ),
                           ),
+
                           const SizedBox(height: _kGap),
+
                           _sizedField(
                             height: _kDescH,
                             child: _styledField(
                               controller: _descCtrl,
                               label: 'وصف مختصر',
-                              hintText: (_descCtrl.text.trim().isEmpty) ? 'لا توجد نبذة' : null,
+                              hintText: (_descCtrl.text.trim().isEmpty)
+                                  ? 'لا توجد نبذة'
+                                  : null,
                               maxLines: 5,
                             ),
                           ),
+
                           const SizedBox(height: _kGap),
+
                           _sizedField(
                             height: _kFieldH,
                             child: _fileButton(
@@ -1154,7 +1181,9 @@ class _EditBookPageState extends State<_EditBookPage> {
                               onPressed: _pickPdf,
                             ),
                           ),
+
                           const SizedBox(height: 24),
+
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton(
@@ -1175,7 +1204,9 @@ class _EditBookPageState extends State<_EditBookPage> {
                                     height: 18,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2.2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
                                     ),
                                   ),
                                   SizedBox(width: 10),

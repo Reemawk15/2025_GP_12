@@ -192,7 +192,8 @@ class _HomeScreenState extends State<HomeScreen> {
           .get();
       if (doc.exists) {
         final data = doc.data() ?? {};
-        name = (data['name'] ?? data['fullName'] ?? data['displayName'] ?? '')
+        name =
+        (data['name'] ?? data['fullName'] ?? data['displayName'] ?? '')
         as String;
         if (name.trim().isEmpty) name = null;
       }
@@ -218,7 +219,9 @@ class _HomeScreenState extends State<HomeScreen> {
         .map((doc) {
       final data = doc.data();
       String? name =
-      (data?['name'] ?? data?['fullName'] ?? data?['displayName']) as String?;
+      (data?['name'] ??
+          data?['fullName'] ??
+          data?['displayName']) as String?;
       if ((name ?? '').trim().isEmpty) name = null;
       return name;
     });
@@ -313,18 +316,15 @@ class _HomeScreenState extends State<HomeScreen> {
                           height: cardH,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(14),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Colors.black26,
-                                blurRadius: 12,
-                                offset: Offset(0, 6),
-                              ),
-                            ],
-                            color: Colors.white,
+                            color: Colors.white, // لا يوجد shadow هنا
                           ),
                           clipBehavior: Clip.antiAlias,
                           child: cover.isNotEmpty
-                              ? Image.network(cover, fit: BoxFit.cover)
+                              ? Image.network(
+                            cover,
+                            fit: BoxFit
+                                .contain, // يعرض الغلاف كامل بدون قص
+                          )
                               : const Icon(
                             Icons.menu_book,
                             size: 48,
@@ -676,7 +676,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               const Size.fromHeight(48), // Same height
                               foregroundColor: _HomeColors.selected,
                               side: BorderSide(
-                                color: _HomeColors.selected.withOpacity(0.6),
+                                color:
+                                _HomeColors.selected.withOpacity(0.6),
                               ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(14),
