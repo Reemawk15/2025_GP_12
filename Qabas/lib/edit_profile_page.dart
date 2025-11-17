@@ -317,7 +317,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
       // Final message / navigation
       if (anySuccess && !anyError) {
-        _showSnack('تم حفظ التعديلات ✅', icon: Icons.check_circle);
+        _showSnack('تم حفظ التعديلات ', icon: Icons.check_circle);
         if (mounted) Navigator.pop(context);
       } else if (!anySuccess && !anyError) {
         _showSnack('لا توجد تغييرات لحفظها.', icon: Icons.info_outline);
@@ -456,7 +456,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                   _field(
                                     controller: _username,
                                     hint: '@username',
-                                    enabled: false, // ⛔️ Not editable
+                                    enabled: false, //  Not editable
                                     suffixIcon: const Icon(
                                       Icons.lock_outline,
                                       size: 18,
@@ -469,7 +469,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                     controller: _email,
                                     keyboard: TextInputType.emailAddress,
                                     hint: 'name@example.com',
-                                    enabled: false, // ⛔️ Not editable
+                                    enabled: false, //  Not editable
                                     suffixIcon: const Icon(
                                       Icons.lock_outline,
                                       size: 18,
