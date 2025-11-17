@@ -6,6 +6,7 @@ import 'book_details_page.dart';
 import 'library_tab.dart'; // fallback if there is no previous page
 
 const Color _midGreen = Color(0xFF2F5145);
+const Color _confirm    = Color(0xFF6F8E63);
 
 // =======================
 // Position/size config for the circular action button (kept for future use)
@@ -459,7 +460,7 @@ class _BookCard extends StatelessWidget {
     messenger.hideCurrentSnackBar();
     messenger.showSnackBar(
       SnackBar(
-        backgroundColor: _midGreen,
+        backgroundColor: _confirm,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(

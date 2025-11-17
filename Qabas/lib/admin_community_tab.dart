@@ -17,23 +17,36 @@ class _AdminCommunityTabState extends State<AdminCommunityTab> {
   static const Color _danger     = Color(0xFFB64B4B);
 
   void _showSnack(bool accepted) {
-    final msg = accepted ? 'تم قبول الطلب ✅' : 'تم رفض الطلب ❌';
-    final bg  = accepted ? _confirm : _danger;
+    final msg = accepted ? 'تم قبول الطلب' : 'تم رفض الطلب';
+    final icon = accepted ? Icons.check_circle : Icons.close_rounded;
+    final bg   = _confirm; // نفس اللون الموحّد الأخضر
+
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          msg,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
         backgroundColor: bg,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
         duration: const Duration(seconds: 2),
+        content: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: const Color(0xFFE7C4DA), size: 22),
+            const SizedBox(width: 8),
+            Text(
+              msg,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

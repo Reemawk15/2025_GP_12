@@ -138,7 +138,7 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
         return userDoc.set({}, SetOptions(merge: true));
       });
 
-      _showSnack('تم إلغاء هدف الاستماع 🎧', icon: Icons.info_rounded);
+      _showSnack('تم إلغاء هدف الاستماع ', icon: Icons.info_rounded);
       if (mounted) Navigator.pop<int?>(context, null);
       return;
     }

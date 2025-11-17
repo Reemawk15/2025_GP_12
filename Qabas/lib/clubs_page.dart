@@ -600,7 +600,7 @@ class _CreateRequestTabState extends State<_CreateRequestTab> {
     messenger.hideCurrentSnackBar();
     messenger.showSnackBar(
       SnackBar(
-        backgroundColor: _midGreen,
+        backgroundColor: _confirm,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(

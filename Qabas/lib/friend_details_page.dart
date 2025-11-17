@@ -19,7 +19,7 @@ void _showAppSnack(BuildContext context, String message, {IconData icon = Icons.
   messenger.hideCurrentSnackBar();
   messenger.showSnackBar(
     SnackBar(
-      backgroundColor: _midGreen,
+      backgroundColor: _confirm,
       behavior: SnackBarBehavior.floating,
       margin: const EdgeInsets.all(16),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -352,10 +352,10 @@ class _HeaderAndTabs {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  'تأكيد إزالة الصديق',
+                Text(
+                  ' تأكيد إلغاء متابعة $friendName',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: _darkGreen,
@@ -416,7 +416,7 @@ class _HeaderAndTabs {
     if (ok == true) {
       await _unfriend(me.uid, friendUid);
       if (!context.mounted) return;
-      _showAppSnack(context, 'تم إلغاء الصداقة');
+      _showAppSnack(context, 'تم إلغاء المتابعة');
       Navigator.of(context).maybePop();
     }
   }
