@@ -31,7 +31,7 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        backgroundColor: _midGreen,                 // نفس اللون
+        backgroundColor: _confirm,                 // نفس اللون
         behavior: SnackBarBehavior.floating,        // يطفو فوق المحتوى
         margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(
@@ -154,7 +154,7 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
       },
     }, SetOptions(merge: true));
 
-    _showSnack('تم حفظ هدف الاستماع 🎧', icon: Icons.check_circle);
+    _showSnack('تم حفظ هدف الاستماع', icon: Icons.check_circle);
     if (mounted) Navigator.pop<int>(context, minutes);
   }
 
