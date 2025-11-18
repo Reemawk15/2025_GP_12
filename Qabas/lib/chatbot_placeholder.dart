@@ -11,7 +11,7 @@ class ChatBotPlaceholderPage extends StatelessWidget {
       textDirection: TextDirection.rtl,
       child: Stack(
         children: [
-          // الخلفية
+          // Background
           Positioned.fill(
             child: Image.asset(
               'assets/images/back.png',

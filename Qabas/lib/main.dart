@@ -8,21 +8,21 @@ import 'sign_up_page.dart';
 import 'sign_in_page.dart';
 import 'splash_logo_page.dart';
 
-/// درجات ألوان قَبَس
+/// Qabas color palette
 class QabasColors {
-  static const primary    = Color(0xFF0E3A2C); // أخضر داكن للنصوص
-  static const background = Color(0xFFC6DABA); // ← خلفية البداية الجديدة (#c6daba)
+  static const primary    = Color(0xFF0E3A2C); // Dark green for texts
+  static const background = Color(0xFFC6DABA); // Start screen background (#c6daba)
 
-  // ألوان الأزرار بنفس روح الصورة:
-  static const btnSolid   = Color(0xFFDDE9C6); // الزر العلوي
-  static const btnLight   = Color(0xFFF0F7DF); // الزر السفلي
-  static const btnText    = primary;           // نص أخضر داكن
+  // Button colors matching the design:
+  static const btnSolid   = Color(0xFFDDE9C6); // Top button
+  static const btnLight   = Color(0xFFF0F7DF); // Bottom button
+  static const btnText    = primary;           // Dark green text
 }
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // توحيد ألوان شريط الحالة + شريط التنقّل السفلي على أخضر قَبَس
+  // Unify status bar and bottom navigation bar colors with Qabas green
   const navBg = QabasColors.background;
   final baseStyle = const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
@@ -51,7 +51,7 @@ class QabasApp extends StatelessWidget {
         primary: QabasColors.primary,
         background: QabasColors.background,
       ),
-      scaffoldBackgroundColor: QabasColors.background, // ← يضمن خلفية الشاشة الافتتاحية
+      scaffoldBackgroundColor: QabasColors.background, // Ensures opening screen background
       appBarTheme: const AppBarTheme(
         centerTitle: true,
         backgroundColor: Colors.white,
@@ -92,12 +92,12 @@ class QabasApp extends StatelessWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       theme: theme,
-      home: const SplashLogoPage(), // شاشة الشعار الأولى
+      home: const SplashLogoPage(), // First splash logo screen
     );
   }
 }
 
-/// صفحة البداية (تسجيل الدخول / إنشاء حساب)
+/// Home page (Sign in / Sign up)
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
@@ -107,20 +107,20 @@ class HomePage extends StatelessWidget {
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.dark,
-        systemNavigationBarColor: Colors.white,         // ⬅️ شريط التنقل أبيض
+        systemNavigationBarColor: Colors.white,         // Navigation bar in white
         systemNavigationBarIconBrightness: Brightness.dark,
       ),
       child: Scaffold(
         body: Stack(
           fit: StackFit.expand,
           children: [
-            // الخلفية: الصورة الجديدة
+            // Background: main image
             Image.asset(
-              'assets/images/First.png', // ← اسم الصورة
+              'assets/images/First.png', // Image file name
               fit: BoxFit.cover,
             ),
 
-            // الأزرار فوق الخلفية
+            // Buttons layered above the background
             SafeArea(
               child: Align(
                 alignment: Alignment.bottomCenter,
@@ -130,7 +130,7 @@ class HomePage extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // زر "تسجيل الدخول"
+                      // "Sign in" button
                       SizedBox(
                         width: double.infinity,
                         child: FilledButton(
@@ -149,7 +149,7 @@ class HomePage extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
 
-                      // زر "إنشاء حساب جديد"
+                      // "Create new account" button
                       SizedBox(
                         width: double.infinity,
                         child: FilledButton(

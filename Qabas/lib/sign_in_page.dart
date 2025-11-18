@@ -7,20 +7,20 @@ import 'home_screen.dart';
 import 'sign_up_page.dart';
 import 'admin_home_screen.dart'; //
 
-/// ======== تحكم سريع بالتموضع/الألوان ========
-const double kSigninProgressTop      = 190;   // موضع الشريط من الأعلى
-const double kSigninBottomPadding    = 190;   // مسافة المحتوى عن أسفل الخلفية
-const double kSigninFieldWidthFactor = 0.85;  // عرض الحقول بالنسبة لعرض الشاشة
+/// ======== Quick control for positioning/colors ========
+const double kSigninProgressTop      = 190;   // Progress bar position from the top
+const double kSigninBottomPadding    = 190;   // Bottom padding between content and background
+const double kSigninFieldWidthFactor = 0.85;  // Field width relative to screen width
 
 class _SigninTheme {
-  static const primary     = Color(0xFF0E3A2C); // نصوص/أيقونات غامق
-  static const btnFill     = Color(0xFF6F8E63); // لون الأزرار المعبّأة
-  static const inputBorder = Color(0xFF6F8E63); // حدود الحقول
-  static const inputFill   = Colors.white;      // تعبئة الحقول
+  static const primary     = Color(0xFF0E3A2C); // Dark text/icons
+  static const btnFill     = Color(0xFF6F8E63); // Filled buttons color
+  static const inputBorder = Color(0xFF6F8E63); // Input borders color
+  static const inputFill   = Colors.white;      // Input background fill
   static const textDark    = primary;
 
-  static Color get track => const Color(0xFFD7E5CF); // مسار الشريط
-  static Color get fill  => const Color(0xFF8EAA7F); // تعبئة الشريط
+  static Color get track => const Color(0xFFD7E5CF); // Progress bar track color
+  static Color get fill  => const Color(0xFF8EAA7F); // Progress bar fill color
 }
 
 class SignInPage extends StatefulWidget {
@@ -31,7 +31,7 @@ class SignInPage extends StatefulWidget {
 
 class _SignInPageState extends State<SignInPage> {
   final _form = GlobalKey<FormState>();
-  final _identifier = TextEditingController(); // بريد أو اسم مستخدم
+  final _identifier = TextEditingController(); // Email or username
   final _pass       = TextEditingController();
 
   bool _loading = false;
@@ -44,14 +44,14 @@ class _SignInPageState extends State<SignInPage> {
     super.dispose();
   }
 
-  // رسالة سريعة
+  // Quick toast message
   void _toast(String msg, {Color? color}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(msg, textDirection: TextDirection.rtl), backgroundColor: color),
     );
   }
 
-  // إخفاء البريد: نُظهر أول 3 حروف من الجزء قبل @ والباقي ** ونترك الدومين كما هو
+  // Mask email: show first 3 characters of the local part and replace the rest with **, keep domain as is
   String _maskEmailForDisplay(String email) {
     final trimmed = email.trim();
     if (!trimmed.contains('@')) {
@@ -68,7 +68,7 @@ class _SignInPageState extends State<SignInPage> {
     return '$shown**@$domain';
   }
 
-  // نحول اسم المستخدم إلى بريد من Firestore — لو دخل بريد نرجعه كما هو
+  // Resolve username to email from Firestore — if the input is an email, return it as is
   Future<String?> _resolveEmail(String input) async {
     final id = input.trim();
     if (id.isEmpty) return null;
@@ -115,7 +115,7 @@ class _SignInPageState extends State<SignInPage> {
     final idInput = _identifier.text.trim();
     final passInput = _pass.text;
 
-    // ✅ مسار أدمن ثابت بالاسم Admin والباس Admin1234_
+    // Admin fixed credentials: username "Admin" and password "Admin1234_"
     if (idInput.toLowerCase() == 'admin' && passInput == 'Admin1234_') {
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
@@ -125,7 +125,6 @@ class _SignInPageState extends State<SignInPage> {
       );
       return;
     }
-
 
     // Otherwise: continue to the Firebase path
     setState(() => _loading = true);
@@ -183,7 +182,7 @@ class _SignInPageState extends State<SignInPage> {
       }
       await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
 
-      // ✅ هنا التغيير: نظهر البريد مُخفّى
+      // Show the masked email in the message
       final masked = _maskEmailForDisplay(email);
       _toast('أرسلنا رابط إعادة تعيين كلمة المرور إلى $masked');
     } finally {
@@ -216,16 +215,16 @@ class _SignInPageState extends State<SignInPage> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        // العناصر ثابتة حتى مع ظهور الكيبورد + سكرول داخلي
+        // Keep elements stable with keyboard open + internal scroll
         resizeToAvoidBottomInset: false,
         backgroundColor: Colors.white,
         body: Stack(
           fit: StackFit.expand,
           children: [
-            // الخلفية (نفس أسلوب التسجيل)
+            // Background (same style as sign-up)
             Image.asset('assets/images/SignIn.png', fit: BoxFit.cover),
 
-            // شريط رفيع + دائرة بسهم ترجع للمين
+            // Thin progress bar + circular arrow to go back to main
             Positioned(
               top: kSigninProgressTop,
               left: 24,
@@ -233,7 +232,7 @@ class _SignInPageState extends State<SignInPage> {
               child: _TopBarArrow(onTap: () => Navigator.pop(context)),
             ),
 
-            // المحتوى
+            // Main content
             SafeArea(
               child: Align(
                 alignment: Alignment.bottomCenter,
@@ -242,7 +241,7 @@ class _SignInPageState extends State<SignInPage> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // العنوان والوصف
+                      // Title and description
                       const Text(
                         'مرحبًا بعودتك',
                         style: TextStyle(
@@ -260,7 +259,7 @@ class _SignInPageState extends State<SignInPage> {
                       ),
                       const SizedBox(height: 18),
 
-                      // الحقول
+                      // Input fields
                       FractionallySizedBox(
                         widthFactor: kSigninFieldWidthFactor,
                         child: Form(
@@ -278,8 +277,8 @@ class _SignInPageState extends State<SignInPage> {
                               const SizedBox(height: 12),
                               TextFormField(
                                 controller: _pass,
-                                obscureText: _obscure,                 // يختفي/يظهر حسب الحالة
-                                obscuringCharacter: '•',               // شكل الإخفاء
+                                obscureText: _obscure,                 // Hide/show based on state
+                                obscuringCharacter: '•',               // Obscuring character
                                 enableSuggestions: false,
                                 autocorrect: false,
                                 validator: (v) => (v == null || v.isEmpty) ? 'أدخل كلمة المرور' : null,
@@ -289,7 +288,7 @@ class _SignInPageState extends State<SignInPage> {
                                   suffix: IconButton(
                                     tooltip: _obscure ? 'إظهار' : 'إخفاء',
                                     onPressed: () => setState(() => _obscure = !_obscure),
-                                    // لما تكون مخفية نعرض أيقونة "مخفي" (عين عليها شطب)
+                                    // When hidden, show the "hidden" icon (eye with slash)
                                     icon: Icon(
                                       _obscure ? Icons.visibility_off : Icons.visibility,
                                       color: _SigninTheme.primary,
@@ -302,7 +301,7 @@ class _SignInPageState extends State<SignInPage> {
                         ),
                       ),
 
-                      // نسيان كلمة المرور
+                      // Forgot password
                       Align(
                         alignment: Alignment.center,
                         child: TextButton(
@@ -313,7 +312,7 @@ class _SignInPageState extends State<SignInPage> {
                       ),
                       const SizedBox(height: 6),
 
-                      // زر تسجيل الدخول
+                      // Sign in button
                       FractionallySizedBox(
                         widthFactor: 0.7,
                         child: FilledButton(
@@ -334,7 +333,7 @@ class _SignInPageState extends State<SignInPage> {
                       ),
                       const SizedBox(height: 14),
 
-                      // لا يوجد حساب؟
+                      // No account yet?
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -371,8 +370,8 @@ class _SignInPageState extends State<SignInPage> {
   }
 }
 
-/// شريط بسيط + دائرة يمين فيها سهم، للرجوع
-/// شريط بسيط + دائرة يمين فيها سهم، للرجوع
+/// Simple progress bar + circular arrow button on the right for going back
+/// Simple progress bar + circular arrow button on the right for going back
 class _TopBarArrow extends StatelessWidget {
   final VoidCallback onTap;
   const _TopBarArrow({required this.onTap});
@@ -380,11 +379,11 @@ class _TopBarArrow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      // نجبر هذا الصف يكون LTR عشان ترتيب العناصر يكون:
-      // [المسار الممدود] ثم [مسافة] ثم [الدائرة بالسهم] على اليمين
+      // Force this row to be LTR so the order is:
+      // [extended track] then [space] then [circle with arrow] on the right
       textDirection: TextDirection.ltr,
       children: [
-        // المسار المليان (شكل جمالي مثل التصميم)
+        // Filled track (visual element similar to the design)
         Expanded(
           child: Container(
             height: 28,
@@ -396,7 +395,7 @@ class _TopBarArrow extends StatelessWidget {
             child: Align(
               alignment: Alignment.centerRight,
               child: FractionallySizedBox(
-                widthFactor: 0.55, // نسبة التعبئة (شكل فقط)
+                widthFactor: 0.55, // Fill percentage (visual only)
                 child: Container(
                   height: 28,
                   decoration: BoxDecoration(
@@ -409,7 +408,7 @@ class _TopBarArrow extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 10),
-        // الدائرة بالسهم (يمين الشريط ويشير لليمين)
+        // Circular button with arrow (at the right of the bar, pointing right visually)
         InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(24),

@@ -19,7 +19,7 @@ class _AdminCommunityTabState extends State<AdminCommunityTab> {
   void _showSnack(bool accepted) {
     final msg = accepted ? 'تم قبول الطلب' : 'تم رفض الطلب';
     final icon = accepted ? Icons.check_circle : Icons.close_rounded;
-    final bg   = _confirm; // نفس اللون الموحّد الأخضر
+    final bg   = _confirm;
 
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
@@ -67,7 +67,7 @@ class _AdminCommunityTabState extends State<AdminCommunityTab> {
     if (decision == null) return;
     final accept = decision == _Decision.accepted;
 
-    // ✅ Handle decision + create club when accepted
+    //  Handle decision + create club when accepted
     await FirestoreClubsService.instance.decide(request: r, accept: accept);
     _showSnack(accept);
   }

@@ -491,7 +491,6 @@ class _AverageRatingRow extends StatelessWidget {
           return Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: const [
-              Icon(Icons.mic_none, size: 18, color: _primary),
               SizedBox(width: 6),
               _Stars(rating: 0.0),
             ],
@@ -505,7 +504,6 @@ class _AverageRatingRow extends StatelessWidget {
           return Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: const [
-              Icon(Icons.mic_none, size: 18, color: _primary),
               SizedBox(width: 6),
               _Stars(rating: 0.0),
             ],
@@ -529,7 +527,6 @@ class _AverageRatingRow extends StatelessWidget {
         return Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.mic_none, size: 18, color: _primary),
             const SizedBox(width: 6),
             _Stars(rating: avg),
             const SizedBox(width: 6),
@@ -603,10 +600,10 @@ class _ReviewsList extends StatelessWidget {
               ),
             );
 
-            // نخلي الصورة قابلة للضغط عشان تودّي لصفحة الصديق
+            // Make avatar tappable to navigate to friend details page
             final tappableAvatar = GestureDetector(
               onTap: () {
-                // لو ما عندي userId أو هو نفس المستخدم الحالي، لا نسوي شيء
+                // If there is no userId or it is the current user, do nothing
                 if (userId.isEmpty || userId == currentUid) return;
 
                 Navigator.of(context).push(

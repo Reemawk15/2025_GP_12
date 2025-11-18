@@ -250,7 +250,7 @@ class _MyBooksPageState extends State<MyBooksPage>
                       children: [
                         const SizedBox(height: 8),
 
-                        // الجملة الرمادية للتوضيح
+
                         const Align(
                           alignment: Alignment.centerRight,
                           child: Text(
@@ -345,7 +345,7 @@ class _MyBooksPageState extends State<MyBooksPage>
       textDirection: TextDirection.rtl,
       child: Stack(
         children: [
-          // الخلفية الجديدة book7
+
           Positioned.fill(
             child: Image.asset('assets/images/book7.png', fit: BoxFit.cover),
           ),
@@ -764,7 +764,7 @@ class _MyBookCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: _darkGreen, // نفس لون العنوان في البروفايل
+                    color: _darkGreen,
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -783,7 +783,7 @@ class _MyBookCard extends StatelessWidget {
                   width: double.infinity,
                   child: FilledButton(
                     style: FilledButton.styleFrom(
-                      backgroundColor: _confirm, // نفس _confirmColor
+                      backgroundColor: _confirm,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -833,13 +833,13 @@ class _MyBookCard extends StatelessWidget {
       final storage = FirebaseStorage.instance;
       final baseRef = storage.ref('users/$uid/mybooks/${book.id}');
 
-      // حذف ملفات التخزين (لو موجودة)
+      // Delete storage files (if any)
       await Future.wait([
         baseRef.child('book.pdf').delete().catchError((_) {}),
         baseRef.child('cover.jpg').delete().catchError((_) {}),
       ]);
 
-      // حذف المستند من فايرستور
+      // Delete the document from Firestore
       await FirebaseFirestore.instance
           .collection('users')
           .doc(uid)

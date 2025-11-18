@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'main.dart'; // لاستخدام HomePage و QabasColors إن وُجدت
+import 'main.dart'; // Import to use HomePage and QabasColors if available
 
 class SplashLogoPage extends StatefulWidget {
   const SplashLogoPage({super.key});
@@ -14,6 +14,7 @@ class _SplashLogoPageState extends State<SplashLogoPage>
     with SingleTickerProviderStateMixin {
   late final AnimationController _c;
   late final Animation<double> _scale;
+
   @override
   void initState() {
     super.initState();
@@ -25,15 +26,15 @@ class _SplashLogoPageState extends State<SplashLogoPage>
     _scale = CurvedAnimation(parent: _c, curve: Curves.easeOutBack);
     _c.forward();
 
-    // بعد 2 ثانية ننتقل إلى HomePage
+    // After 2 seconds, navigate to HomePage
     Timer(const Duration(milliseconds: 2000), () {
       if (!mounted) return;
 
-      // ✅ غيّري شكل شريط الحالة + شريط التنقّل للصفحات العادية (أبيض)
+      // Set status bar + navigation bar style for regular pages (white background)
       const homeStyle = SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.dark,
-        systemNavigationBarColor: Colors.white,           // ⬅️ أبيض
+        systemNavigationBarColor: Colors.white,           // White
         systemNavigationBarIconBrightness: Brightness.dark,
       );
       SystemChrome.setSystemUIOverlayStyle(homeStyle);
@@ -53,13 +54,12 @@ class _SplashLogoPageState extends State<SplashLogoPage>
 
   @override
   Widget build(BuildContext context) {
-    return const _LogoOnGreen(); // نفس الاسم القديم
+    return const _LogoOnGreen(); // Keep the same widget name as before
   }
 }
 
 class _LogoOnGreen extends StatelessWidget {
   const _LogoOnGreen();
-
 
   @override
   Widget build(BuildContext context) {
@@ -67,15 +67,15 @@ class _LogoOnGreen extends StatelessWidget {
     final scale = state?._scale ?? const AlwaysStoppedAnimation(1.0);
 
     const splashBg = QabasColors.background;
-    // const splashBg = Color(0xFFC6DABA);
+    // const splashBg = Color(0xFFC6DABA); // Alternative: explicit background color
 
-    // نضبط ألوان الـ status bar + navigation bar
+    // Configure status bar and navigation bar colors
     final overlayStyle = const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.dark,
       systemNavigationBarIconBrightness: Brightness.dark,
     ).copyWith(
-      systemNavigationBarColor: splashBg, // نفس لون الخلفية
+      systemNavigationBarColor: splashBg, // Match navigation bar color to background
     );
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -96,4 +96,3 @@ class _LogoOnGreen extends StatelessWidget {
     );
   }
 }
-

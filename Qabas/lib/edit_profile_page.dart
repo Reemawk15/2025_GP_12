@@ -42,7 +42,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     messenger.hideCurrentSnackBar();
     messenger.showSnackBar(
       SnackBar(
-        backgroundColor: _confirm, // ← نفس لون السناك بار في باقي الصفحات
+        backgroundColor: _confirm,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -128,7 +128,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: _darkGreen, // نفس لون العنوان في تسجيل الخروج
+                    color: _darkGreen,
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -139,7 +139,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 ),
                 const SizedBox(height: 24),
 
-                // نفس زر التأكيد في تسجيل الخروج
+
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
@@ -160,7 +160,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
                 const SizedBox(height: 10),
 
-                // نفس زر الإلغاء في تسجيل الخروج
+
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
