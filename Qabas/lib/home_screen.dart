@@ -481,7 +481,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           SizedBox(height: 4),
                           Text(
-                            'استمع إلى أبرز إصدارات معرض الرياض الدولي للكتاب',
+                            ' تصفّح في قبس أبرز إصدارات معرض الرياض الدولي للكتاب',
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.black54,
@@ -490,11 +490,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ],
                       ),
                     ),
-                    Icon(
-                      Icons.headset_mic,
-                      color: _HomeColors.selected,
-                      size: 32,
-                    ),
+
                   ],
                 ),
               ),
