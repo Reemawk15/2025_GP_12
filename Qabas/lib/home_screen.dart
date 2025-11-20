@@ -152,6 +152,9 @@ class _HomeScreenState extends State<HomeScreen> {
   // Optional: keep a live subscription if needed
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _profileSub;
 
+  /// Scroll controller for the horizontal books list
+  final ScrollController _booksScrollController = ScrollController();
+
   @override
   void initState() {
     super.initState();
@@ -168,9 +171,10 @@ class _HomeScreenState extends State<HomeScreen> {
         String? name;
         if (doc.exists) {
           final data = doc.data() ?? {};
-          name =
-          (data['name'] ?? data['fullName'] ?? data['displayName'] ?? '')
-          as String?;
+          name = (data['name'] ??
+              data['fullName'] ??
+              data['displayName'] ??
+              '') as String?;
           if ((name ?? '').trim().isEmpty) name = null;
         }
         name ??= user.displayName;
@@ -192,9 +196,10 @@ class _HomeScreenState extends State<HomeScreen> {
           .get();
       if (doc.exists) {
         final data = doc.data() ?? {};
-        name =
-        (data['name'] ?? data['fullName'] ?? data['displayName'] ?? '')
-        as String;
+        name = (data['name'] ??
+            data['fullName'] ??
+            data['displayName'] ??
+            '') as String;
         if (name.trim().isEmpty) name = null;
       }
     } catch (_) {}
@@ -205,6 +210,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _profileSub?.cancel();
+    _booksScrollController.dispose();
     super.dispose();
   }
 
@@ -219,9 +225,7 @@ class _HomeScreenState extends State<HomeScreen> {
         .map((doc) {
       final data = doc.data();
       String? name =
-      (data?['name'] ??
-          data?['fullName'] ??
-          data?['displayName']) as String?;
+      (data?['name'] ?? data?['fullName'] ?? data?['displayName']) as String?;
       if ((name ?? '').trim().isEmpty) name = null;
       return name;
     });
@@ -261,7 +265,57 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  /// Centered horizontal list of covers
+  /// Scroll books horizontally when arrow is pressed
+  void _scrollBooks({required bool forward}) {
+    if (!_booksScrollController.hasClients) return;
+
+    // Move by one "page" of visible covers
+    final double delta =
+        coverW * visibleCount + coverGap * (visibleCount - 1);
+
+    // In RTL UI we still treat forward as increasing offset
+    final double target = _booksScrollController.offset +
+        (forward ? delta : -delta);
+
+    _booksScrollController.animateTo(
+      target.clamp(
+        0.0,
+        _booksScrollController.position.maxScrollExtent,
+      ),
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+    );
+  }
+
+  /// Small overlay arrow button used on top of the books rail
+  Widget _booksArrow({required bool isLeft}) {
+    return Container(
+      width: 28,
+      height: 28,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.9),
+        shape: BoxShape.circle,
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black12,
+            blurRadius: 6,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: IconButton(
+        padding: EdgeInsets.zero,
+        iconSize: 18,
+        onPressed: () => _scrollBooks(forward: isLeft),
+        icon: Icon(
+          isLeft ? Icons.keyboard_double_arrow_left : Icons.keyboard_double_arrow_right,
+          color: _HomeColors.unselected,
+        ),
+      ),
+    );
+  }
+
+  /// Centered horizontal list of covers with left/right arrows on top
   Widget _centeredCoversRail() {
     final cardW = coverW;
     final cardH = coverH;
@@ -277,80 +331,98 @@ class _HomeScreenState extends State<HomeScreen> {
 
         return SizedBox(
           height: cardH + 30.0,
-          child: StreamBuilder<
-              List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
-            stream: _booksStream(),
-            builder: (context, snap) {
-              if (snap.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              if (!snap.hasData || snap.data!.isEmpty) {
-                return const Center(child: Text('لا توجد نتائج مطابقة'));
-              }
-              final docs = snap.data!;
+          child: Stack(
+            children: [
+              // Books horizontal list
+              StreamBuilder<
+                  List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+                stream: _booksStream(),
+                builder: (context, snap) {
+                  if (snap.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (!snap.hasData || snap.data!.isEmpty) {
+                    return const Center(child: Text('لا توجد نتائج مطابقة'));
+                  }
+                  final docs = snap.data!;
 
-              return ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: EdgeInsets.symmetric(horizontal: sidePad),
-                itemCount: docs.length,
-                separatorBuilder: (_, __) => SizedBox(width: gap),
-                itemBuilder: (context, i) {
-                  final d = docs[i];
-                  final data = d.data() as Map<String, dynamic>? ?? {};
-                  final cover = (data['coverUrl'] ?? '') as String;
-                  final title = (data['title'] ?? '') as String;
+                  return ListView.separated(
+                    controller: _booksScrollController,
+                    scrollDirection: Axis.horizontal,
+                    padding: EdgeInsets.symmetric(horizontal: sidePad),
+                    itemCount: docs.length,
+                    separatorBuilder: (_, __) => SizedBox(width: gap),
+                    itemBuilder: (context, i) {
+                      final d = docs[i];
+                      final data = d.data() as Map<String, dynamic>? ?? {};
+                      final cover = (data['coverUrl'] ?? '') as String;
+                      final title = (data['title'] ?? '') as String;
 
-                  return GestureDetector(
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => BookDetailsPage(bookId: d.id),
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => BookDetailsPage(bookId: d.id),
+                            ),
+                          );
+                        },
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: cardW,
+                              height: cardH,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(14),
+                                color: Colors.white, // No shadow here
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: cover.isNotEmpty
+                                  ? Image.network(
+                                cover,
+                                fit: BoxFit
+                                    .contain, // Show full cover without cropping
+                              )
+                                  : const Icon(
+                                Icons.menu_book,
+                                size: 48,
+                                color: _HomeColors.unselected,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            SizedBox(
+                              width: cardW,
+                              child: Text(
+                                title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       );
                     },
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: cardW,
-                          height: cardH,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(14),
-                            color: Colors.white, // لا يوجد shadow هنا
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: cover.isNotEmpty
-                              ? Image.network(
-                            cover,
-                            fit: BoxFit
-                                .contain, // يعرض الغلاف كامل بدون قص
-                          )
-                              : const Icon(
-                            Icons.menu_book,
-                            size: 48,
-                            color: _HomeColors.unselected,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        SizedBox(
-                          width: cardW,
-                          child: Text(
-                            title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
                   );
                 },
-              );
-            },
+              ),
+
+              // Right arrow (start of list)
+              Align(
+                alignment: Alignment.centerRight,
+                child: _booksArrow(isLeft: false),
+              ),
+
+              // Left arrow (more books)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: _booksArrow(isLeft: true),
+              ),
+            ],
           ),
         );
       },
@@ -490,7 +562,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         ],
                       ),
                     ),
-
                   ],
                 ),
               ),
@@ -507,7 +578,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 10),
 
-              // Centered covers rail
+              // Centered covers rail with overlay arrows
               _centeredCoversRail(),
 
               const SizedBox(height: 24),
@@ -688,7 +759,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               Navigator.pop(context);
                               setState(() {}); // Apply filters on page
                             },
-                            icon: const Icon(Icons.check_circle_outline),
+                            icon:
+                            const Icon(Icons.check_circle_outline),
                             label: const Text('تطبيق التصفية'),
                             style: ElevatedButton.styleFrom(
                               minimumSize:
