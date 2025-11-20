@@ -61,6 +61,10 @@ class _SignUpPageState extends State<SignUpPage> {
   String? _livePassError;
   String? _livePass2Error;
 
+  // Password visibility toggles
+  bool _obscurePass  = true;
+  bool _obscurePass2 = true;
+
   @override
   void initState() {
     super.initState();
@@ -132,7 +136,12 @@ class _SignUpPageState extends State<SignUpPage> {
     }
   }
 
-  InputDecoration _dec(String hint, {bool error = false, String? helper}) {
+  InputDecoration _dec(
+      String hint, {
+        bool error = false,
+        String? helper,
+        Widget? suffix,
+      }) {
     const r = 22.0;
     final borderColor = error ? Colors.red : _SignupTheme.inputBorder.withOpacity(0.35);
     final focusColor  = error ? Colors.red : _SignupTheme.inputBorder;
@@ -148,6 +157,7 @@ class _SignUpPageState extends State<SignUpPage> {
       filled: true,
       fillColor: _SignupTheme.inputFill.withOpacity(0.92),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      suffixIcon: suffix,
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(r),
         borderSide: BorderSide(color: borderColor),
@@ -424,13 +434,22 @@ class _SignUpPageState extends State<SignUpPage> {
                             height: kFieldHeight,
                             child: TextField(
                               controller: _passCtrl,
-                              obscureText: true,
+                              obscureText: _obscurePass,
+                              obscuringCharacter: '•',
                               onChanged: (_) => setState(() {}),
                               decoration: _dec(
                                 'كلمة المرور',
                                 error: _livePassError != null,
                                 helper: _livePassError ??
                                     'كلمة المرور يجب أن تكون ٨ أحرف على الأقل\nوتضمّ حرفًا كبيرًا وحرفًا صغيرًا ورقمًا ورمزًا خاصًا.',
+                                suffix: IconButton(
+                                  tooltip: _obscurePass ? 'إظهار' : 'إخفاء',
+                                  onPressed: () => setState(() => _obscurePass = !_obscurePass),
+                                  icon: Icon(
+                                    _obscurePass ? Icons.visibility_off : Icons.visibility,
+                                    color: _SignupTheme.primary,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -442,12 +461,21 @@ class _SignUpPageState extends State<SignUpPage> {
                             height: kFieldHeight,
                             child: TextField(
                               controller: _pass2Ctrl,
-                              obscureText: true,
+                              obscureText: _obscurePass2,
+                              obscuringCharacter: '•',
                               onChanged: (_) => setState(() {}),
                               decoration: _dec(
                                 'تأكيد كلمة المرور',
                                 error: _livePass2Error != null,
                                 helper: _livePass2Error,
+                                suffix: IconButton(
+                                  tooltip: _obscurePass2 ? 'إظهار' : 'إخفاء',
+                                  onPressed: () => setState(() => _obscurePass2 = !_obscurePass2),
+                                  icon: Icon(
+                                    _obscurePass2 ? Icons.visibility_off : Icons.visibility,
+                                    color: _SignupTheme.primary,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -624,7 +652,8 @@ class _RoundMainButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 240, height: 52,
+      width: 240,
+      height: 52,
       child: FilledButton(
         onPressed: onTap,
         style: FilledButton.styleFrom(
@@ -702,7 +731,8 @@ class _ProgressWithArrow extends StatelessWidget {
           onTap: onArrowTap,
           borderRadius: BorderRadius.circular(24),
           child: Container(
-            width: 44, height: 44,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
               color: _SignupTheme.fill,
               shape: BoxShape.circle,

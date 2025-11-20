@@ -866,84 +866,90 @@ class _ClubsTab extends StatelessWidget {
           );
         }
 
-        return ListView.separated(
+        // Top padding is outside the scrollable area
+        return Padding(
           padding: const EdgeInsets.fromLTRB(16, 280, 16, 24),
-          itemCount: clubs.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
-          itemBuilder: (context, i) {
-            final clubDoc = clubs[i];
-            final clubId  = clubDoc.id;
-            final data    = clubDoc.data();
-            final title   = (data['title'] ?? 'نادي بدون اسم') as String;
-            final desc    = (data['description'] ?? '') as String?;
-            final cat     = (data['category'] ?? '') as String?;
+          child: ListView.separated(
+            // Inside padding is zero so position stays exactly the same
+            padding: EdgeInsets.zero,
+            physics: const ClampingScrollPhysics(),
+            itemCount: clubs.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (context, i) {
+              final clubDoc = clubs[i];
+              final clubId  = clubDoc.id;
+              final data    = clubDoc.data();
+              final title   = (data['title'] ?? 'نادي بدون اسم') as String;
+              final desc    = (data['description'] ?? '') as String?;
+              final cat     = (data['category'] ?? '') as String?;
 
-            // Only show this club if the friend is a member
-            final friendMemberDoc = FirebaseFirestore.instance
-                .collection('clubs').doc(clubId)
-                .collection('members').doc(friendUid)
-                .snapshots();
+              // Only show this club if the friend is a member
+              final friendMemberDoc = FirebaseFirestore.instance
+                  .collection('clubs').doc(clubId)
+                  .collection('members').doc(friendUid)
+                  .snapshots();
 
-            return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-              stream: friendMemberDoc,
-              builder: (context, friendSnap) {
-                final friendIsMember = friendSnap.data?.exists == true;
-                if (!friendIsMember) return const SizedBox.shrink();
+              return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                stream: friendMemberDoc,
+                builder: (context, friendSnap) {
+                  final friendIsMember = friendSnap.data?.exists == true;
+                  if (!friendIsMember) return const SizedBox.shrink();
 
-                return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: _card,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: const [
-                      BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4)),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          color: _darkGreen,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      if (desc != null && desc.trim().isNotEmpty) ...[
-                        const SizedBox(height: 6),
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: _card,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: const [
+                        BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4)),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          desc,
+                          title,
                           style: const TextStyle(
-                            color: Colors.black87,
-                            height: 1.35,
+                            color: _darkGreen,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        if (desc != null && desc.trim().isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            desc,
+                            style: const TextStyle(
+                              color: Colors.black87,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
+                        if (cat != null && cat.trim().isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            'الفئة: $cat',
+                            style: const TextStyle(
+                              color: Colors.black87,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        Align(
+                          alignment: AlignmentDirectional.centerEnd,
+                          child: _JoinOrOpenButtonFD(
+                            clubId: clubId,
+                            clubTitle: title,
                           ),
                         ),
                       ],
-                      if (cat != null && cat.trim().isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          'الفئة: $cat',
-                          style: const TextStyle(
-                            color: Colors.black87,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 12),
-                      Align(
-                        alignment: AlignmentDirectional.centerEnd,
-                        child: _JoinOrOpenButtonFD(
-                          clubId: clubId,
-                          clubTitle: title,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            );
-          },
+                    ),
+                  );
+                },
+              );
+            },
+          ),
         );
       },
     );
