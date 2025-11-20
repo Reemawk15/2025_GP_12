@@ -114,7 +114,6 @@ class _SignInPageState extends State<SignInPage> {
 
     final idInput = _identifier.text.trim();
     final passInput = _pass.text;
-
     // Admin fixed credentials: username "Admin" and password "Admin1234_"
     if (idInput.toLowerCase() == 'admin' && passInput == 'Admin1234_') {
       if (!mounted) return;
@@ -125,7 +124,6 @@ class _SignInPageState extends State<SignInPage> {
       );
       return;
     }
-
     // Otherwise: continue to the Firebase path
     setState(() => _loading = true);
     try {
@@ -134,7 +132,6 @@ class _SignInPageState extends State<SignInPage> {
         _toast('لا يوجد حساب يطابق البريد الإلكتروني/اسم المستخدم المدخل.', color: Colors.red);
         return;
       }
-
       final cred = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email,
         password: passInput,
@@ -158,7 +155,6 @@ class _SignInPageState extends State<SignInPage> {
           return;
         }
       }
-
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
         context,

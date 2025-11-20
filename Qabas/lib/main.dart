@@ -21,7 +21,6 @@ class QabasColors {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
   // Unify status bar and bottom navigation bar colors with Qabas green
   const navBg = QabasColors.background;
   final baseStyle = const SystemUiOverlayStyle(

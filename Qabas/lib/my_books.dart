@@ -210,7 +210,7 @@ class _MyBooksPageState extends State<MyBooksPage>
     final nameMissing = _titleCtrl.text.trim().isEmpty;
     final pdfMissing = _pdfFile == null;
     if (nameMissing && pdfMissing) {
-      return 'أضيف اسم الكتاب واختاري ملف PDF أولاً ';
+      return 'أضيف اسم الكتاب واختار ملف PDF أولاً ';
     } else if (nameMissing) {
       return 'أضيف اسم الكتاب أولاً ✍';
     } else {
@@ -778,7 +778,7 @@ class _MyBookCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 24),
 
-                // زر تأكيد
+
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(

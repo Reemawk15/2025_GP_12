@@ -29,7 +29,7 @@ class ProfileTab extends StatelessWidget {
     );
   }
 
-  // Confirmation dialog (same style used previously)
+  // Confirmation dialog
   Future<void> _confirmLogout(BuildContext context) async {
     final ok = await showDialog<bool>(
       context: context,

@@ -137,7 +137,6 @@ class FirestoreClubsService {
           .map((s) => s.docs.map((d) => ClubRequest.fromDoc(d)).toList());
 
   /// Admin decision + create club when approved
-
   Future<void> decide({
     required ClubRequest request,
     required bool accept,
@@ -163,7 +162,6 @@ class FirestoreClubsService {
         'joinedAt': FieldValue.serverTimestamp(),
       });
     }
-
     await batch.commit();
   }
 

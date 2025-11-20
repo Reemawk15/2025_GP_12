@@ -989,7 +989,7 @@ class _EditBookPageState extends State<_EditBookPage> {
 
   @override
   Widget build(BuildContext context) {
-    //  Show full image (no cropping) inside fixed 80x100 box
+    // % Show full image (no cropping) inside fixed 80x100 box
     Widget coverPreview;
     if (_newCoverFile != null) {
       coverPreview = Image.file(
