@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
+import 'friend_details_page.dart';
 import 'chatbot_placeholder.dart';
 
 // Theme colors
@@ -112,18 +112,14 @@ class BookDetailsPage extends StatelessWidget {
                           height: 270,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(20),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Colors.black26,
-                                blurRadius: 20,
-                                offset: Offset(0, 8),
-                              )
-                            ],
                             color: Colors.white,
                           ),
                           clipBehavior: Clip.antiAlias,
                           child: cover.isNotEmpty
-                              ? Image.network(cover, fit: BoxFit.cover)
+                              ? Image.network(
+                            cover,
+                            fit: BoxFit.contain,
+                          )
                               : const Icon(
                             Icons.menu_book,
                             size: 80,
@@ -495,7 +491,6 @@ class _AverageRatingRow extends StatelessWidget {
           return Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: const [
-              Icon(Icons.mic_none, size: 18, color: _primary),
               SizedBox(width: 6),
               _Stars(rating: 0.0),
             ],
@@ -509,7 +504,6 @@ class _AverageRatingRow extends StatelessWidget {
           return Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: const [
-              Icon(Icons.mic_none, size: 18, color: _primary),
               SizedBox(width: 6),
               _Stars(rating: 0.0),
             ],
@@ -533,7 +527,6 @@ class _AverageRatingRow extends StatelessWidget {
         return Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.mic_none, size: 18, color: _primary),
             const SizedBox(width: 6),
             _Stars(rating: avg),
             const SizedBox(width: 6),
@@ -567,6 +560,8 @@ class _ReviewsList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('audiobooks')
@@ -594,6 +589,31 @@ class _ReviewsList extends StatelessWidget {
                 ? rating.toDouble()
                 : (rating as double? ?? 0.0);
             final text = (m['text'] ?? '') as String;
+            final userId = (m['userId'] ?? '') as String;
+
+            final avatar = CircleAvatar(
+              backgroundColor: _accent.withOpacity(0.25),
+              child: Text(
+                userName.isNotEmpty
+                    ? userName.characters.first
+                    : 'ق',
+              ),
+            );
+
+            // Make avatar tappable to navigate to friend details page
+            final tappableAvatar = GestureDetector(
+              onTap: () {
+                // If there is no userId or it is the current user, do nothing
+                if (userId.isEmpty || userId == currentUid) return;
+
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => FriendDetailsPage(friendUid: userId),
+                  ),
+                );
+              },
+              child: avatar,
+            );
 
             return Container(
               margin: const EdgeInsets.only(bottom: 10),
@@ -605,14 +625,7 @@ class _ReviewsList extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  CircleAvatar(
-                    backgroundColor: _accent.withOpacity(0.25),
-                    child: Text(
-                      userName.isNotEmpty
-                          ? userName.characters.first
-                          : 'ق',
-                    ),
-                  ),
+                  tappableAvatar,
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(

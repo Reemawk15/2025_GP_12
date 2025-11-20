@@ -83,11 +83,11 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
     );
   }
 
-  // ---- Lifecycle ----
-  @override
   // Helper to mark required fields
   String _req(String label) => '$label *';
 
+  // ---- Lifecycle ----
+  @override
   void initState() {
     super.initState();
     // Listen to text changes so the Save button state is updated
@@ -193,9 +193,16 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
         _category = null;
       });
 
-      if (mounted) {
-        _showSnack('تمت إضافة الكتاب بنجاح');
-      }
+      // Show success message and "refresh" the whole screen
+      if (!mounted) return;
+      _showSnack('تم حفظ الكتاب بنجاح');
+
+      // Replace current screen with a fresh instance so everything resets
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => const AdminBookManagerScreen(),
+        ),
+      );
     } catch (e) {
       if (mounted) {
         _showSnack('حدث خطأ أثناء الحفظ: $e', icon: Icons.error_outline);
@@ -315,9 +322,10 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
             .catchError((_) {}),
       );
 
-      // 4) Delete all reviews for this book from each user's "reviews" subcollection
+      // 4) Delete reviews AND shelves entries from every user
       final usersSnap = await firestore.collection('users').get();
       for (final userDoc in usersSnap.docs) {
+        // 4.a) Delete all reviews for this book from "reviews" subcollection
         final reviewsSnap = await userDoc.reference
             .collection('reviews')
             .where('bookId', isEqualTo: bookId)
@@ -326,9 +334,19 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
         for (final reviewDoc in reviewsSnap.docs) {
           deletions.add(reviewDoc.reference.delete());
         }
+
+        // 4.b) Delete this book from user's shelves ("library" subcollection)
+        final librarySnap = await userDoc.reference
+            .collection('library')
+            .where('bookId', isEqualTo: bookId)
+            .get();
+
+        for (final libDoc in librarySnap.docs) {
+          deletions.add(libDoc.reference.delete());
+        }
       }
 
-      // 5) Delete the audiobook document itself
+      // 5) Finally delete the audiobook document itself
       deletions.add(doc.reference.delete());
 
       await Future.wait(deletions);
@@ -427,7 +445,6 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
                               ).copyWith(
                                 labelText: _req('التصنيف'),
                               ),
-
                               items: _categories
                                   .map((c) => DropdownMenuItem(
                                 value: c,
@@ -461,7 +478,6 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
                             text: _pdfFile == null
                                 ? _req('اختيار ملف PDF')
                                 : 'تم اختيار: ${_pdfFile!.path.split('/').last}',
-
                             icon: Icons.picture_as_pdf,
                             onPressed: _pickPdf,
                           ),
@@ -475,7 +491,6 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
                             text: _coverFile == null
                                 ? _req('اختيار صورة الغلاف')
                                 : 'تم اختيار: ${_coverFile!.path.split('/').last}',
-
                             icon: Icons.image,
                             onPressed: _pickCover,
                           ),
@@ -501,10 +516,13 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: const [
                                 SizedBox(
-                                  width: 18, height: 18,
+                                  width: 18,
+                                  height: 18,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2.2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    valueColor:
+                                    AlwaysStoppedAnimation<Color>(
+                                        Colors.white),
                                   ),
                                 ),
                                 SizedBox(width: 10),
@@ -574,7 +592,6 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
                     final author = (data['author'] ?? '') as String;
 
                     return Container(
-
                       decoration: BoxDecoration(
                         color: _fillGreen,
                         borderRadius: BorderRadius.circular(16),
@@ -972,11 +989,18 @@ class _EditBookPageState extends State<_EditBookPage> {
 
   @override
   Widget build(BuildContext context) {
+    // % Show full image (no cropping) inside fixed 80x100 box
     Widget coverPreview;
     if (_newCoverFile != null) {
-      coverPreview = Image.file(_newCoverFile!, fit: BoxFit.cover);
+      coverPreview = Image.file(
+        _newCoverFile!,
+        fit: BoxFit.contain, // ← يعرض كل الصورة بدون قص
+      );
     } else if (_currentCoverUrl != null) {
-      coverPreview = Image.network(_currentCoverUrl!, fit: BoxFit.cover);
+      coverPreview = Image.network(
+        _currentCoverUrl!,
+        fit: BoxFit.contain, // ← نفس الشي للرابط الحالي
+      );
     } else {
       coverPreview = Container(
         color: Colors.white24,
@@ -1041,6 +1065,8 @@ class _EditBookPageState extends State<_EditBookPage> {
                       child: Column(
                         children: [
                           SizedBox(height: kFormTopOffset),
+
+                          // Cover + change button
                           Container(
                             decoration: BoxDecoration(
                               color: _fillGreen,
@@ -1054,7 +1080,7 @@ class _EditBookPageState extends State<_EditBookPage> {
                                   child: SizedBox(
                                     width: 80,
                                     height: 100,
-                                    child: coverPreview,
+                                    child: coverPreview, // 👈 الصورة بنفس المقاس وتظهر كاملة
                                   ),
                                 ),
                                 const SizedBox(width: 12),
@@ -1078,21 +1104,31 @@ class _EditBookPageState extends State<_EditBookPage> {
                             child: _styledField(
                               controller: _titleCtrl,
                               label: 'اسم الكتاب',
-                              hintText: (_titleCtrl.text.trim().isEmpty) ? 'لا يوجد عنوان' : null,
-                              validator: (v) => (v == null || v.trim().isEmpty) ? 'اسم الكتاب مطلوب' : null,
+                              hintText: (_titleCtrl.text.trim().isEmpty)
+                                  ? 'لا يوجد عنوان'
+                                  : null,
+                              validator: (v) => (v == null || v.trim().isEmpty)
+                                  ? 'اسم الكتاب مطلوب'
+                                  : null,
                             ),
                           ),
                           const SizedBox(height: _kGap),
+
                           _sizedField(
                             height: _kFieldH,
                             child: _styledField(
                               controller: _authorCtrl,
                               label: 'اسم المؤلف',
-                              hintText: (_authorCtrl.text.trim().isEmpty) ? 'لا يوجد مؤلف' : null,
-                              validator: (v) => (v == null || v.trim().isEmpty) ? 'اسم المؤلف مطلوب' : null,
+                              hintText: (_authorCtrl.text.trim().isEmpty)
+                                  ? 'لا يوجد مؤلف'
+                                  : null,
+                              validator: (v) => (v == null || v.trim().isEmpty)
+                                  ? 'اسم المؤلف مطلوب'
+                                  : null,
                             ),
                           ),
                           const SizedBox(height: _kGap),
+
                           _sizedField(
                             height: _kFieldH,
                             child: Container(
@@ -1102,7 +1138,9 @@ class _EditBookPageState extends State<_EditBookPage> {
                               ),
                               padding: const EdgeInsets.symmetric(horizontal: 12),
                               child: DropdownButtonFormField<String>(
-                                value: (widget.categories.contains(_category)) ? _category : null,
+                                value: (widget.categories.contains(_category))
+                                    ? _category
+                                    : null,
                                 dropdownColor: _fillGreen,
                                 decoration: const InputDecoration(
                                   border: InputBorder.none,
@@ -1118,17 +1156,23 @@ class _EditBookPageState extends State<_EditBookPage> {
                               ),
                             ),
                           ),
+
                           const SizedBox(height: _kGap),
+
                           _sizedField(
                             height: _kDescH,
                             child: _styledField(
                               controller: _descCtrl,
                               label: 'وصف مختصر',
-                              hintText: (_descCtrl.text.trim().isEmpty) ? 'لا توجد نبذة' : null,
+                              hintText: (_descCtrl.text.trim().isEmpty)
+                                  ? 'لا توجد نبذة'
+                                  : null,
                               maxLines: 5,
                             ),
                           ),
+
                           const SizedBox(height: _kGap),
+
                           _sizedField(
                             height: _kFieldH,
                             child: _fileButton(
@@ -1137,7 +1181,9 @@ class _EditBookPageState extends State<_EditBookPage> {
                               onPressed: _pickPdf,
                             ),
                           ),
+
                           const SizedBox(height: 24),
+
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton(
@@ -1154,10 +1200,13 @@ class _EditBookPageState extends State<_EditBookPage> {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: const [
                                   SizedBox(
-                                    width: 18, height: 18,
+                                    width: 18,
+                                    height: 18,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2.2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
                                     ),
                                   ),
                                   SizedBox(width: 10),

@@ -3,12 +3,20 @@ import { logger } from "firebase-functions";
 import { Storage } from "@google-cloud/storage";
 import { DocumentProcessorServiceClient } from "@google-cloud/documentai";
 import { v4 as uuidv4 } from "uuid";
+import { PDFDocument } from "pdf-lib"; // Used to split large PDFs
 
 // ================== CONFIGURATION ==================
 const APP_BUCKET = "qabas-95e06.firebasestorage.app";   // Firebase Storage bucket
 const DOC_OUTPUT_BUCKET = "qabas-95e06-docai-us-1";     // Document AI output bucket
 const LOCATION = "us";                                  // Processor location
-const PROCESSOR_ID = "63d2df301e9805cd";                // Processor ID
+const PROCESSOR_ID = "63d2df301e9805cd";                // Processor ID;
+
+// Maximum pages per part when splitting a large PDF
+const MAX_PAGES_PER_PART = 100;
+
+// Maximum number of OCR parts to process in parallel for a single book
+// This keeps some parallelism (faster than pure sequential) while staying under quota limits.
+const MAX_OCR_PART_CONCURRENCY = 2;
 
 const storage = new Storage();
 const docai = new DocumentProcessorServiceClient();
@@ -82,6 +90,90 @@ async function runBatchOCR(gcsInputUri: string, outPrefix: string) {
   logger.info("Started Batch OCR", { gcsInputUri, outPrefix });
   await operation.promise();
   logger.info("Batch OCR completed", { outPrefix });
+}
+
+/**
+ * For large PDFs, split into multiple parts stored in APP_BUCKET (under temp-split),
+ * so we can run OCR on each chunk separately and then merge the text.
+ * For smaller PDFs, just use the original file as-is.
+ */
+async function preparePdfParts(
+  sourceBucketName: string,
+  sourceFilePath: string
+): Promise<{ inputUris: string[]; pageCount: number }> {
+  const bucket = storage.bucket(sourceBucketName);
+  const [pdfBytes] = await bucket.file(sourceFilePath).download();
+
+  const pdfDoc = await PDFDocument.load(pdfBytes);
+  const totalPages = pdfDoc.getPageCount();
+
+  logger.info("PDF page count detected", {
+    sourceBucketName,
+    sourceFilePath,
+    totalPages,
+  });
+
+  // No split needed: use original file
+  if (totalPages <= MAX_PAGES_PER_PART) {
+    return {
+      inputUris: [`gs://${sourceBucketName}/${sourceFilePath}`],
+      pageCount: totalPages,
+    };
+  }
+
+  const numParts = Math.ceil(totalPages / MAX_PAGES_PER_PART);
+  const splitBase = `temp-split/${uuidv4()}`;
+  const inputUris: string[] = [];
+
+  logger.info("Splitting large PDF", {
+    totalPages,
+    maxPagesPerPart: MAX_PAGES_PER_PART,
+    numParts,
+    splitBase,
+  });
+
+  for (let partIndex = 0; partIndex < numParts; partIndex++) {
+    const startPage = partIndex * MAX_PAGES_PER_PART; // inclusive (0-based)
+    const endPage = Math.min(
+      totalPages,
+      (partIndex + 1) * MAX_PAGES_PER_PART
+    ); // exclusive
+
+    const partDoc = await PDFDocument.create();
+    const pageIndices = Array.from(
+      { length: endPage - startPage },
+      (_, i) => startPage + i
+    );
+
+    const copiedPages = await partDoc.copyPages(pdfDoc, pageIndices);
+    copiedPages.forEach((p) => partDoc.addPage(p));
+
+    const partBytes = await partDoc.save();
+
+    const partName = `part-${String(partIndex + 1).padStart(3, "0")}.pdf`;
+    const partPath = `${splitBase}/${partName}`;
+
+    await storage.bucket(APP_BUCKET).file(partPath).save(Buffer.from(partBytes), {
+      resumable: false,
+      contentType: "application/pdf",
+    });
+
+    const gcsUri = `gs://${APP_BUCKET}/${partPath}`;
+    inputUris.push(gcsUri);
+
+    logger.info("Created split PDF part", {
+      partIndex: partIndex + 1,
+      partPath,
+      startPage,
+      endPage: endPage - 1,
+      gcsUri,
+    });
+  }
+
+  return {
+    inputUris,
+    pageCount: totalPages,
+  };
 }
 
 // ================== Helpers to extract text ==================
@@ -206,18 +298,96 @@ function isPageNumberLine(line: string): boolean {
 }
 
 /**
+ * Detect if a single line looks like a table-of-contents entry:
+ * - "61 السابع"
+ * - "الضمير أصوات 61"
+ * - "Chapter 3 ..... 15" (with dotted leaders)
+ */
+function isTocLikeLine(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed) return false;
+
+  // "title ..... 15" style
+  if (/\.{3,}\s*[0-9\u0660-\u0669\u06F0-\u06F9]{1,4}\s*$/.test(trimmed)) {
+    return true;
+  }
+
+  // "61 السابع" : page number at the beginning
+  if (/^[0-9\u0660-\u0669\u06F0-\u06F9]{1,4}\s+.+$/.test(trimmed)) {
+    return true;
+  }
+
+  // "السابع 61" : page number at the end
+  if (/^.+\s[0-9\u0660-\u0669\u06F0-\u06F9]{1,4}\s*$/.test(trimmed)) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Short Arabic title-like line without sentence punctuation.
+ * Used to detect TOC pages where only titles are listed (no page numbers).
+ */
+function isShortTitleLine(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed) return false;
+
+  // Must have Arabic letters
+  if (!/[\u0600-\u06FF]{3,}/.test(trimmed)) return false;
+
+  // Too long = likely a full sentence, not a pure title line
+  if (trimmed.length > 40) return false;
+
+  // If it contains sentence-level punctuation, treat as normal content
+  if (/[\.؟!؛،]/.test(trimmed)) return false;
+
+  return true;
+}
+
+/**
+ * Detect if a whole page structurally behaves like a table of contents.
+ * We restrict to early pages to avoid dropping real content.
+ */
+function isTocStructurePage(lines: string[], pageIndex: number): boolean {
+  const MAX_TOC_PAGE_INDEX = 14; // first 15 pages
+  if (pageIndex > MAX_TOC_PAGE_INDEX) return false;
+
+  const nonEmpty = lines.map((l) => l.trim()).filter(Boolean);
+  if (nonEmpty.length < 5) return false;
+
+  let tocLike = 0;
+  let shortTitleLike = 0;
+
+  for (const ln of nonEmpty) {
+    if (isTocLikeLine(ln)) {
+      tocLike++;
+    } else if (isShortTitleLine(ln)) {
+      shortTitleLike++;
+    }
+  }
+
+  const candidateCount = tocLike + shortTitleLike;
+  if (candidateCount < 5) return false;
+
+  if (candidateCount >= nonEmpty.length * 0.6) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Remove inline page numbers embedded between sentences:
  * - After punctuation like ". ۱۲ الكلمة"
  * - Trailing small number at end of line, but ONLY if no other digits in that line.
  */
 function removeInlinePageNumbers(text: string): string {
-  // Remove patterns like: punctuation + spaces + 1-3 digits + space + letter
   text = text.replace(
     /([\.!\؟؟!])\s*[0-9\u0660-\u0669\u06F0-\u06F9]{1,3}\s+(?=[A-Za-zء-ي])/g,
     "$1 "
   );
 
-  // For each line, remove trailing small number if the rest of the line has NO digits.
   text = text.replace(
     /^([^\n0-9\u0660-\u0669\u06F0-\u06F9]*?)\s[0-9\u0660-\u0669\u06F0-\u06F9]{1,3}\s*$/gm,
     "$1"
@@ -227,19 +397,110 @@ function removeInlinePageNumbers(text: string): string {
 }
 
 /**
+ * Detect and remove a reference/footer block at the bottom of the page.
+ *
+ * Heuristics:
+ *  0) Divider line (----- / _____ / ....) near the bottom => everything after is footer.
+ *  1) Generic Arabic + Latin reference block with "المرجع/المراجع/المصادر/انظر".
+ *  2) Hindawi-style Arabic-only footer starting with "انظر أيضًا ...".
+ *
+ * These rules are conservative and only trigger near the bottom of the page
+ * so we do not accidentally cut normal content in the middle.
+ */
+function stripReferenceFooterFromLines(lines: string[]): string[] {
+  const n = lines.length;
+  if (n < 4) return lines;
+
+  // ---------- (0) Divider line near the bottom ----------
+  // If there is a horizontal divider in the last few lines, treat everything
+  // after it as footer. We keep content above the divider.
+  for (let i = Math.max(0, n - 6); i < n; i++) {
+    const l = lines[i].trim();
+    if (/^[\.\-\_]{5,}$/.test(l)) {
+      return lines.slice(0, i);
+    }
+  }
+
+  // ---------- (1) Generic mixed Arabic/Latin reference footer ----------
+  const lookback = Math.min(10, n);
+  const candidateIdxs: number[] = [];
+  let hasRefKeyword = false;
+
+  for (let i = n - lookback; i < n; i++) {
+    const l = lines[i].trim();
+    if (!l) continue;
+
+    const hasArabicRefWord = /المرجع|المراجع|المصادر|انظر/.test(l);
+    const latinCount = (l.match(/[A-Za-z]/g) || []).length;
+
+    if (hasArabicRefWord) {
+      hasRefKeyword = true;
+      candidateIdxs.push(i);
+    } else if (latinCount >= 8) {
+      candidateIdxs.push(i);
+    }
+  }
+
+  if (hasRefKeyword && candidateIdxs.length >= 2) {
+    const start = Math.min(...candidateIdxs);
+    // Ensure footer really starts near the bottom
+    if (start >= n - 6) {
+      return lines.slice(0, start);
+    }
+  }
+
+  // ---------- (2) Hindawi-style Arabic-only footer ("انظر أيضًا ...") ----------
+  const hindawiStartRegex = /انظر\s+أيضًا|انظر\s+ايضاً|انظر\s+ايضا/i;
+  const metaRegex =
+    /(الكتاب|سلسلة|المؤلف|تأليف|ترجمة|دار النشر|من سلسلة|الطبعة)/;
+
+  const searchFrom = Math.max(0, n - 5);
+  for (let i = searchFrom; i < n; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    if (!hindawiStartRegex.test(line)) continue;
+    // Must be very close to the bottom (last 4 lines)
+    if (i < n - 4) continue;
+
+    let hasMeta = false;
+    for (let j = i; j < n; j++) {
+      const lj = lines[j].trim();
+      if (!lj) continue;
+      if (metaRegex.test(lj)) {
+        hasMeta = true;
+        break;
+      }
+      if (/(19|20)\d{2}/.test(lj) || /[\u0660-\u0669]{4}/.test(lj)) {
+        hasMeta = true;
+        break;
+      }
+    }
+
+    if (hasMeta) {
+      return lines.slice(0, i);
+    }
+  }
+
+  // No footer detected, keep all lines
+  return lines;
+}
+
+/**
  * Clean book pages:
  * - Remove table of contents / publisher / rights pages entirely
  * - Remove page-number lines ("7", "١١", "۱۱", "Page 3", "صفحة ٥")
  * - Remove repeating small headers/footers
  * - Remove TOC-like dotted lines
  * - Remove decorative-only lines
+ * - Strip reference-style footer blocks at the bottom (per page)
  */
 function cleanPages(rawPages: string[]): string[] {
   if (!rawPages.length) return [];
 
   const pagesLines = rawPages.map((p) => p.split(/\r?\n+/));
 
-  // 1) Detect repeated small header/footer lines
+  // 1) Detect repeated small header/footer lines across pages
   const freq = new Map<string, number>();
 
   for (const lines of pagesLines) {
@@ -264,12 +525,16 @@ function cleanPages(rawPages: string[]): string[] {
 
   const cleaned: string[] = [];
 
-  for (const lines of pagesLines) {
+  // Use pageIndex in the loop to help TOC detection
+  for (let pageIndex = 0; pageIndex < pagesLines.length; pageIndex++) {
+    const lines = pagesLines[pageIndex];
     const rawPageText = lines.join("\n");
     const lower = rawPageText.toLowerCase();
 
-    // 2) Drop full pages that look like table of contents or publisher/rights pages
+    const isTocByStructure = isTocStructurePage(lines, pageIndex);
+
     const isTocPage =
+      isTocByStructure ||
       /المحتويات/.test(rawPageText) ||
       /الفهرس/.test(rawPageText);
 
@@ -291,8 +556,10 @@ function cleanPages(rawPages: string[]): string[] {
       continue;
     }
 
-    // 3) Line-by-line cleaning
-    const newLines: string[] = [];
+    // 3) Line-by-line cleaning before footer detection
+    //    We keep decorative lines for now so the footer logic can see them
+    //    (e.g., "-----" used as a divider before the footer).
+    const candidateLines: string[] = [];
 
     for (const rawLine of lines) {
       const line = rawLine.trim();
@@ -305,17 +572,22 @@ function cleanPages(rawPages: string[]): string[] {
         continue;
       }
 
-      // Dotted leaders (e.g., "Chapter .... 12")
-      if (/\.{5,}/.test(line)) continue;
-
-      // Decorative-only lines
-      if (/^[\u2022•·]+$/.test(line)) continue;
-      if (/^[\.\-\_]{3,}$/.test(line)) continue;
-
-      newLines.push(line);
+      candidateLines.push(line);
     }
 
-    let joined = newLines.join("\n").trim();
+    // 3.5) Strip reference-style footer block from the bottom of this page
+    const footerStrippedLines = stripReferenceFooterFromLines(candidateLines);
+
+    // Now remove dotted leaders and decorative-only lines
+    const finalLines: string[] = [];
+    for (const l of footerStrippedLines) {
+      if (/\.{5,}/.test(l)) continue;            // dotted leaders
+      if (/^[\u2022•·]+$/.test(l)) continue;     // bullets-only
+      if (/^[\.\-\_]{3,}$/.test(l)) continue;    // horizontal dividers
+      finalLines.push(l);
+    }
+
+    let joined = finalLines.join("\n").trim();
 
     // Remove inline page numbers
     joined = removeInlinePageNumbers(joined).trim();
@@ -336,14 +608,14 @@ function stripInlineEnglish(text: string): string {
   // Remove emails
   t = t.replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, " ");
 
-  // Remove standalone Latin words/tokens (keep hyphenated/possessives)
+  // Remove standalone Latin words/tokens
   t = t.replace(/\b[A-Za-z][A-Za-z\-']*\b/g, " ");
 
   // Collapse extra spaces and tidy lines
   t = t
     .split(/\r?\n+/)
     .map((ln) => ln.replace(/\s{2,}/g, " ").trim())
-    .filter((ln) => ln.length > 0) // drop empty lines after stripping
+    .filter((ln) => ln.length > 0)
     .join("\n");
 
   return t.trim();
@@ -366,10 +638,8 @@ function looksLikeReferencesPage(text: string): boolean {
   for (const ln of lines.slice(0, 60)) {
     const l = ln.trim();
     if (!l) continue;
-    // APA-style year (.... (2018).) or Arabic-Indic years
     if (/\(\s*\d{4}\s*\)\.?$/.test(l) || /[\u0660-\u0669]{4}\s*[\.\)]?$/.test(l)) refLike++;
     if (/doi\.org|http|https|www\./i.test(l)) refLike++;
-    // Many Latin author names and commas
     if (/[A-Za-z]{3,}.*,/.test(l)) refLike++;
   }
   return refLike >= 3;
@@ -377,34 +647,30 @@ function looksLikeReferencesPage(text: string): boolean {
 
 /**
  * Heuristic: skip whole page if it's mostly English or becomes noise after stripping.
- * - If Latin letters are much more than Arabic letters and Arabic is short -> skip.
- * - If after stripInlineEnglish the remainder is only numbers/punctuation/bullets -> skip.
  */
 function shouldSkipAsMostlyEnglish(rawText: string): boolean {
   const lettersOnly = rawText.replace(/[^A-Za-z\u0600-\u06FF]/g, "");
   const latinCount = countMatches(lettersOnly, /[A-Za-z]/g);
   const arabicCount = countMatches(lettersOnly, /[\u0600-\u06FF]/g);
 
-  // If Latin dominates heavily and Arabic is scarce, likely an English page.
   if (latinCount >= Math.max(60, 3 * arabicCount) && arabicCount < 120) {
     return true;
   }
 
-  // After stripping English, check if what's left is just noise.
   const arabicOnly = stripInlineEnglish(rawText);
   if (!arabicOnly) return true;
 
-  // Remove digits, punctuation, bullets, dashes, underscores and spaces.
-  const core = arabicOnly.replace(/[0-9\u0660-\u0669\u06F0-\u06F9\s\.\,\-\_\:\;\(\)\[\]\{\}\/\\|~`'"!?…•٫٬؛،]+/g, "");
-  // If very few Arabic letters remain overall, treat as noise.
+  const core = arabicOnly.replace(
+    /[0-9\u0660-\u0669\u06F0-\u06F9\s\.\,\-\_\:\;\(\)\[\]\{\}\/\\|~`'"!?…•٫٬؛،]+/g,
+    ""
+  );
   if (core.length < 20) return true;
 
-  // Also if the number of lines with real Arabic words is very small.
   const arabicLines = arabicOnly
     .split(/\r?\n+/)
-    .map(s => s.trim())
+    .map((s) => s.trim())
     .filter(Boolean)
-    .filter(s => /[\u0600-\u06FF]{3,}/.test(s)).length;
+    .filter((s) => /[\u0600-\u06FF]{3,}/.test(s)).length;
 
   if (arabicLines <= 1 && core.length < 40) return true;
 
@@ -412,25 +678,20 @@ function shouldSkipAsMostlyEnglish(rawText: string): boolean {
 }
 
 /**
- * Decide per-page: type + spoken text (Arabic only)
- * IMPORTANT: We DO NOT skip a whole page just for containing some English.
- * We only skip if the page is detected as references OR mostly English/noise.
+ * Decide per-page: type + spoken text (Arabic only).
  */
 function processOnePageForSpeech(rawText: string) {
   const base = rawText.trim();
   if (!base) return { type: "empty" as const, spokenText: "" };
 
-  // Skip "References/المراجع" pages completely
   if (looksLikeReferencesPage(base)) {
     return { type: "references" as const, spokenText: "" };
   }
 
-  // Skip pages that are mostly English or degrade into noise after stripping
   if (shouldSkipAsMostlyEnglish(base)) {
     return { type: "english" as const, spokenText: "" };
   }
 
-  // Otherwise keep Arabic content only
   const arabicOnly = stripInlineEnglish(base);
   if (!arabicOnly) return { type: "empty" as const, spokenText: "" };
 
@@ -441,7 +702,6 @@ function processOnePageForSpeech(rawText: string) {
 async function collectPages(outPrefix: string): Promise<string[]> {
   const bucket = storage.bucket(DOC_OUTPUT_BUCKET);
 
-  // Wait for JSON files to appear (batch OCR output can be slightly delayed)
   const maxAttempts = 12;
   const delayMs = 5000;
   const sleep = (ms: number) =>
@@ -453,9 +713,7 @@ async function collectPages(outPrefix: string): Promise<string[]> {
       prefix: outPrefix,
       autoPaginate: true,
     });
-    jsonFiles = files.filter(
-      (f) => f.name.endsWith(".json") && f.name.includes("book-")
-    );
+    jsonFiles = files.filter((f) => f.name.endsWith(".json"));
     logger.info("OCR JSON scan", {
       outPrefix,
       attempt,
@@ -469,7 +727,6 @@ async function collectPages(outPrefix: string): Promise<string[]> {
   }
   if (!jsonFiles.length) throw new Error("No OCR JSON files found");
 
-  // Sort as book-0.json, book-1.json, ...
   jsonFiles.sort((a, b) => a.name.localeCompare(b.name));
 
   const pagesTexts: string[] = [];
@@ -484,7 +741,6 @@ async function collectPages(outPrefix: string): Promise<string[]> {
     const [buf] = await bucket.file(f.name).download();
     const j = JSON.parse(buf.toString("utf-8"));
 
-    // Try to locate the document structure wherever it is
     const candidateDoc =
       j?.document ||
       j?.documentShard?.document ||
@@ -514,13 +770,11 @@ async function collectPages(outPrefix: string): Promise<string[]> {
     if (full) anyFullText = true;
 
     if (!pagesArr.length) {
-      // If there are no pages but we have document.text, treat it as a single page
       if (full?.trim()) pagesTexts.push(full.trim());
       else logger.warn("No pages and no document.text", { name: f.name });
       continue;
     }
 
-    // Extract each page separately
     for (const page of pagesArr) {
       const txt = extractOnePageText(page, full);
       if (txt) pagesTexts.push(txt);
@@ -529,7 +783,6 @@ async function collectPages(outPrefix: string): Promise<string[]> {
 
   logger.info("JSON summary", { readCount, withDocCount, skippedNoDoc });
 
-  // Final fallback: if we have no pages but at least one full text, use that as single page
   if (!pagesTexts.length && anyFullText) {
     logger.warn("Fallback to single-page from full document.text");
     for (const f of jsonFiles) {
@@ -554,7 +807,6 @@ async function collectPages(outPrefix: string): Promise<string[]> {
     pages: nonEmpty.length,
   });
 
-  // Apply cleaning (remove TOC, publisher pages, headers, page numbers, etc.)
   const cleaned = cleanPages(nonEmpty);
   logger.info("Pages after cleaning", {
     before: nonEmpty.length,
@@ -562,6 +814,33 @@ async function collectPages(outPrefix: string): Promise<string[]> {
   });
 
   return cleaned;
+}
+
+// ========== Generic helper: process items with bounded concurrency ==========
+async function processWithConcurrency<T, R>(
+  items: T[],
+  maxConcurrent: number,
+  worker: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let currentIndex = 0;
+
+  async function runWorker() {
+    while (true) {
+      const i = currentIndex++;
+      if (i >= items.length) break;
+      results[i] = await worker(items[i], i);
+    }
+  }
+
+  const workers: Promise<void>[] = [];
+  const workerCount = Math.min(maxConcurrent, items.length);
+  for (let i = 0; i < workerCount; i++) {
+    workers.push(runWorker());
+  }
+
+  await Promise.all(workers);
+  return results;
 }
 
 // ================== MAIN FUNCTION ==================
@@ -607,13 +886,52 @@ export const ocrOnPdfUploadV2 = onObjectFinalized(
       basePrefix: ctx.basePrefix,
     });
 
-    // 1) Run Batch OCR
-    const gcsInputUri = `gs://${triggeredBucket}/${filePath}`;
-    const outPrefix = `${ctx.basePrefix}/ocr/${Date.now()}/`;
-    await runBatchOCR(gcsInputUri, outPrefix);
+    // 0) If the PDF is large, split it into multiple parts and process each separately.
+    const { inputUris, pageCount } = await preparePdfParts(
+      triggeredBucket,
+      filePath
+    );
 
-    // 2) Collect cleaned pages
-    const pages = await collectPages(outPrefix);
+    logger.info("Prepared PDF parts for OCR", {
+      id: logId,
+      totalPages: pageCount,
+      parts: inputUris.length,
+      maxPagesPerPart: MAX_PAGES_PER_PART,
+    });
+
+    // Use a single runId for this OCR run so prefixes are stable
+    const runId = Date.now().toString();
+
+    // 1) Run Batch OCR on each part with bounded parallelism
+    const partResults = await processWithConcurrency(
+      inputUris,
+      MAX_OCR_PART_CONCURRENCY,
+      async (partUri, idx) => {
+        const partNumber = idx + 1;
+        const outPrefix = `${ctx.basePrefix}/ocr/${runId}-p${partNumber}/`;
+
+        logger.info("Starting OCR for part", {
+          id: logId,
+          part: partNumber,
+          partUri,
+          outPrefix,
+        });
+
+        await runBatchOCR(partUri, outPrefix);
+
+        const partPages = await collectPages(outPrefix);
+        logger.info("Collected cleaned pages for part", {
+          id: logId,
+          part: partNumber,
+          pages: partPages.length,
+        });
+
+        return partPages;
+      }
+    );
+
+    const pages = partResults.flat();
+
     if (!pages.length) {
       logger.error("No text pages found after OCR", {
         id: logId,
@@ -623,22 +941,18 @@ export const ocrOnPdfUploadV2 = onObjectFinalized(
       return;
     }
 
-    // 3) Classify each page and build combined text (Arabic only)
+    // 2) Classify each page and build combined text (Arabic only)
     const pagesFolder = `${ctx.basePrefix}/pages`;
     const combinedPath = `${ctx.basePrefix}/book.txt`;
     const combinedToken = uuidv4();
-
     const processed = pages.map(processOnePageForSpeech);
 
-    // Build combined text: keep only Arabic text pages
     const combinedParts: string[] = [];
     for (const p of processed) {
       if (p.type === "text") combinedParts.push(p.spokenText);
-      // references/english/empty produce nothing
     }
     const combinedText = combinedParts.join("\n\n");
 
-    // Save combined file with a public download token
     await storage.bucket(APP_BUCKET).file(combinedPath).save(combinedText, {
       resumable: false,
       contentType: "text/plain; charset=utf-8",
@@ -650,18 +964,15 @@ export const ocrOnPdfUploadV2 = onObjectFinalized(
       },
     });
 
-    // Save per-page files (store Arabic-only text, skip others)
     for (let i = 0; i < processed.length; i++) {
       const n = String(i + 1).padStart(3, "0");
       const pPath = `${pagesFolder}/page-${n}.txt`;
-
       const p = processed[i];
       const payload = p.type === "text" ? p.spokenText : "";
-
       await storage
         .bucket(APP_BUCKET)
         .file(pPath)
-        .save((payload ? payload + "\n" : ""), {
+        .save(payload ? payload + "\n" : "", {
           resumable: false,
           contentType: "text/plain; charset=utf-8",
           metadata: { cacheControl: "no-cache" },
@@ -672,10 +983,11 @@ export const ocrOnPdfUploadV2 = onObjectFinalized(
       `https://firebasestorage.googleapis.com/v0/b/${APP_BUCKET}/o/` +
       `${encodeURIComponent(combinedPath)}?alt=media&token=${combinedToken}`;
 
-    logger.info("✅ book.txt created successfully", {
+    logger.info("book.txt created successfully", {
       id: logId,
       kind: ctx.kind,
-      pages: pages.length,
+      totalPages: pageCount,
+      logicalPages: pages.length,
       publicUrl,
       pagesFolder,
     });

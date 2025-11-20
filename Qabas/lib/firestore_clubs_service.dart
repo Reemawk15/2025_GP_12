@@ -136,7 +136,7 @@ class FirestoreClubsService {
           .snapshots()
           .map((s) => s.docs.map((d) => ClubRequest.fromDoc(d)).toList());
 
-  /// قرار الأدمن + إنشاء نادي عند القبول
+  /// Admin decision + create club when approved
   Future<void> decide({
     required ClubRequest request,
     required bool accept,
@@ -147,29 +147,28 @@ class FirestoreClubsService {
     batch.update(reqRef, {'status': accept ? 'accepted' : 'rejected'});
 
     if (accept) {
-      final clubRef = _clubs.doc(); // id تلقائي
+      final clubRef = _clubs.doc();
       batch.set(clubRef, {
         'title': request.title,
         'description': request.description,
         'category': request.category,
         'ownerUid': request.createdBy,
         'requestId': request.id,
-        'createdAt': FieldValue.serverTimestamp(), // للعرض فقط
-        'membersCount': 1, // يبدأ بصاحب الطلب
+        'createdAt': FieldValue.serverTimestamp(),
+        'membersCount': 1,
       });
-      // إضافة صاحب الطلب كعضو أولي
+      // Add the requester as the initial member
       batch.set(clubRef.collection('members').doc(request.createdBy), {
         'joinedAt': FieldValue.serverTimestamp(),
       });
     }
-
     await batch.commit();
   }
 
   // ======== Clubs (Public) ========
   Stream<List<PublicClub>> streamPublicClubs() =>
       _clubs
-      // ترتيب بسيط على createdAt فقط (بدون where) → لا يحتاج فهرس مركّب
+
           .orderBy('createdAt', descending: true)
           .snapshots()
           .map((s) => s.docs.map((d) => PublicClub.fromDoc(d)).toList());
@@ -195,7 +194,7 @@ class FirestoreClubsService {
     return _clubs
         .doc(clubId)
         .collection('messages')
-        .orderBy('createdAt', descending: false) // فقط ترتيب
+        .orderBy('createdAt', descending: false) // Just ordering
         .snapshots();
   }
 
@@ -204,7 +203,7 @@ class FirestoreClubsService {
     required String uid,
     required String text,
     required String displayName,
-    String? photoUrl, // << جديد
+    String? photoUrl,
   }) async {
     await _clubs
         .doc(clubId)
@@ -213,7 +212,7 @@ class FirestoreClubsService {
       'uid': uid,
       'text': text,
       'displayName': displayName,
-      'photoUrl': photoUrl, // << جديد
+      'photoUrl': photoUrl,
       'createdAt': FieldValue.serverTimestamp(),
     });
   }

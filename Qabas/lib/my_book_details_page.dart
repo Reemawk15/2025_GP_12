@@ -6,27 +6,27 @@ import 'package:url_launcher/url_launcher_string.dart';
 import 'package:firebase_storage/firebase_storage.dart' as storage;
 
 class MyBookDetailsPage extends StatelessWidget {
-  final String bookId; // id المستند داخل users/{uid}/mybooks
+  final String bookId; // Document ID inside users/{uid}/mybooks
   const MyBookDetailsPage({super.key, required this.bookId});
 
   static const _primary   = Color(0xFF0E3A2C);
   static const _accent    = Color(0xFF6F8E63);
   static const _pillGreen = Color(0xFFE6F0E0);
 
-  // ✅ SnackBar موحّد بنفس الستايل، وبألوان الملف فقط
+  // Unified SnackBar using the same style and colors as this file
   void _showSnack(BuildContext context, String message, {IconData icon = Icons.check_circle}) {
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
     messenger.showSnackBar(
       SnackBar(
-        backgroundColor: _accent,                       // خلفية خضراء من ألوان الملف
+        backgroundColor: _accent, // Green background from this file colors
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         content: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: Color(0xFFE7C4DA)),       // وردي فاتح ثابت
+            Icon(icon, color: Color(0xFFE7C4DA)), // Fixed light pink
             const SizedBox(width: 8),
             Text(
               message,
@@ -41,7 +41,7 @@ class MyBookDetailsPage extends StatelessWidget {
     );
   }
 
-  // 1) تحويل الروابط إلى https صالح
+  // 1) Normalize links into a valid https URL
   Future<String?> _normalizeUrl(String raw) async {
     String url = (raw).trim();
     if (url.isEmpty) return null;
@@ -57,7 +57,7 @@ class MyBookDetailsPage extends StatelessWidget {
       }
     }
 
-    // روابط درايف — نحولها إلى direct download
+    // Google Drive links — convert to a direct download URL
     if (url.contains('drive.google.com')) {
       final uri = Uri.tryParse(url);
       if (uri != null) {
@@ -73,7 +73,7 @@ class MyBookDetailsPage extends StatelessWidget {
       }
     }
 
-    // إذا ما فيه scheme نضيف https://
+    // If there is no URL scheme, prepend https://
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = 'https://$url';
     }
@@ -121,7 +121,7 @@ class MyBookDetailsPage extends StatelessWidget {
       textDirection: TextDirection.rtl,
       child: Stack(
         children: [
-          // الخلفية الخاصة
+          // Private background image
           Positioned.fill(
             child: Image.asset('assets/images/back_private2.png', fit: BoxFit.cover),
           ),
@@ -157,7 +157,7 @@ class MyBookDetailsPage extends StatelessWidget {
                 if (snap.connectionState == ConnectionState.waiting) {
                   return const Center(
                     child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(_primary), // لون التحميل من ألوان الملف
+                      valueColor: AlwaysStoppedAnimation<Color>(_primary), // Loading color from this file palette
                     ),
                   );
                 }
@@ -175,7 +175,7 @@ class MyBookDetailsPage extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // الغلاف (اختياري)
+                      // Optional cover
                       Center(
                         child: Container(
                           width: 200,
@@ -195,7 +195,7 @@ class MyBookDetailsPage extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
 
-                      // العنوان
+                      // Title
                       Center(
                         child: Text(
                           title.isEmpty ? 'كتاب بدون عنوان' : title,
@@ -209,7 +209,7 @@ class MyBookDetailsPage extends StatelessWidget {
                       ),
                       const SizedBox(height: 18),
 
-                      // بطاقة "ملف الكتاب"
+                      // "Book file" card
                       Container(
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
@@ -240,7 +240,7 @@ class MyBookDetailsPage extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
 
-                      // زر بدء الاستماع (غير مفعل)
+                      // Start listening button (disabled for now)
                       SizedBox(
                         height: 52,
                         child: ElevatedButton.icon(

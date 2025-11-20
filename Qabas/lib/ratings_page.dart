@@ -64,9 +64,7 @@ class _RatingsPageState extends State<RatingsPage> {
         .orderBy('createdAt', descending: true);
 
     return col.snapshots().map((snap) {
-      return snap.docs
-          .map((d) => _Review.fromDoc(d.id, d.data()))
-          .toList();
+      return snap.docs.map((d) => _Review.fromDoc(d.id, d.data())).toList();
     }).handleError((_) => <_Review>[]);
   }
 
@@ -166,15 +164,12 @@ class _RatingsPageState extends State<RatingsPage> {
 
       // 2) Delete review from the book document (if bookId is available)
       if (review.bookId != null && review.bookId!.isNotEmpty) {
-        final bookReviewsCol = firestore
-            .collection('audiobooks')
-            .doc(review.bookId)
-            .collection('reviews');
+        final bookReviewsCol =
+        firestore.collection('audiobooks').doc(review.bookId).collection('reviews');
 
         // We delete all docs for this user on that book (safe even if one)
-        final snap = await bookReviewsCol
-            .where('userId', isEqualTo: user.uid)
-            .get();
+        final snap =
+        await bookReviewsCol.where('userId', isEqualTo: user.uid).get();
 
         for (final d in snap.docs) {
           ops.add(d.reference.delete());
@@ -231,11 +226,9 @@ class _RatingsPageState extends State<RatingsPage> {
                             child: IconButton(
                               tooltip: 'رجوع',
                               style: IconButton.styleFrom(
-                                backgroundColor:
-                                Colors.white.withOpacity(0.85),
+                                backgroundColor: Colors.white.withOpacity(0.85),
                               ),
-                              icon: const Icon(
-                                  Icons.arrow_back_ios_new_rounded),
+                              icon: const Icon(Icons.arrow_back_ios_new_rounded),
                               color: _darkGreen,
                               onPressed: () => Navigator.pop(context),
                             ),
@@ -282,29 +275,24 @@ class _RatingsPageState extends State<RatingsPage> {
                                 return _loadingSkeleton();
                               }
                               if (snap.hasError) {
-                                return _errorBox(
-                                    'حدث خطأ أثناء جلب التقييمات.');
+                                return _errorBox('حدث خطأ أثناء جلب التقييمات.');
                               }
-                              final reviews =
-                                  snap.data ?? const <_Review>[];
+                              final reviews = snap.data ?? const <_Review>[];
                               if (reviews.isEmpty) {
                                 return _emptyBox();
                               }
 
                               return ListView.separated(
                                 shrinkWrap: true,
-                                physics:
-                                const NeverScrollableScrollPhysics(),
+                                physics: const NeverScrollableScrollPhysics(),
                                 itemCount: reviews.length,
                                 separatorBuilder: (_, __) =>
                                 const SizedBox(height: 10),
                                 itemBuilder: (context, i) {
                                   final r = reviews[i];
                                   return _ReviewTile(
-                                    title:
-                                    r.bookTitle ?? 'كتاب بدون عنوان',
-                                    stars: (r.rating >= 0 &&
-                                        r.rating <= 5)
+                                    title: r.bookTitle ?? 'كتاب بدون عنوان',
+                                    stars: (r.rating >= 0 && r.rating <= 5)
                                         ? r.rating
                                         : 0,
                                     date: r.formattedDate,
@@ -356,8 +344,7 @@ class _RatingsPageState extends State<RatingsPage> {
   // Simple error box
   Widget _errorBox(String msg) {
     return Container(
-      padding:
-      const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
       decoration: BoxDecoration(
         color: Colors.red.withOpacity(0.08),
         border: Border.all(color: Colors.red.withOpacity(0.25)),
@@ -441,9 +428,7 @@ class _Review {
       bookTitle: (data['bookTitle'] as String?)?.trim(),
       bookCover: (data['bookCover'] as String?)?.trim(),
       text: (data['text'] as String?)?.trim(),
-      rating: (data['rating'] is num)
-          ? (data['rating'] as num).toInt()
-          : 0,
+      rating: (data['rating'] is num) ? (data['rating'] as num).toInt() : 0,
       createdAt: created,
     );
   }
@@ -458,7 +443,6 @@ class _Review {
 }
 
 /* ------------------------------ Review card widget ------------------------------ */
-
 class _ReviewTile extends StatelessWidget {
   final String title;
   final int stars; // 0..5
@@ -479,11 +463,27 @@ class _ReviewTile extends StatelessWidget {
   static const Color _darkGreen = Color(0xFF0E3A2C);
   static const Color _lightGreen = Color(0xFFC9DABF);
 
+  // Size of the book cover (you can change these)
+  static const double _coverWidth = 80;
+  static const double _coverHeight = 100;
+
+  // Card padding values
+  static const double _cardPaddingTop = 0;
+  static const double _cardPaddingSide = 12;
+  static const double _cardPaddingBottom = 12;
+
+  // Shared left inset for both date row and stars row
+  static const double _leftAlignInset = 0; // change if you want some inset
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding:
-      const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      padding: const EdgeInsets.fromLTRB(
+        _cardPaddingSide,
+        _cardPaddingTop,
+        _cardPaddingSide,
+        _cardPaddingBottom,
+      ),
       decoration: BoxDecoration(
         color: _lightGreen,
         borderRadius: BorderRadius.circular(16),
@@ -496,13 +496,13 @@ class _ReviewTile extends StatelessWidget {
             child: (coverUrl != null && coverUrl!.isNotEmpty)
                 ? Image.network(
               coverUrl!,
-              width: 56,
-              height: 72,
+              width: _coverWidth,
+              height: _coverHeight,
               fit: BoxFit.cover,
             )
                 : Container(
-              width: 56,
-              height: 72,
+              width: _coverWidth,
+              height: _coverHeight,
               color: Colors.white.withOpacity(0.6),
               child: const Icon(
                 Icons.menu_book,
@@ -517,68 +517,61 @@ class _ReviewTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                // Title + date + delete icon
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        title,
-                        textAlign: TextAlign.right,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: _darkGreen,
+                // Date + delete icon at top-left (aligned with stars)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: EdgeInsets.only(left: _leftAlignInset),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          date,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: _darkGreen,
+                          ),
                         ),
-                      ),
+                        if (onDelete != null) ...[
+                          const SizedBox(width: 4),
+                          IconButton(
+                            tooltip: 'حذف التقييم',
+                            onPressed: onDelete,
+                            icon: const Icon(
+                              Icons.delete_outline,
+                              color: Colors.red,
+                              size: 20,
+                            ),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            splashRadius: 18,
+                          ),
+                        ],
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      date,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: _darkGreen,
-                      ),
-                    ),
-                    if (onDelete != null) ...[
-                      const SizedBox(width: 4),
-                      IconButton(
-                        tooltip: 'حذف التقييم',
-                        onPressed: onDelete,
-                        icon: const Icon(
-                          Icons.delete_outline,
-                          color: Colors.red,
-                          size: 20,
-                        ),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        splashRadius: 18,
-                      ),
-                    ],
-                  ],
+                  ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
 
-                // Stars row
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: List.generate(5, (i) {
-                    final filled = i < stars;
-                    return Padding(
-                      padding: const EdgeInsets.only(left: 2),
-                      child: Icon(
-                        filled ? Icons.star : Icons.star_border,
-                        size: 18,
-                        color: _darkGreen,
-                      ),
-                    );
-                  }),
+                // Book title
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    title,
+                    textAlign: TextAlign.right,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: _darkGreen,
+                    ),
+                  ),
                 ),
 
-                // Optional review text
+                // Review text directly under the title
                 if (review != null && review!.isNotEmpty) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Align(
                     alignment: Alignment.centerRight,
                     child: Text(
@@ -592,6 +585,30 @@ class _ReviewTile extends StatelessWidget {
                     ),
                   ),
                 ],
+
+                const SizedBox(height: 6),
+
+                // Stars row aligned with the same left inset as date
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: EdgeInsets.only(left: _leftAlignInset),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: List.generate(5, (i) {
+                        final filled = i < stars;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 2),
+                          child: Icon(
+                            filled ? Icons.star : Icons.star_border,
+                            size: 18,
+                            color: _darkGreen,
+                          ),
+                        );
+                      }),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),

@@ -36,7 +36,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
         _enabled = (snap.data()?['notificationsEnabled'] ?? false) as bool;
       }
     } catch (_) {
-      // تجاهل الأخطاء الصغيرة
+
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -53,7 +53,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
             .set({'notificationsEnabled': value}, SetOptions(merge: true));
       }
     } catch (_) {
-      // ممكن تضيفي SnackBar هنا لاحقاً لو تبين إشعار
+
     }
   }
 
@@ -63,7 +63,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
       textDirection: TextDirection.rtl,
       child: Stack(
         children: [
-          // 🔹 الخلفية مثل صفحة تعديل المعلومات
+
           Positioned.fill(
             child: Image.asset('assets/images/back.png', fit: BoxFit.cover),
           ),
@@ -80,7 +80,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
               child: Column(
                 children: [
-                  const SizedBox(height: 190), // نزول الكرت للأسفل مثل صفحة التعديل
+                  const SizedBox(height: 190),
 
                   Container(
                     width: double.infinity,
@@ -89,7 +89,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: [
                         BoxShadow(
-                          // لو واجهتِ تعارض مع withValues، استخدمي withOpacity(0.05)
+
                           color: Colors.black.withOpacity(0.05),
                           blurRadius: 12,
                           offset: const Offset(0, 4),
@@ -101,7 +101,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          // 🔙 سهم الرجوع داخل الكرت نفسه
+
                           Align(
                             alignment: AlignmentDirectional.centerStart, // RTL: start = يمين
                             child: IconButton(
@@ -115,10 +115,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
                             ),
                           ),
 
-                          // 🔽 مسافة بسيطة تحت السهم
+
                           const SizedBox(height: 28),
 
-                          // 🟢 كرت الإشعارات (جرس + سويتش)
+
                           Container(
                             decoration: BoxDecoration(
                               color: const Color(0xFFF6F7F5),
@@ -143,10 +143,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                 ),
                                 Switch.adaptive(
                                   value: _enabled,
-                                  // ✅ ألوان التفعيل حسب الهوية
+
                                   activeTrackColor: _lightGreen,
                                   onChanged: (v) => _save(v),
-                                  // (اختياري بسيط للثيم) لون الزر نفسه وقت التفعيل:
+
                                   thumbColor: MaterialStateProperty.resolveWith<Color?>(
                                         (states) => states.contains(MaterialState.selected)
                                         ? _confirm

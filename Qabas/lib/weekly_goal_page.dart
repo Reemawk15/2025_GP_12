@@ -11,12 +11,12 @@ class WeeklyGoalPage extends StatefulWidget {
 }
 
 class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
-  static const Color _darkGreen = Color(0xFF0E3A2C);
-  static const Color _midGreen  = Color(0xFF2F5145);
+  static const Color _darkGreen  = Color(0xFF0E3A2C);
+  static const Color _midGreen   = Color(0xFF2F5145);
   static const Color _lightGreen = Color(0xFFC9DABF);
-  static const Color _confirm   = Color(0xFF6F8E63);
+  static const Color _confirm    = Color(0xFF6F8E63);
 
-  /// beginner | active | pro | '' (بدون هدف)
+  /// beginner | active | pro | '' (no goal selected)
   String _selectedLevel = '';
 
   @override
@@ -25,14 +25,14 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
     _loadExisting();
   }
 
-  /// ✅ نفس تصميم SnackBar في كل الرسائل
+  /// Unified SnackBar design used across the app
   void _showSnack(String message, {IconData icon = Icons.check_circle}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        backgroundColor: _midGreen,                 // نفس اللون
-        behavior: SnackBarBehavior.floating,        // يطفو فوق المحتوى
+        backgroundColor: _confirm,                 // Same confirm color used in the page
+        behavior: SnackBarBehavior.floating,       // Floating above the content
         margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
@@ -40,7 +40,10 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
         content: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: const Color(0xFFE7C4DA)), // 🌸 وردي فاتح
+            Icon(
+              icon,
+              color: const Color(0xFFE7C4DA),      // Light pink accent color for the icon
+            ),
             const SizedBox(width: 8),
             Text(
               message,
@@ -57,6 +60,7 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
     );
   }
 
+  /// Load any existing weekly goal for the current user from Firestore
   Future<void> _loadExisting() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -74,7 +78,7 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
           setState(() => _selectedLevel = lvl);
         }
       } else if (data != null && data['weeklyGoalMinutes'] != null) {
-        // دعم الحقل القديم (إن وُجد)
+        // Support old field (if it exists)
         final mins = (data['weeklyGoalMinutes'] as num).toInt();
         if (mins >= 180) {
           _selectedLevel = 'pro';
@@ -86,11 +90,11 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
         setState(() {});
       }
     } catch (_) {
-      // ما نعرض خطأ للمستخدم هنا، الصفحة تشتغل عادي بدون هدف
+      // Do not show an error to the user; the page still works fine without a saved goal
     }
   }
 
-  /// ✅ دقائق كل مستوى — متطابقة مع الوصف العربي
+  /// Minutes for each level — matches the Arabic description shown in the UI
   int _minutesFor(String level) {
     switch (level) {
       case 'beginner':
@@ -104,6 +108,7 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
     }
   }
 
+  /// Title text for each listening level (in Arabic, for display only)
   String _titleFor(String level) {
     switch (level) {
       case 'beginner':
@@ -117,12 +122,14 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
     }
   }
 
+  /// Description text for each level (in Arabic, for display only)
   String _descFor(String level) {
     if (level == 'beginner') return 'ساعة (٦٠ دقيقة) على الأقل أسبوعيًا';
     if (level == 'active')   return 'ساعتان (١٢٠ دقيقة) على الأقل أسبوعيًا';
     return 'ثلاث ساعات (١٨٠ دقيقة) على الأقل أسبوعيًا';
   }
 
+  /// Save the selected weekly goal (or remove it if no level selected)
   Future<void> _save() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -133,17 +140,17 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
     final userDoc = FirebaseFirestore.instance.collection('users').doc(user.uid);
 
     if (_selectedLevel.isEmpty) {
-      // حذف الهدف
+      // Remove the weekly goal field completely
       await userDoc.update({'weeklyGoal': FieldValue.delete()}).catchError((_) {
         return userDoc.set({}, SetOptions(merge: true));
       });
 
-      _showSnack('تم إلغاء هدف الاستماع 🎧', icon: Icons.info_rounded);
+      _showSnack('تم إلغاء هدف الاستماع ', icon: Icons.info_rounded);
       if (mounted) Navigator.pop<int?>(context, null);
       return;
     }
 
-    // حفظ هدف جديد
+    // Save a new weekly goal based on the selected level
     final int minutes = _minutesFor(_selectedLevel);
 
     await userDoc.set({
@@ -154,10 +161,11 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
       },
     }, SetOptions(merge: true));
 
-    _showSnack('تم حفظ هدف الاستماع 🎧', icon: Icons.check_circle);
+    _showSnack('تم حفظ هدف الاستماع', icon: Icons.check_circle);
     if (mounted) Navigator.pop<int>(context, minutes);
   }
 
+  /// Single goal option tile (beginner / active / pro)
   Widget _goalTile(String level) {
     final bool selected = _selectedLevel == level;
 
@@ -165,6 +173,7 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
       borderRadius: BorderRadius.circular(18),
       onTap: () {
         setState(() {
+          // Tap again on the same tile to unselect / clear goal
           _selectedLevel = selected ? '' : level;
         });
       },
@@ -202,7 +211,8 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start, // يبدأ من يمين الأيقونة
+                  crossAxisAlignment:
+                  CrossAxisAlignment.start, // Start from the right of the icon in RTL
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
@@ -240,6 +250,7 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
       textDirection: TextDirection.rtl,
       child: Stack(
         children: [
+          // Background image for the page
           Positioned.fill(
             child: Image.asset('assets/images/back.png', fit: BoxFit.cover),
           ),
@@ -249,6 +260,7 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
               padding: const EdgeInsets.fromLTRB(18, 200, 18, 40),
               child: Column(
                 children: [
+                  // Main white card that contains the weekly goal content
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
@@ -259,6 +271,7 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        // Back button inside the card
                         Align(
                           alignment: AlignmentDirectional.centerStart,
                           child: IconButton(
@@ -272,6 +285,8 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
                           ),
                         ),
                         const SizedBox(height: 6),
+
+                        // Title
                         Align(
                           alignment: Alignment.centerRight,
                           child: const Text(
@@ -284,6 +299,8 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
                           ),
                         ),
                         const SizedBox(height: 8),
+
+                        // Subtitle / helper text
                         Align(
                           alignment: Alignment.centerRight,
                           child: Text(
@@ -298,6 +315,7 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
                         ),
                         const SizedBox(height: 30),
 
+                        // Goal level tiles
                         _goalTile('beginner'),
                         const SizedBox(height: 12),
                         _goalTile('active'),
@@ -306,6 +324,7 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
 
                         const SizedBox(height: 44),
 
+                        // Save button
                         SizedBox(
                           width: 150,
                           child: FilledButton(

@@ -1,23 +1,25 @@
+// Profile tab (shows user info, buttons, logout, etc.)
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'edit_profile_page.dart';
-import 'main.dart'; // ✅ للرجوع إلى HomePage بعد تسجيل الخروج
-import 'notifications_page.dart'; // ✅ صفحة الإشعارات
+import 'main.dart';                // Return to HomePage after logout
+import 'notifications_page.dart'; // Notifications screen
 import 'weekly_goal_page.dart';
 import 'ratings_page.dart';
 
 class ProfileTab extends StatelessWidget {
   const ProfileTab({super.key});
 
-  // ألوان حسب هويتك
+  // Theme colors (same identity colors)
   static const Color _darkGreen  = Color(0xFF0E3A2C);
   static const Color _lightGreen = Color(0xFFC9DABF);
-  static const Color _confirm    = Color(0xFF6F8E63); // ✅ نفس لون التأكيد
-  static const _titleColor   = _darkGreen;
-  static const _confirmColor = _confirm; // 0xFF6F8E63 حسب كودك السابق
+  static const Color _confirm    = Color(0xFF6F8E63);
+  static const _titleColor       = _darkGreen;
+  static const _confirmColor     = _confirm;
 
-  // --- نفس تدفق الخروج الموجود سابقًا (نفس النصوص/الألوان/الانتقال) ---
+  // Logout → return to HomePage
   Future<void> _logout(BuildContext context) async {
     await FirebaseAuth.instance.signOut();
     Navigator.pushAndRemoveUntil(
@@ -27,6 +29,7 @@ class ProfileTab extends StatelessWidget {
     );
   }
 
+  // Confirmation dialog
   Future<void> _confirmLogout(BuildContext context) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -46,7 +49,7 @@ class ProfileTab extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: _titleColor, // نفس حوار الحذف
+                    color: _titleColor,
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -56,29 +59,44 @@ class ProfileTab extends StatelessWidget {
                   style: TextStyle(fontSize: 15, color: Colors.black87),
                 ),
                 const SizedBox(height: 24),
+
+                // Confirm button
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
                     style: FilledButton.styleFrom(
-                      backgroundColor: _confirmColor, // نفس لون التأكيد
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      backgroundColor: _confirmColor,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                     onPressed: () => Navigator.pop(ctx, true),
-                    child: const Text('تأكيد', style: TextStyle(fontSize: 16, color: Colors.white)),
+                    child: const Text(
+                      'تأكيد',
+                      style: TextStyle(fontSize: 16, color: Colors.white),
+                    ),
                   ),
                 ),
+
                 const SizedBox(height: 10),
+
+                // Cancel button
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
                     style: FilledButton.styleFrom(
-                      backgroundColor:  Colors.grey[300], //
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      backgroundColor: Colors.grey[300],
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                     onPressed: () => Navigator.pop(ctx, false),
-                    child: const Text('إلغاء', style: TextStyle(fontSize: 16, color: _titleColor)),
+                    child: const Text(
+                      'إلغاء',
+                      style: TextStyle(fontSize: 16, color: _titleColor),
+                    ),
                   ),
                 ),
               ],
@@ -90,12 +108,11 @@ class ProfileTab extends StatelessWidget {
 
     if (ok == true) await _logout(context);
   }
-  // ---------------------------------------------------------------------------
 
+  // Stream of user profile: name + photo
   Stream<_UserProfile> _profileStream() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      // غير مسجّل: رجّع قيم افتراضية
       return Stream.value(const _UserProfile(name: 'الاسم'));
     }
 
@@ -103,11 +120,10 @@ class ProfileTab extends StatelessWidget {
     final authName = user.displayName;
     final authPhoto = user.photoURL;
 
-    // نراقب مستند Firestore: users/{uid}
     final docRef = FirebaseFirestore.instance.collection('users').doc(uid);
     return docRef.snapshots().map((snap) {
-      final data = snap.data();
-      final name = (data?['name'] as String?)?.trim();
+      final data  = snap.data();
+      final name  = (data?['name'] as String?)?.trim();
       final photo = (data?['photoUrl'] as String?)?.trim();
 
       return _UserProfile(
@@ -119,7 +135,6 @@ class ProfileTab extends StatelessWidget {
             : (authPhoto?.isNotEmpty == true ? authPhoto : null),
       );
     }).handleError((_) {
-      // لو صار خطأ، استخدم قيم Auth / الافتراضي
       return _UserProfile(
         name: (authName?.isNotEmpty == true ? authName! : 'الاسم'),
         photoUrl: (authPhoto?.isNotEmpty == true ? authPhoto : null),
@@ -131,7 +146,7 @@ class ProfileTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // الخلفية "back" خلف كل شيء (حتى البار — تذكّري حاطين extendBody: true في الـ Scaffold)
+        // Full background image
         Positioned.fill(
           child: Image.asset(
             'assets/images/back.png',
@@ -139,7 +154,7 @@ class ProfileTab extends StatelessWidget {
           ),
         ),
 
-        // المحتوى
+        // Profile content
         StreamBuilder<_UserProfile>(
           stream: _profileStream(),
           builder: (context, snap) {
@@ -150,6 +165,8 @@ class ProfileTab extends StatelessWidget {
               child: Column(
                 children: [
                   const SizedBox(height: 200),
+
+                  // White rounded container
                   Container(
                     width: double.infinity,
                     decoration: const BoxDecoration(
@@ -164,9 +181,8 @@ class ProfileTab extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          // الاسم + الأفـاتار على اليمين
+                          // Avatar + name
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.start, // RTL مع بروفايل
                             children: [
                               Padding(
                                 padding: const EdgeInsetsDirectional.only(start: 20),
@@ -176,12 +192,12 @@ class ProfileTab extends StatelessWidget {
                               Expanded(
                                 child: Text(
                                   profile.name,
+                                  textAlign: TextAlign.right,
                                   style: const TextStyle(
                                     fontSize: 22,
                                     fontWeight: FontWeight.w700,
                                     color: _darkGreen,
                                   ),
-                                  textAlign: TextAlign.right,
                                 ),
                               ),
                             ],
@@ -189,16 +205,17 @@ class ProfileTab extends StatelessWidget {
 
                           const SizedBox(height: 24),
 
-                          // المستطيلات/الأزرار
+                          // Profile options
                           _ProfileButton(
                             title: 'المعلومات الشخصية',
                             icon: Icons.badge_outlined,
                             onTap: () {
-                              Navigator.push(context, MaterialPageRoute(
-                                builder: (_) => EditProfilePage(),
-                              ));
+                              Navigator.push(context,
+                                MaterialPageRoute(builder: (_) => EditProfilePage()),
+                              );
                             },
                           ),
+
                           _ProfileButton(
                             title: 'هدف الاستماع الأسبوعي',
                             icon: Icons.track_changes_outlined,
@@ -208,6 +225,7 @@ class ProfileTab extends StatelessWidget {
                               );
                             },
                           ),
+
                           _ProfileButton(
                             title: 'تقييماتي',
                             icon: Icons.star_rate_outlined,
@@ -217,6 +235,7 @@ class ProfileTab extends StatelessWidget {
                               );
                             },
                           ),
+
                           _ProfileButton(
                             title: 'الإشعارات',
                             icon: Icons.notifications_none_outlined,
@@ -226,10 +245,11 @@ class ProfileTab extends StatelessWidget {
                               );
                             },
                           ),
+
                           _ProfileButton(
                             title: 'تسجيل خروج',
                             icon: Icons.logout,
-                            onTap: () => _confirmLogout(context), // ✅ نفس الحوار والانتقال
+                            onTap: () => _confirmLogout(context),
                           ),
                         ],
                       ),
@@ -245,6 +265,7 @@ class ProfileTab extends StatelessWidget {
   }
 }
 
+// Avatar component
 class _Avatar extends StatelessWidget {
   final String? photoUrl;
   const _Avatar({this.photoUrl});
@@ -258,13 +279,14 @@ class _Avatar extends StatelessWidget {
           ? NetworkImage(photoUrl!)
           : null,
       child: (photoUrl == null || photoUrl!.isEmpty)
-          ? Icon(Icons.person, size: 40, color: ProfileTab._darkGreen.withOpacity(0.75))
+          ? Icon(Icons.person, size: 40,
+          color: ProfileTab._darkGreen.withOpacity(0.75))
           : null,
     );
   }
 }
 
-/// زر/مستطيل أخضر فاتح بحواف دائرية
+// Green profile button
 class _ProfileButton extends StatelessWidget {
   final String title;
   final IconData icon;
@@ -295,16 +317,14 @@ class _ProfileButton extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // أيقونة على اليمين (RTL)
               Padding(
                 padding: const EdgeInsetsDirectional.only(end: 18, start: 12),
                 child: Icon(icon, color: _darkGreen, size: 26),
               ),
-              // العنوان في المنتصف تقريبًا
               Expanded(
                 child: Text(
                   title,
-                  textAlign: TextAlign.right, // ✅ يجعل النص على اليمين
+                  textAlign: TextAlign.right,
                   style: const TextStyle(
                     fontSize: 16.5,
                     fontWeight: FontWeight.w600,
@@ -312,7 +332,7 @@ class _ProfileButton extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 56), // محاذاة بصرية
+              const SizedBox(width: 56),
             ],
           ),
         ),

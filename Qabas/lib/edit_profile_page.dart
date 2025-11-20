@@ -42,7 +42,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     messenger.hideCurrentSnackBar();
     messenger.showSnackBar(
       SnackBar(
-        backgroundColor: _midGreen,
+        backgroundColor: _confirm,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -112,34 +112,75 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('إزالة الصورة', textAlign: TextAlign.center),
-          content: const Text('هل تريد إزالة صورة الملف الشخصي؟', textAlign: TextAlign.center),
-          contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-          actions: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+          child: Directionality(
+            textDirection: TextDirection.rtl,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
+                const Text(
+                  'إزالة الصورة',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: _darkGreen,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'هل تريد إزالة صورة الملف الشخصي؟',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 15, color: Colors.black87),
+                ),
+                const SizedBox(height: 24),
+
+
                 SizedBox(
-                  height: 48,
+                  width: double.infinity,
                   child: FilledButton(
                     style: FilledButton.styleFrom(
                       backgroundColor: _confirm,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                     onPressed: () => Navigator.pop(ctx, true),
-                    child: const Text('تأكيد'),
+                    child: const Text(
+                      'تأكيد',
+                      style: TextStyle(fontSize: 16, color: Colors.white),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 8),
-                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
+
+                const SizedBox(height: 10),
+
+
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.grey[300],
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text(
+                      'إلغاء',
+                      style: TextStyle(fontSize: 16, color: _darkGreen),
+                    ),
+                  ),
+                ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -155,7 +196,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
         await ref.delete();
       } catch (_) {}
 
-      await FirebaseFirestore.instance.collection('users').doc(uid)
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
           .set({'photoUrl': FieldValue.delete()}, SetOptions(merge: true));
 
       await _user.updatePhotoURL(null);
@@ -210,8 +253,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
     final currentPhoto = _user.photoURL ?? '';
 
     final newName   = _name.text.trim();
-    final newUser   = _username.text.trim();  // not editable
-    final newEmail  = _email.text.trim();     // not editable
+    final newUser   = _username.text.trim();  // not editable (kept for completeness)
+    final newEmail  = _email.text.trim();     // not editable (kept for completeness)
     final newPass   = _password.text.trim();
     final newPhoto  = _photoUrl ?? '';
 
@@ -274,7 +317,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
       // Final message / navigation
       if (anySuccess && !anyError) {
-        _showSnack('تم حفظ التعديلات ✅', icon: Icons.check_circle);
+        _showSnack('تم حفظ التعديلات ', icon: Icons.check_circle);
         if (mounted) Navigator.pop(context);
       } else if (!anySuccess && !anyError) {
         _showSnack('لا توجد تغييرات لحفظها.', icon: Icons.info_outline);
@@ -321,7 +364,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                 ? NetworkImage(_photoUrl!)
                                 : null,
                             child: (_photoUrl == null || _photoUrl!.isEmpty)
-                                ? Icon(Icons.person, size: 50, color: _darkGreen.withOpacity(0.8))
+                                ? Icon(Icons.person,
+                                size: 50,
+                                color: _darkGreen.withOpacity(0.8))
                                 : null,
                           ),
                           Positioned(
@@ -333,7 +378,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
                               child: CircleAvatar(
                                 radius: 16,
                                 backgroundColor: _confirm,
-                                child: const Icon(Icons.edit, size: 16, color: Colors.white),
+                                child: const Icon(Icons.edit,
+                                    size: 16, color: Colors.white),
                               ),
                             ),
                           ),
@@ -347,7 +393,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                 child: CircleAvatar(
                                   radius: 16,
                                   backgroundColor: Colors.red.shade600,
-                                  child: const Icon(Icons.delete_outline, size: 16, color: Colors.white),
+                                  child: const Icon(Icons.delete_outline,
+                                      size: 16, color: Colors.white),
                                 ),
                               ),
                             ),
@@ -374,15 +421,18 @@ class _EditProfilePageState extends State<EditProfilePage> {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             Padding(
-                              padding: const EdgeInsetsDirectional.only(top: 8, end: 4),
+                              padding: const EdgeInsetsDirectional.only(
+                                  top: 8, end: 4),
                               child: Align(
                                 alignment: AlignmentDirectional.centerStart,
                                 child: IconButton(
                                   tooltip: 'رجوع',
                                   style: IconButton.styleFrom(
-                                    backgroundColor: Colors.white.withOpacity(0.85),
+                                    backgroundColor:
+                                    Colors.white.withOpacity(0.85),
                                   ),
-                                  icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                                  icon: const Icon(
+                                      Icons.arrow_back_ios_new_rounded),
                                   color: _darkGreen,
                                   onPressed: () => Navigator.pop(context),
                                 ),
@@ -392,18 +442,25 @@ class _EditProfilePageState extends State<EditProfilePage> {
                             Form(
                               key: _formKey,
                               child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                crossAxisAlignment:
+                                CrossAxisAlignment.stretch,
                                 children: [
                                   _label('الاسم'),
-                                  _field(controller: _name, hint: 'اكتب اسمك'),
+                                  _field(
+                                    controller: _name,
+                                    hint: 'اكتب اسمك',
+                                  ),
                                   const SizedBox(height: 12),
 
                                   _label('اسم المستخدم'),
                                   _field(
                                     controller: _username,
                                     hint: '@username',
-                                    enabled: false, // ⛔️ Not editable
-                                    suffixIcon: const Icon(Icons.lock_outline, size: 18),
+                                    enabled: false, //  Not editable
+                                    suffixIcon: const Icon(
+                                      Icons.lock_outline,
+                                      size: 18,
+                                    ),
                                   ),
                                   const SizedBox(height: 12),
 
@@ -412,8 +469,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                     controller: _email,
                                     keyboard: TextInputType.emailAddress,
                                     hint: 'name@example.com',
-                                    enabled: false, // ⛔️ Not editable
-                                    suffixIcon: const Icon(Icons.lock_outline, size: 18),
+                                    enabled: false, //  Not editable
+                                    suffixIcon: const Icon(
+                                      Icons.lock_outline,
+                                      size: 18,
+                                    ),
                                     validator: (_) => null,
                                   ),
                                   const SizedBox(height: 12),
@@ -433,13 +493,20 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                       style: FilledButton.styleFrom(
                                         backgroundColor: _confirm,
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(26),
+                                          borderRadius:
+                                          BorderRadius.circular(26),
                                         ),
                                       ),
                                       onPressed: _save,
                                       child: _saving
-                                          ? const CircularProgressIndicator(color: Colors.white)
-                                          : const Text('حفظ', style: TextStyle(fontSize: 16)),
+                                          ? const CircularProgressIndicator(
+                                        color: Colors.white,
+                                      )
+                                          : const Text(
+                                        'حفظ',
+                                        style: TextStyle(
+                                            fontSize: 16),
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -464,7 +531,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
       padding: const EdgeInsetsDirectional.only(bottom: 6, start: 6),
       child: Text(
         text,
-        style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: _darkGreen),
+        style: const TextStyle(
+          fontSize: 14.5,
+          fontWeight: FontWeight.w700,
+          color: _darkGreen,
+        ),
         textAlign: TextAlign.right,
       ),
     );
@@ -483,22 +554,32 @@ class _EditProfilePageState extends State<EditProfilePage> {
       controller: controller,
       keyboardType: keyboard,
       obscureText: obscure,
-      validator: validator ?? (v) => (v == null || v.trim().isEmpty) ? 'هذا الحقل مطلوب' : null,
+      validator: validator ??
+              (v) =>
+          (v == null || v.trim().isEmpty) ? 'هذا الحقل مطلوب' : null,
       enabled: enabled,
       readOnly: !enabled,
       decoration: InputDecoration(
         hintText: hint,
         filled: true,
-        fillColor: enabled ? const Color(0xFFF6F7F5) : const Color(0xFFF0F0F0),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        fillColor:
+        enabled ? const Color(0xFFF6F7F5) : const Color(0xFFF0F0F0),
+        contentPadding:
+        const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         suffixIcon: suffixIcon,
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: enabled ? _lightGreen : Colors.grey.shade400, width: 2),
+          borderSide: BorderSide(
+            color: enabled ? _lightGreen : Colors.grey.shade400,
+            width: 2,
+          ),
         ),
         disabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade400, width: 2),
+          borderSide: BorderSide(
+            color: Colors.grey.shade400,
+            width: 2,
+          ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),

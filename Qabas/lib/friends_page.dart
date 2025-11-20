@@ -17,12 +17,13 @@ class FriendsPage extends StatelessWidget {
 
   static const Color _darkGreen  = Color(0xFF0E3A2C);
   static const Color _midGreen   = Color(0xFF2F5145);
+  static Color _confirm = Color(0xFF6F8E63);
 
   /// Unified SnackBar helper for this page
   static void _showAppSnack(BuildContext context, String message, {IconData icon = Icons.check_circle}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        backgroundColor: _midGreen,
+        backgroundColor: _confirm,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -204,7 +205,7 @@ class _RequestsTab extends StatelessWidget {
 
     try {
       await batch.commit();
-      FriendsPage._showAppSnack(context, 'تم قبول الطلب ✅');
+      FriendsPage._showAppSnack(context, 'تم قبول الطلب');
     } catch (e) {
       FriendsPage._showAppSnack(context, 'تعذّر القبول: $e', icon: Icons.error_outline);
     }
@@ -242,7 +243,7 @@ class _RequestsTab extends StatelessWidget {
               return const Center(child: CircularProgressIndicator());
             }
             if (!snap.hasData || snap.data!.docs.isEmpty) {
-              return const Center(child: Text('لا توجد طلبات ً ✨', style: TextStyle(color: Colors.black54)));
+              return const Center(child: Text('لا توجد طلبات', style: TextStyle(color: Colors.black54)));
             }
 
             final fromUids = snap.data!.docs.map((d) => d.id).toList();
@@ -447,7 +448,7 @@ class _SearchTabState extends State<_SearchTab> {
         _results = _results.map((x) => x.uid == toUid ? x.copyWith(pending: true) : x).toList();
       });
 
-      FriendsPage._showAppSnack(context, 'تم إرسال الطلب ✅');
+      FriendsPage._showAppSnack(context, 'تم إرسال الطلب ');
     } catch (e) {
       FriendsPage._showAppSnack(context, 'تعذّر الإرسال: $e', icon: Icons.error_outline);
     }
@@ -718,3 +719,4 @@ class _TinyActionButton extends StatelessWidget {
     );
   }
 }
+

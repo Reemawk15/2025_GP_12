@@ -59,7 +59,7 @@ class _MyBooksPageState extends State<MyBooksPage>
     messenger.hideCurrentSnackBar();
     messenger.showSnackBar(
       SnackBar(
-        backgroundColor: _midGreen,
+        backgroundColor: _confirm,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -210,7 +210,7 @@ class _MyBooksPageState extends State<MyBooksPage>
     final nameMissing = _titleCtrl.text.trim().isEmpty;
     final pdfMissing = _pdfFile == null;
     if (nameMissing && pdfMissing) {
-      return 'أضيف اسم الكتاب واختاري ملف PDF أولاً ';
+      return 'أضيف اسم الكتاب واختار ملف PDF أولاً ';
     } else if (nameMissing) {
       return 'أضيف اسم الكتاب أولاً ✍';
     } else {
@@ -250,7 +250,7 @@ class _MyBooksPageState extends State<MyBooksPage>
                       children: [
                         const SizedBox(height: 8),
 
-                        // الجملة الرمادية للتوضيح
+
                         const Align(
                           alignment: Alignment.centerRight,
                           child: Text(
@@ -345,7 +345,7 @@ class _MyBooksPageState extends State<MyBooksPage>
       textDirection: TextDirection.rtl,
       child: Stack(
         children: [
-          // الخلفية الجديدة book7
+
           Positioned.fill(
             child: Image.asset('assets/images/book7.png', fit: BoxFit.cover),
           ),
@@ -717,7 +717,7 @@ class _MyBookCard extends StatelessWidget {
     messenger.hideCurrentSnackBar();
     messenger.showSnackBar(
       SnackBar(
-        backgroundColor: _midGreen,
+        backgroundColor: _confirm,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(
@@ -748,7 +748,9 @@ class _MyBookCard extends StatelessWidget {
       context: context,
       builder: (ctx) => Dialog(
         backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
           child: Directionality(
@@ -769,9 +771,14 @@ class _MyBookCard extends StatelessWidget {
                 const Text(
                   'هل أنت متأكد أنك تريد حذف هذا الكتاب من مكتبتك؟',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 15),
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: Colors.black87,
+                  ),
                 ),
                 const SizedBox(height: 24),
+
+
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
@@ -789,12 +796,15 @@ class _MyBookCard extends StatelessWidget {
                     ),
                   ),
                 ),
+
                 const SizedBox(height: 10),
+
+                // زر إلغاء
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
                     style: FilledButton.styleFrom(
-                      backgroundColor: Colors.grey,
+                      backgroundColor: Colors.grey[300],
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -803,7 +813,10 @@ class _MyBookCard extends StatelessWidget {
                     onPressed: () => Navigator.pop(ctx, false),
                     child: const Text(
                       'إلغاء',
-                      style: TextStyle(fontSize: 16, color: _darkGreen),
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: _darkGreen,
+                      ),
                     ),
                   ),
                 ),
@@ -820,12 +833,13 @@ class _MyBookCard extends StatelessWidget {
       final storage = FirebaseStorage.instance;
       final baseRef = storage.ref('users/$uid/mybooks/${book.id}');
 
-      // Delete files quietly (ignore if missing)
+      // Delete storage files (if any)
       await Future.wait([
         baseRef.child('book.pdf').delete().catchError((_) {}),
         baseRef.child('cover.jpg').delete().catchError((_) {}),
       ]);
 
+      // Delete the document from Firestore
       await FirebaseFirestore.instance
           .collection('users')
           .doc(uid)

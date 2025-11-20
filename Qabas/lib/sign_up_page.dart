@@ -8,11 +8,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'home_screen.dart';
 import 'sign_in_page.dart';
 
-/// ===== تحكّم سريع بالمظهر والتموضع =====
-const double kProgressTop = 210;          // موضع شريط التقدم + السهم من الأعلى
-const double kContentBottomPadding = 240; // مسافة المحتوى من أسفل
+/// ===== Quick control for layout and appearance =====
+const double kProgressTop = 210;          // Progress bar + arrow position from the top
+const double kContentBottomPadding = 240; // Content distance from bottom
 
-/// إزاحات اختيارية لكل صفحة (سالب = يطلع فوق، موجب = ينزل)
+/// Optional offsets for each page (negative = move up, positive = move down)
 const double kShiftIntro     = 0;
 const double kShiftName      = 0;
 const double kShiftNotifs    = 0;
@@ -21,10 +21,10 @@ const double kShiftEmail     = 20;
 const double kShiftPassword  = 100;
 const double kShiftUsername  = 30;
 
-/// ارتفاع حقول الإدخال
+/// Input fields height
 const double kFieldHeight = 90;
 
-/// لوحة ألوان
+/// Color palette
 class _SignupTheme {
   static const primary     = Color(0xFF0E3A2C);
   static const btnFill     = Color(0xFF6F8E63);
@@ -60,6 +60,10 @@ class _SignUpPageState extends State<SignUpPage> {
 
   String? _livePassError;
   String? _livePass2Error;
+
+  // Password visibility toggles
+  bool _obscurePass  = true;
+  bool _obscurePass2 = true;
 
   @override
   void initState() {
@@ -103,7 +107,7 @@ class _SignUpPageState extends State<SignUpPage> {
     );
   }
 
-  // شروط كلمة المرور
+  // Password rules
   String? _validatePassword(String? v) {
     final s = v ?? '';
     if (s.length < 8) return 'الحد الأدنى 8 أحرف';
@@ -118,8 +122,8 @@ class _SignUpPageState extends State<SignUpPage> {
     switch (_index) {
       case 0: return true; // Intro
       case 1: return _nameCtrl.text.trim().length >= 2;
-      case 2: return true; // الإشعارات اختيارية
-      case 3: return true; // رائع
+      case 2: return true; // Notifications are optional
+      case 3: return true; // "Great" screen
       case 4:
         return RegExp(r'^[^@]+@[^@]+\.[^@]+$').hasMatch(_emailCtrl.text.trim());
       case 5:
@@ -132,7 +136,12 @@ class _SignUpPageState extends State<SignUpPage> {
     }
   }
 
-  InputDecoration _dec(String hint, {bool error = false, String? helper}) {
+  InputDecoration _dec(
+      String hint, {
+        bool error = false,
+        String? helper,
+        Widget? suffix,
+      }) {
     const r = 22.0;
     final borderColor = error ? Colors.red : _SignupTheme.inputBorder.withOpacity(0.35);
     final focusColor  = error ? Colors.red : _SignupTheme.inputBorder;
@@ -148,6 +157,7 @@ class _SignUpPageState extends State<SignUpPage> {
       filled: true,
       fillColor: _SignupTheme.inputFill.withOpacity(0.92),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      suffixIcon: suffix,
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(r),
         borderSide: BorderSide(color: borderColor),
@@ -159,7 +169,7 @@ class _SignUpPageState extends State<SignUpPage> {
     );
   }
 
-  // 🔤 توحيد النصوص (للعربية والإنجليزية) — للتخزين والبحث
+  // Normalize text (Arabic and English) for storage and search
   String _normalize(String s) => s
       .trim()
       .toLowerCase()
@@ -184,7 +194,7 @@ class _SignUpPageState extends State<SignUpPage> {
 
     setState(() => _loading = true);
     try {
-      // تحقق من توفر اسم المستخدم (Lower)
+      // Check if username (lowercased) already exists
       final exists = await FirebaseFirestore.instance
           .collection('users')
           .where('usernameLower', isEqualTo: _normalize(username))
@@ -196,12 +206,10 @@ class _SignUpPageState extends State<SignUpPage> {
         return;
       }
 
-
       final cred = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(email: email, password: pass);
 
       final user = cred.user!;
-
 
       // Save the user in Firestore with standardized fields
       await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
@@ -285,24 +293,24 @@ class _SignUpPageState extends State<SignUpPage> {
           body: Stack(
             fit: StackFit.expand,
             children: [
-              // الخلفية
+              // Background
               Image.asset('assets/images/SignIn.png', fit: BoxFit.cover),
 
-              // المحتوى
+              // Content
               SafeArea(
                 child: PageView(
                   controller: _pc,
                   physics: const NeverScrollableScrollPhysics(),
                   onPageChanged: (i) => setState(() => _index = i),
                   children: [
-                    // 0) المقدمة
+                    // 0) Intro
                     _BottomSheetArea(
                       bottomPadding: kContentBottomPadding,
                       yShift: kShiftIntro,
                       child: _IntroBlock(onStart: _next),
                     ),
 
-                    // 1) الاسم
+                    // 1) Name
                     _BottomSheetArea(
                       bottomPadding: kContentBottomPadding,
                       yShift: kShiftName,
@@ -328,7 +336,7 @@ class _SignUpPageState extends State<SignUpPage> {
                       ]),
                     ),
 
-                    // 2) الإشعارات
+                    // 2) Notifications
                     _BottomSheetArea(
                       bottomPadding: kContentBottomPadding,
                       yShift: kShiftNotifs,
@@ -370,7 +378,7 @@ class _SignUpPageState extends State<SignUpPage> {
                       ]),
                     ),
 
-                    // 3) رائع
+                    // 3) "Great" screen
                     _BottomSheetArea(
                       bottomPadding: kContentBottomPadding,
                       yShift: kShiftGreat,
@@ -386,7 +394,7 @@ class _SignUpPageState extends State<SignUpPage> {
                       ]),
                     ),
 
-                    // 4) البريد
+                    // 4) Email
                     _BottomSheetArea(
                       bottomPadding: kContentBottomPadding,
                       yShift: kShiftEmail,
@@ -414,7 +422,7 @@ class _SignUpPageState extends State<SignUpPage> {
                       ]),
                     ),
 
-                    // 5) كلمة المرور
+                    // 5) Password
                     _BottomSheetArea(
                       bottomPadding: kContentBottomPadding,
                       yShift: kShiftPassword,
@@ -426,13 +434,22 @@ class _SignUpPageState extends State<SignUpPage> {
                             height: kFieldHeight,
                             child: TextField(
                               controller: _passCtrl,
-                              obscureText: true,
+                              obscureText: _obscurePass,
+                              obscuringCharacter: '•',
                               onChanged: (_) => setState(() {}),
                               decoration: _dec(
                                 'كلمة المرور',
                                 error: _livePassError != null,
                                 helper: _livePassError ??
                                     'كلمة المرور يجب أن تكون ٨ أحرف على الأقل\nوتضمّ حرفًا كبيرًا وحرفًا صغيرًا ورقمًا ورمزًا خاصًا.',
+                                suffix: IconButton(
+                                  tooltip: _obscurePass ? 'إظهار' : 'إخفاء',
+                                  onPressed: () => setState(() => _obscurePass = !_obscurePass),
+                                  icon: Icon(
+                                    _obscurePass ? Icons.visibility_off : Icons.visibility,
+                                    color: _SignupTheme.primary,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -444,12 +461,21 @@ class _SignUpPageState extends State<SignUpPage> {
                             height: kFieldHeight,
                             child: TextField(
                               controller: _pass2Ctrl,
-                              obscureText: true,
+                              obscureText: _obscurePass2,
+                              obscuringCharacter: '•',
                               onChanged: (_) => setState(() {}),
                               decoration: _dec(
                                 'تأكيد كلمة المرور',
                                 error: _livePass2Error != null,
                                 helper: _livePass2Error,
+                                suffix: IconButton(
+                                  tooltip: _obscurePass2 ? 'إظهار' : 'إخفاء',
+                                  onPressed: () => setState(() => _obscurePass2 = !_obscurePass2),
+                                  icon: Icon(
+                                    _obscurePass2 ? Icons.visibility_off : Icons.visibility,
+                                    color: _SignupTheme.primary,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -459,7 +485,7 @@ class _SignUpPageState extends State<SignUpPage> {
                       ]),
                     ),
 
-                    // 6) اسم المستخدم + تسجيل
+                    // 6) Username + register
                     _BottomSheetArea(
                       bottomPadding: kContentBottomPadding,
                       yShift: kShiftUsername,
@@ -498,7 +524,7 @@ class _SignUpPageState extends State<SignUpPage> {
                 ),
               ),
 
-              // ✅ شريط التقدم + السهم
+              // Progress bar + arrow
               Positioned(
                 top: kProgressTop,
                 left: 24,
@@ -528,7 +554,7 @@ class _SignUpPageState extends State<SignUpPage> {
   }
 }
 
-/*====================== Widgets مساعدة ======================*/
+/*====================== Helper widgets ======================*/
 
 class _Title extends StatelessWidget {
   final String text;
@@ -586,7 +612,7 @@ class _IntroBlock extends StatelessWidget {
 class _BottomSheetArea extends StatelessWidget {
   final Widget child;
   final double bottomPadding;
-  final double yShift; // + ينزل، - يطلع
+  final double yShift; // + moves down, - moves up
 
   const _BottomSheetArea({
     required this.child,
@@ -626,7 +652,8 @@ class _RoundMainButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 240, height: 52,
+      width: 240,
+      height: 52,
       child: FilledButton(
         onPressed: onTap,
         style: FilledButton.styleFrom(
@@ -641,10 +668,10 @@ class _RoundMainButton extends StatelessWidget {
   }
 }
 
-/// شريط تقدم RTL بدون دائرة (يمتلي من اليمين لليسار)
+/// RTL progress bar without circle (fills from right to left)
 class _ProgressBarRtl extends StatelessWidget {
   final int step;   // 0..(total-1)
-  final int total;  // عدد الصفحات
+  final int total;  // Total number of pages
   const _ProgressBarRtl({required this.step, required this.total});
 
   @override
@@ -681,7 +708,7 @@ class _ProgressBarRtl extends StatelessWidget {
   }
 }
 
-/// ✅ مركّب: شريط التقدم + دائرة سهم يمين
+/// Composite widget: progress bar + circular arrow on the right
 class _ProgressWithArrow extends StatelessWidget {
   final int step;
   final int total;
@@ -704,7 +731,8 @@ class _ProgressWithArrow extends StatelessWidget {
           onTap: onArrowTap,
           borderRadius: BorderRadius.circular(24),
           child: Container(
-            width: 44, height: 44,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
               color: _SignupTheme.fill,
               shape: BoxShape.circle,

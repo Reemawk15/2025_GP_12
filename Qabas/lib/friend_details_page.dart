@@ -2,11 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-// لو عندك صفحة الشات
 import 'club_chat_page.dart';
 
 /// =====================
-/// ألوان الهوية
+/// Brand colors
 /// =====================
 const Color _darkGreen   = Color(0xFF0E3A2C);
 const Color _midGreen    = Color(0xFF2F5145);
@@ -14,11 +13,13 @@ const Color _lightGreen  = Color(0xFFC9DABF);
 const Color _confirm     = Color(0xFF6F8E63);
 const Color _danger      = Color(0xFFB64B4B);
 
-/// ✅ سناك موحّد
+/// Unified snack bar helper
 void _showAppSnack(BuildContext context, String message, {IconData icon = Icons.check_circle}) {
-  ScaffoldMessenger.of(context).showSnackBar(
+  final messenger = ScaffoldMessenger.of(context);
+  messenger.hideCurrentSnackBar();
+  messenger.showSnackBar(
     SnackBar(
-      backgroundColor: _midGreen,
+      backgroundColor: _confirm,
       behavior: SnackBarBehavior.floating,
       margin: const EdgeInsets.all(16),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -76,7 +77,10 @@ class FriendDetailsPage extends StatelessWidget {
             clipBehavior: Clip.none,
             children: const [
               Positioned.fill(
-                child: Image(image: AssetImage('assets/images/friend.png'), fit: BoxFit.cover),
+                child: Image(
+                  image: AssetImage('assets/images/friend.png'),
+                  fit: BoxFit.cover,
+                ),
               ),
               TabBarView(
                 physics: BouncingScrollPhysics(),
@@ -95,7 +99,7 @@ class FriendDetailsPage extends StatelessWidget {
 }
 
 /// ===============================
-/// Header داخل AppBar: الصورة + الاسم + @ + زر ديناميكي
+/// Header inside AppBar: avatar + name + username + dynamic friend button
 /// ===============================
 class _FriendHeader extends StatelessWidget {
   final DocumentReference<Map<String, dynamic>> userDoc;
@@ -106,7 +110,7 @@ class _FriendHeader extends StatelessWidget {
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: userDoc.snapshots(),
       builder: (context, snap) {
-        final data = snap.data?.data() ?? {};
+        final data     = snap.data?.data() ?? {};
         final name     = (data['name'] ?? '') as String;
         final username = (data['username'] ?? '') as String;
         final photoUrl = (data['photoUrl'] ?? '') as String;
@@ -119,35 +123,63 @@ class _FriendHeader extends StatelessWidget {
           alignment: Alignment.topCenter,
           child: Transform.translate(
             offset: const Offset(13, -53),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                CircleAvatar(
-                  radius: 26,
-                  backgroundColor: Colors.white,
-                  backgroundImage: photoUrl.isEmpty ? null : NetworkImage(photoUrl),
-                  child: photoUrl.isEmpty ? const Icon(Icons.person, color: Colors.black38) : null,
-                ),
-                const SizedBox(width: 10),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      name.isEmpty ? 'بدون اسم' : name,
-                      style: const TextStyle(color: _darkGreen, fontWeight: FontWeight.w800, fontSize: 15),
+            child: SizedBox(
+              // Fixed header width so avatar and button stay aligned for all users
+              width: 257,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Avatar (fixed position)
+                  CircleAvatar(
+                    radius: 26,
+                    backgroundColor: Colors.white,
+                    backgroundImage: photoUrl.isEmpty ? null : NetworkImage(photoUrl),
+                    child: photoUrl.isEmpty
+                        ? const Icon(Icons.person, color: Colors.black38)
+                        : null,
+                  ),
+                  const SizedBox(width: 10),
+
+                  // Name + username (do not push the friend button)
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          name.isEmpty ? 'بدون اسم' : name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: _darkGreen,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          userAsTail,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.black54,
+                            fontSize: 12.5,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(userAsTail, style: const TextStyle(color: Colors.black54, fontSize: 12.5)),
-                  ],
-                ),
-                const SizedBox(width: 70),
-                _DynamicFriendAction(
-                  friendUid: userDoc.id,
-                  friendName: name.isEmpty ? 'الصديق' : name,
-                ),
-              ],
+                  ),
+
+                  const SizedBox(width: 12),
+
+                  // Friend button (fixed at the end)
+                  _DynamicFriendAction(
+                    friendUid: userDoc.id,
+                    friendName: name.isEmpty ? 'الصديق' : name,
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -156,7 +188,9 @@ class _FriendHeader extends StatelessWidget {
   }
 }
 
-/// زر ديناميكي: صديق/بانتظار القبول/إضافة
+/// ===============================
+/// Dynamic friend button: friend / pending / add
+/// ===============================
 class _DynamicFriendAction extends StatelessWidget {
   final String friendUid;
   final String friendName;
@@ -192,9 +226,14 @@ class _DynamicFriendAction extends StatelessWidget {
             if (waiting) {
               return Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(color: _confirm.withOpacity(0.12), borderRadius: BorderRadius.circular(12)),
-                child: const Text('بانتظار القبول ⏳',
-                    style: TextStyle(fontWeight: FontWeight.w700, color: _confirm)),
+                decoration: BoxDecoration(
+                  color: _confirm.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'بانتظار القبول ⏳',
+                  style: TextStyle(fontWeight: FontWeight.w700, color: _confirm),
+                ),
               );
             }
             return GestureDetector(
@@ -202,9 +241,14 @@ class _DynamicFriendAction extends StatelessWidget {
               behavior: HitTestBehavior.opaque,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(color: _confirm, borderRadius: BorderRadius.circular(12)),
-                child: const Text('إضافة',
-                    style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white)),
+                decoration: BoxDecoration(
+                  color: _confirm,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'إضافة',
+                  style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white),
+                ),
               ),
             );
           },
@@ -215,7 +259,7 @@ class _DynamicFriendAction extends StatelessWidget {
 }
 
 /// ===============================
-/// شريط التبويبات الأبيض
+/// White tab bar shell
 /// ===============================
 class _TabbarContainer extends StatelessWidget {
   const _TabbarContainer();
@@ -227,8 +271,11 @@ class _TabbarContainer extends StatelessWidget {
       child: Container(
         height: 40,
         decoration: BoxDecoration(
-          color: Colors.white, borderRadius: BorderRadius.circular(18),
-          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 3))],
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: const [
+            BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 3)),
+          ],
         ),
         child: const _TabsOnly(),
       ),
@@ -260,7 +307,7 @@ class _TabsOnly extends StatelessWidget {
 }
 
 /// ===============================
-/// عمليات إرسال/إلغاء الصداقة
+/// Friend operations (send request / unfriend)
 /// ===============================
 class _HeaderAndTabs {
   static Future<void> sendFriendRequest(BuildContext context, String friendUid) async {
@@ -272,54 +319,96 @@ class _HeaderAndTabs {
         .collection('friendRequests').doc(me.uid);
 
     try {
-      await reqRef.set({'fromUid': me.uid, 'createdAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
-      _showAppSnack(context, 'تم إرسال الطلب ✅');
+      await reqRef.set(
+        {'fromUid': me.uid, 'createdAt': FieldValue.serverTimestamp()},
+        SetOptions(merge: true),
+      );
+      _showAppSnack(context, 'تم إرسال الطلب');
     } catch (e) {
       _showAppSnack(context, 'تعذّر الإرسال: $e', icon: Icons.error_outline);
     }
   }
 
-  static Future<void> _confirmUnfollow(BuildContext context, String friendName, String friendUid) async {
+  /// Unfriend confirmation dialog using same style as club leave dialog
+  static Future<void> _confirmUnfollow(
+      BuildContext context,
+      String friendName,
+      String friendUid,
+      ) async {
     final me = FirebaseAuth.instance.currentUser;
     if (me == null) return;
 
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-          title: const Text('إلغاء المتابعة', textAlign: TextAlign.center,
-              style: TextStyle(fontWeight: FontWeight.bold, color: _darkGreen)),
-          content: Text('هل أنت متأكد من إلغاء متابعة $friendName؟',
-              textAlign: TextAlign.center, style: const TextStyle(fontSize: 14, color: Colors.black87)),
-          actionsAlignment: MainAxisAlignment.center,
-          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-          actions: [
-            SizedBox(
-              width: 130,
-              child: FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: _danger, foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+          child: Directionality(
+            textDirection: TextDirection.rtl,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  ' تأكيد إلغاء متابعة $friendName',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: _darkGreen,
+                  ),
                 ),
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('نعم، ألغِ'),
-              ),
-            ),
-            const SizedBox(width: 8),
-            SizedBox(
-              width: 130,
-              child: FilledButton.tonal(
-                style: FilledButton.styleFrom(
-                  backgroundColor: _lightGreen, foregroundColor: _darkGreen,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                const SizedBox(height: 10),
+                Text(
+                  'هل أنت متأكد أنك تريد إزالة $friendName من قائمة أصدقائك؟',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    color: Colors.black87,
+                  ),
                 ),
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('تراجع'),
-              ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _confirm,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: const Text(
+                      'تأكيد',
+                      style: TextStyle(fontSize: 16, color: Colors.white),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFF2F2F2),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text(
+                      'إلغاء',
+                      style: TextStyle(fontSize: 16, color: _darkGreen),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -352,7 +441,7 @@ class _HeaderAndTabs {
 }
 
 /// ===============================
-/// تبويب الإحصاءات
+/// Stats tab (streak and listened books)
 /// ===============================
 class _StatsTabWrapper extends StatelessWidget {
   const _StatsTabWrapper();
@@ -395,8 +484,11 @@ class _StatsTab extends StatelessWidget {
           itemBuilder: (_, i) => Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
             decoration: BoxDecoration(
-              color: _card, borderRadius: BorderRadius.circular(16),
-              boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4))],
+              color: _card,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: const [
+                BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4)),
+              ],
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -406,7 +498,11 @@ class _StatsTab extends StatelessWidget {
                   child: Text(
                     items[i].text,
                     textAlign: TextAlign.right,
-                    style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: _darkGreen),
+                    style: const TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                      color: _darkGreen,
+                    ),
                   ),
                 ),
               ],
@@ -427,7 +523,7 @@ class _StatRow {
 }
 
 /// ===============================
-/// تبويب التقييمات
+/// Reviews tab (friend book reviews)
 /// ===============================
 class _ReviewsTabWrapper extends StatelessWidget {
   const _ReviewsTabWrapper();
@@ -492,9 +588,17 @@ class _FriendReviewsTab extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.fromLTRB(16, 280, 16, 24),
         padding: const EdgeInsets.symmetric(vertical: 40),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18)),
-        child: const Text('لا توجد تقييمات بعد 📭',
-          style: TextStyle(color: Colors.black54, fontSize: 15.5, fontWeight: FontWeight.w600),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: const Text(
+          'لا توجد تقييمات بعد 📭',
+          style: TextStyle(
+            color: Colors.black54,
+            fontSize: 15.5,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
     );
@@ -518,7 +622,10 @@ class _FriendReviewsTab extends StatelessWidget {
             Flexible(
               child: Text(
                 msg,
-                style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
+                style: const TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],
@@ -530,11 +637,20 @@ class _FriendReviewsTab extends StatelessWidget {
   Widget _friendLoadingSkeleton() {
     Widget bone() => Container(
       height: 84,
-      decoration: BoxDecoration(color: _lightGreen.withOpacity(0.6), borderRadius: BorderRadius.circular(16)),
+      decoration: BoxDecoration(
+        color: _lightGreen.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(16),
+      ),
     );
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 280, 16, 24),
-      children: [bone(), const SizedBox(height: 10), bone(), const SizedBox(height: 10), bone()],
+      children: [
+        bone(),
+        const SizedBox(height: 10),
+        bone(),
+        const SizedBox(height: 10),
+        bone(),
+      ],
     );
   }
 }
@@ -559,8 +675,13 @@ class _FriendReview {
   factory _FriendReview.fromDoc(String id, Map<String, dynamic> data) {
     DateTime? created;
     final raw = data['createdAt'];
-    if (raw is Timestamp) created = raw.toDate();
-    else if (raw is String) { try { created = DateTime.tryParse(raw); } catch (_) {} }
+    if (raw is Timestamp) {
+      created = raw.toDate();
+    } else if (raw is String) {
+      try {
+        created = DateTime.tryParse(raw);
+      } catch (_) {}
+    }
 
     final title   = (data['bookTitle'] ?? data['title']) as String?;
     final cover   = (data['bookCover'] ?? data['coverUrl']) as String?;
@@ -569,7 +690,10 @@ class _FriendReview {
     final ratingVal = (() {
       final v = data['rating'];
       if (v is num) return v.toInt();
-      if (v is String) { final p = int.tryParse(v); if (p != null) return p; }
+      if (v is String) {
+        final p = int.tryParse(v);
+        if (p != null) return p;
+      }
       return 0;
     })();
 
@@ -611,15 +735,27 @@ class _FriendReviewTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      decoration: BoxDecoration(color: _lightGreen, borderRadius: BorderRadius.circular(16)),
+      decoration: BoxDecoration(
+        color: _lightGreen,
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: Row(
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: (coverUrl != null && coverUrl!.isNotEmpty)
-                ? Image.network(coverUrl!, width: 56, height: 72, fit: BoxFit.cover)
-                : Container(width: 56, height: 72, color: Colors.white.withOpacity(0.6),
-                child: const Icon(Icons.menu_book, color: _darkGreen)),
+                ? Image.network(
+              coverUrl!,
+              width: 56,
+              height: 72,
+              fit: BoxFit.cover,
+            )
+                : Container(
+              width: 56,
+              height: 72,
+              color: Colors.white.withOpacity(0.6),
+              child: const Icon(Icons.menu_book, color: _darkGreen),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -634,11 +770,21 @@ class _FriendReviewTile extends StatelessWidget {
                         textAlign: TextAlign.right,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: _darkGreen),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: _darkGreen,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Text(date, style: const TextStyle(fontSize: 12, color: _darkGreen)),
+                    Text(
+                      date,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: _darkGreen,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 6),
@@ -648,7 +794,11 @@ class _FriendReviewTile extends StatelessWidget {
                     final filled = i < stars;
                     return Padding(
                       padding: const EdgeInsets.only(left: 2),
-                      child: Icon(filled ? Icons.star : Icons.star_border, size: 18, color: _darkGreen),
+                      child: Icon(
+                        filled ? Icons.star : Icons.star_border,
+                        size: 18,
+                        color: _darkGreen,
+                      ),
                     );
                   }),
                 ),
@@ -659,7 +809,11 @@ class _FriendReviewTile extends StatelessWidget {
                     child: Text(
                       review!,
                       textAlign: TextAlign.right,
-                      style: const TextStyle(fontSize: 13.5, height: 1.35, color: _darkGreen),
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        height: 1.35,
+                        color: _darkGreen,
+                      ),
                     ),
                   ),
                 ],
@@ -673,7 +827,7 @@ class _FriendReviewTile extends StatelessWidget {
 }
 
 /// ===============================
-/// تبويب الأندية — يعرض أندية الصديق فقط، مع زر حالتك أنتِ
+/// Clubs tab: shows friend clubs with your join state
 /// ===============================
 class _ClubsTabWrapper extends StatelessWidget {
   const _ClubsTabWrapper();
@@ -704,71 +858,107 @@ class _ClubsTab extends StatelessWidget {
         final clubs = snap.data?.docs ?? const [];
 
         if (clubs.isEmpty) {
-          return const Center(child: Text('لا توجد أندية', style: TextStyle(color: Colors.black54)));
+          return const Center(
+            child: Text(
+              'لا توجد أندية',
+              style: TextStyle(color: Colors.black54),
+            ),
+          );
         }
 
-        return ListView.separated(
+        // Top padding is outside the scrollable area
+        return Padding(
           padding: const EdgeInsets.fromLTRB(16, 280, 16, 24),
-          itemCount: clubs.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
-          itemBuilder: (context, i) {
-            final clubDoc = clubs[i];
-            final clubId  = clubDoc.id;
-            final data    = clubDoc.data();
-            final title   = (data['title'] ?? 'نادي بدون اسم') as String;
-            final desc    = (data['description'] ?? '') as String?;
-            final cat     = (data['category'] ?? '') as String?;
+          child: ListView.separated(
+            // Inside padding is zero so position stays exactly the same
+            padding: EdgeInsets.zero,
+            physics: const ClampingScrollPhysics(),
+            itemCount: clubs.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (context, i) {
+              final clubDoc = clubs[i];
+              final clubId  = clubDoc.id;
+              final data    = clubDoc.data();
+              final title   = (data['title'] ?? 'نادي بدون اسم') as String;
+              final desc    = (data['description'] ?? '') as String?;
+              final cat     = (data['category'] ?? '') as String?;
 
-            // نعرض النادي فقط إذا كان الصديق عضواً فيه
-            final friendMemberDoc = FirebaseFirestore.instance
-                .collection('clubs').doc(clubId)
-                .collection('members').doc(friendUid)
-                .snapshots();
+              // Only show this club if the friend is a member
+              final friendMemberDoc = FirebaseFirestore.instance
+                  .collection('clubs').doc(clubId)
+                  .collection('members').doc(friendUid)
+                  .snapshots();
 
-            return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-              stream: friendMemberDoc,
-              builder: (context, friendSnap) {
-                final friendIsMember = friendSnap.data?.exists == true;
-                if (!friendIsMember) return const SizedBox.shrink();
+              return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                stream: friendMemberDoc,
+                builder: (context, friendSnap) {
+                  final friendIsMember = friendSnap.data?.exists == true;
+                  if (!friendIsMember) return const SizedBox.shrink();
 
-                return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: _card,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4))],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(title, style: const TextStyle(color: _darkGreen, fontSize: 18, fontWeight: FontWeight.w900)),
-                      if (desc != null && desc.trim().isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Text(desc, style: const TextStyle(color: Colors.black87, height: 1.35)),
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: _card,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: const [
+                        BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4)),
                       ],
-                      if (cat != null && cat.trim().isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Text('الفئة: $cat',
-                            style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w700)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            color: _darkGreen,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        if (desc != null && desc.trim().isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            desc,
+                            style: const TextStyle(
+                              color: Colors.black87,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
+                        if (cat != null && cat.trim().isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            'الفئة: $cat',
+                            style: const TextStyle(
+                              color: Colors.black87,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        Align(
+                          alignment: AlignmentDirectional.centerEnd,
+                          child: _JoinOrOpenButtonFD(
+                            clubId: clubId,
+                            clubTitle: title,
+                          ),
+                        ),
                       ],
-                      const SizedBox(height: 12),
-                      Align(
-                        alignment: AlignmentDirectional.centerEnd, // يسار في RTL
-                        child: _JoinOrOpenButtonFD(clubId: clubId, clubTitle: title),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            );
-          },
+                    ),
+                  );
+                },
+              );
+            },
+          ),
         );
       },
     );
   }
 }
 
-/// زر الانضمام/فتح الشات داخل تبويب صديق
+/// ===============================
+/// Join / open chat button in friend clubs tab
+/// ===============================
 class _JoinOrOpenButtonFD extends StatefulWidget {
   final String clubId;
   final String clubTitle;
@@ -797,7 +987,7 @@ class _JoinOrOpenButtonFDState extends State<_JoinOrOpenButtonFD> {
         final isMember = snap.data?.exists == true;
 
         final String label = isMember ? 'أنت جزء من النادي' : 'انضم';
-        final Color bg      = isMember ? Colors.white : _confirm;
+        final Color bg     = isMember ? Colors.white : _confirm;
         final BorderSide side =
         isMember ? const BorderSide(color: _darkGreen, width: 1.2) : BorderSide.none;
 
@@ -831,7 +1021,7 @@ class _JoinOrOpenButtonFDState extends State<_JoinOrOpenButtonFD> {
             },
             style: TextButton.styleFrom(
               backgroundColor: bg,
-              foregroundColor: _darkGreen, // النص داكن في الحالتين
+              foregroundColor: _darkGreen,
               padding: const EdgeInsets.symmetric(horizontal: 18),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
@@ -840,13 +1030,17 @@ class _JoinOrOpenButtonFDState extends State<_JoinOrOpenButtonFD> {
             ),
             child: _busy
                 ? const SizedBox(
-              width: 18, height: 18,
+              width: 18,
+              height: 18,
               child: CircularProgressIndicator(
                 strokeWidth: 2,
                 valueColor: AlwaysStoppedAnimation(_darkGreen),
               ),
             )
-                : Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
+                : Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
           ),
         );
       },
@@ -866,12 +1060,21 @@ class _FriendBadge extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(color: _confirm.withOpacity(0.18), borderRadius: BorderRadius.circular(12)),
+        decoration: BoxDecoration(
+          color: _confirm.withOpacity(0.18),
+          borderRadius: BorderRadius.circular(12),
+        ),
         child: Row(
           children: const [
             Icon(Icons.verified, size: 18, color: _confirm),
             SizedBox(width: 6),
-            Text('صديق', style: TextStyle(fontWeight: FontWeight.w700, color: _confirm)),
+            Text(
+              'صديق',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: _confirm,
+              ),
+            ),
           ],
         ),
       ),
