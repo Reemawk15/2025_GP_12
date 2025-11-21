@@ -1,23 +1,39 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum RequestStatus { pending, accepted, rejected }
+/// =======================================
+/// Request Status Enum
+/// =======================================
+enum RequestStatus { pending, accepted, rejected, canceled }
 
 RequestStatus _statusFromString(String s) {
   switch (s) {
-    case 'accepted': return RequestStatus.accepted;
-    case 'rejected': return RequestStatus.rejected;
-    default:         return RequestStatus.pending;
+    case 'accepted':
+      return RequestStatus.accepted;
+    case 'rejected':
+      return RequestStatus.rejected;
+    case 'canceled':
+      return RequestStatus.canceled;
+    default:
+      return RequestStatus.pending;
   }
 }
 
 String _statusToString(RequestStatus s) {
   switch (s) {
-    case RequestStatus.accepted: return 'accepted';
-    case RequestStatus.rejected: return 'rejected';
-    case RequestStatus.pending:  return 'pending';
+    case RequestStatus.accepted:
+      return 'accepted';
+    case RequestStatus.rejected:
+      return 'rejected';
+    case RequestStatus.canceled:
+      return 'canceled';
+    case RequestStatus.pending:
+      return 'pending';
   }
 }
 
+/// =======================================
+/// Club Request Model
+/// =======================================
 class ClubRequest {
   final String id;
   final String title;
@@ -64,12 +80,16 @@ class ClubRequest {
   };
 }
 
+/// =======================================
+/// Public Club Model
+/// =======================================
 class PublicClub {
   final String id;
   final String title;
   final String? description;
   final String? category;
   final String ownerUid;
+
   PublicClub({
     required this.id,
     required this.title,
@@ -90,6 +110,9 @@ class PublicClub {
   }
 }
 
+/// =======================================
+/// Firestore Clubs Service
+/// =======================================
 class FirestoreClubsService {
   FirestoreClubsService._();
 
@@ -98,7 +121,7 @@ class FirestoreClubsService {
   final _requests = FirebaseFirestore.instance.collection('clubRequests');
   final _clubs = FirebaseFirestore.instance.collection('clubs');
 
-  // ======== Requests ========
+  // ======== Create New Request ========
   Future<void> submitRequest({
     required String uid,
     required String title,
@@ -118,32 +141,30 @@ class FirestoreClubsService {
     });
   }
 
-  Stream<List<ClubRequest>> streamPending() =>
-      _requests
-          .where('status', isEqualTo: 'pending')
-          .snapshots()
-          .map((s) => s.docs.map((d) => ClubRequest.fromDoc(d)).toList());
+  // ======== Streams ========
+  Stream<List<ClubRequest>> streamPending() => _requests
+      .where('status', isEqualTo: 'pending')
+      .snapshots()
+      .map((s) => s.docs.map((d) => ClubRequest.fromDoc(d)).toList());
 
-  Stream<List<ClubRequest>> streamHistory() =>
-      _requests
-          .where('status', whereIn: ['accepted', 'rejected'])
-          .snapshots()
-          .map((s) => s.docs.map((d) => ClubRequest.fromDoc(d)).toList());
+  Stream<List<ClubRequest>> streamHistory() => _requests
+      .where('status', whereIn: ['accepted', 'rejected', 'canceled'])
+      .snapshots()
+      .map((s) => s.docs.map((d) => ClubRequest.fromDoc(d)).toList());
 
-  Stream<List<ClubRequest>> streamMyRequests(String uid) =>
-      _requests
-          .where('createdBy', isEqualTo: uid)
-          .snapshots()
-          .map((s) => s.docs.map((d) => ClubRequest.fromDoc(d)).toList());
+  Stream<List<ClubRequest>> streamMyRequests(String uid) => _requests
+      .where('createdBy', isEqualTo: uid)
+      .snapshots()
+      .map((s) => s.docs.map((d) => ClubRequest.fromDoc(d)).toList());
 
-  /// Admin decision + create club when approved
+  // ======== Admin Decision ========
   Future<void> decide({
     required ClubRequest request,
     required bool accept,
   }) async {
     final batch = FirebaseFirestore.instance.batch();
-
     final reqRef = _requests.doc(request.id);
+
     batch.update(reqRef, {'status': accept ? 'accepted' : 'rejected'});
 
     if (accept) {
@@ -157,21 +178,20 @@ class FirestoreClubsService {
         'createdAt': FieldValue.serverTimestamp(),
         'membersCount': 1,
       });
-      // Add the requester as the initial member
+
       batch.set(clubRef.collection('members').doc(request.createdBy), {
         'joinedAt': FieldValue.serverTimestamp(),
       });
     }
+
     await batch.commit();
   }
 
-  // ======== Clubs (Public) ========
-  Stream<List<PublicClub>> streamPublicClubs() =>
-      _clubs
-
-          .orderBy('createdAt', descending: true)
-          .snapshots()
-          .map((s) => s.docs.map((d) => PublicClub.fromDoc(d)).toList());
+  // ======== Public Clubs ========
+  Stream<List<PublicClub>> streamPublicClubs() => _clubs
+      .orderBy('createdAt', descending: true)
+      .snapshots()
+      .map((s) => s.docs.map((d) => PublicClub.fromDoc(d)).toList());
 
   Future<void> joinClub({
     required String clubId,
@@ -180,8 +200,7 @@ class FirestoreClubsService {
     final clubRef = _clubs.doc(clubId);
     final memberRef = clubRef.collection('members').doc(uid);
 
-    final snap = await memberRef.get();
-    if (!snap.exists) {
+    if (!(await memberRef.get()).exists) {
       await FirebaseFirestore.instance.runTransaction((tx) async {
         tx.set(memberRef, {'joinedAt': FieldValue.serverTimestamp()});
         tx.update(clubRef, {'membersCount': FieldValue.increment(1)});
@@ -194,7 +213,7 @@ class FirestoreClubsService {
     return _clubs
         .doc(clubId)
         .collection('messages')
-        .orderBy('createdAt', descending: false) // Just ordering
+        .orderBy('createdAt')
         .snapshots();
   }
 
@@ -205,15 +224,43 @@ class FirestoreClubsService {
     required String displayName,
     String? photoUrl,
   }) async {
-    await _clubs
-        .doc(clubId)
-        .collection('messages')
-        .add({
+    await _clubs.doc(clubId).collection('messages').add({
       'uid': uid,
       'text': text,
       'displayName': displayName,
       'photoUrl': photoUrl,
       'createdAt': FieldValue.serverTimestamp(),
     });
+  }
+
+  // ======== Cancel Club ========
+  Future<void> cancelClubForRequest(ClubRequest request) async {
+    // Find the club from this request
+    final query = await _clubs
+        .where('requestId', isEqualTo: request.id)
+        .limit(1)
+        .get();
+
+    if (query.docs.isEmpty) return;
+
+    final clubRef = query.docs.first.reference;
+
+    // Delete members
+    final members = await clubRef.collection('members').get();
+    for (final m in members.docs) {
+      await m.reference.delete();
+    }
+
+    // Delete messages
+    final msgs = await clubRef.collection('messages').get();
+    for (final m in msgs.docs) {
+      await m.reference.delete();
+    }
+
+    // Delete club doc
+    await clubRef.delete();
+
+    // Update request status → canceled
+    await _requests.doc(request.id).update({'status': 'canceled'});
   }
 }

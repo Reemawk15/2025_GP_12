@@ -17,11 +17,13 @@ class FriendsPage extends StatelessWidget {
 
   static const Color _darkGreen  = Color(0xFF0E3A2C);
   static const Color _midGreen   = Color(0xFF2F5145);
-  static Color _confirm = Color(0xFF6F8E63);
+  static Color _confirm          = const Color(0xFF6F8E63);
 
-  /// Unified SnackBar helper for this page
+  /// Unified SnackBar helper (same style as FriendDetailsPage)
   static void _showAppSnack(BuildContext context, String message, {IconData icon = Icons.check_circle}) {
-    ScaffoldMessenger.of(context).showSnackBar(
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
       SnackBar(
         backgroundColor: _confirm,
         behavior: SnackBarBehavior.floating,
@@ -34,7 +36,11 @@ class FriendsPage extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               message,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
             ),
           ],
         ),
@@ -62,7 +68,11 @@ class FriendsPage extends StatelessWidget {
               child: IconButton(
                 tooltip: 'رجوع',
                 onPressed: () => Navigator.of(context).maybePop(),
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _midGreen, size: 20),
+                icon: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: _midGreen,
+                  size: 20,
+                ),
               ),
             ),
             bottom: const PreferredSize(
@@ -94,8 +104,11 @@ class _TabbarContainer extends StatelessWidget {
       child: Container(
         height: 40,
         decoration: BoxDecoration(
-          color: Colors.white, borderRadius: BorderRadius.circular(18),
-          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 3))],
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: const [
+            BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 3)),
+          ],
         ),
         child: const _FriendsTabBar(),
       ),
@@ -141,7 +154,9 @@ class _FriendsListTab extends StatelessWidget {
     }
 
     final friendsRef = FirebaseFirestore.instance
-        .collection('users').doc(uid).collection('friends')
+        .collection('users')
+        .doc(uid)
+        .collection('friends')
         .orderBy('since', descending: true);
 
     return Stack(
@@ -154,7 +169,12 @@ class _FriendsListTab extends StatelessWidget {
               return const Center(child: CircularProgressIndicator());
             }
             if (!snap.hasData || snap.data!.docs.isEmpty) {
-              return const Center(child: Text('لا يوجد لديك أصدقاء بعد 📭', style: TextStyle(color: Colors.black54)));
+              return const Center(
+                child: Text(
+                  'لا يوجد لديك أصدقاء بعد',
+                  style: TextStyle(color: Colors.black54),
+                ),
+              );
             }
 
             final friendUids = snap.data!.docs.map((d) => d.id).toList();
@@ -168,7 +188,9 @@ class _FriendsListTab extends StatelessWidget {
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => FriendDetailsPage(friendUid: friendUid)),
+                      MaterialPageRoute(
+                        builder: (_) => FriendDetailsPage(friendUid: friendUid),
+                      ),
                     );
                   },
                 );
@@ -191,13 +213,28 @@ class _RequestsTab extends StatelessWidget {
   static const Color _confirm = Color(0xFF6F8E63);
   static const Color _danger  = Color(0xFFB64B4B);
 
+  /// Accept incoming friend request
   Future<void> _accept(BuildContext context, String fromUid) async {
     final myUid = FirebaseAuth.instance.currentUser!.uid;
     final batch = FirebaseFirestore.instance.batch();
 
-    final myFriends = FirebaseFirestore.instance.collection('users').doc(myUid).collection('friends').doc(fromUid);
-    final hisFriends = FirebaseFirestore.instance.collection('users').doc(fromUid).collection('friends').doc(myUid);
-    final myReq = FirebaseFirestore.instance.collection('users').doc(myUid).collection('friendRequests').doc(fromUid);
+    final myFriends = FirebaseFirestore.instance
+        .collection('users')
+        .doc(myUid)
+        .collection('friends')
+        .doc(fromUid);
+
+    final hisFriends = FirebaseFirestore.instance
+        .collection('users')
+        .doc(fromUid)
+        .collection('friends')
+        .doc(myUid);
+
+    final myReq = FirebaseFirestore.instance
+        .collection('users')
+        .doc(myUid)
+        .collection('friendRequests')
+        .doc(fromUid);
 
     batch.set(myFriends, {'since': FieldValue.serverTimestamp()});
     batch.set(hisFriends, {'since': FieldValue.serverTimestamp()});
@@ -211,9 +248,15 @@ class _RequestsTab extends StatelessWidget {
     }
   }
 
+  /// Decline incoming friend request
   Future<void> _decline(BuildContext context, String fromUid) async {
     final myUid = FirebaseAuth.instance.currentUser!.uid;
-    final reqRef = FirebaseFirestore.instance.collection('users').doc(myUid).collection('friendRequests').doc(fromUid);
+    final reqRef = FirebaseFirestore.instance
+        .collection('users')
+        .doc(myUid)
+        .collection('friendRequests')
+        .doc(fromUid);
+
     try {
       await reqRef.delete();
       FriendsPage._showAppSnack(context, 'تم رفض الطلب');
@@ -230,7 +273,9 @@ class _RequestsTab extends StatelessWidget {
     }
 
     final requestsRef = FirebaseFirestore.instance
-        .collection('users').doc(uid).collection('friendRequests')
+        .collection('users')
+        .doc(uid)
+        .collection('friendRequests')
         .orderBy('createdAt', descending: true);
 
     return Stack(
@@ -243,7 +288,12 @@ class _RequestsTab extends StatelessWidget {
               return const Center(child: CircularProgressIndicator());
             }
             if (!snap.hasData || snap.data!.docs.isEmpty) {
-              return const Center(child: Text('لا توجد طلبات', style: TextStyle(color: Colors.black54)));
+              return const Center(
+                child: Text(
+                  'لا توجد طلبات',
+                  style: TextStyle(color: Colors.black54),
+                ),
+              );
             }
 
             final fromUids = snap.data!.docs.map((d) => d.id).toList();
@@ -257,15 +307,25 @@ class _RequestsTab extends StatelessWidget {
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _TinyActionButton(label: 'قبول', color: _confirm, onTap: () => _accept(context, fromUid)),
+                      _TinyActionButton(
+                        label: 'قبول',
+                        color: _confirm,
+                        onTap: () => _accept(context, fromUid),
+                      ),
                       const SizedBox(width: 8),
-                      _TinyActionButton(label: 'رفض', color: _danger, onTap: () => _decline(context, fromUid)),
+                      _TinyActionButton(
+                        label: 'رفض',
+                        color: _danger,
+                        onTap: () => _decline(context, fromUid),
+                      ),
                     ],
                   ),
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => FriendDetailsPage(friendUid: fromUid)),
+                      MaterialPageRoute(
+                        builder: (_) => FriendDetailsPage(friendUid: fromUid),
+                      ),
                     );
                   },
                 );
@@ -290,7 +350,7 @@ class _SearchTab extends StatefulWidget {
 }
 
 class _SearchTabState extends State<_SearchTab> {
-  final _controller = TextEditingController();
+  final TextEditingController _controller = TextEditingController();
   bool _loading = false;
   List<_FriendUser> _results = const [];
 
@@ -299,12 +359,16 @@ class _SearchTabState extends State<_SearchTab> {
 
   // Normalize Arabic text for better matching
   String normalize(String s) => s
-      .trim().toLowerCase()
+      .trim()
+      .toLowerCase()
       .replaceAll('ـ', '')
-      .replaceAll('أ', 'ا').replaceAll('إ', 'ا').replaceAll('آ', 'ا')
-      .replaceAll('ة', 'ه').replaceAll('ى', 'ي');
+      .replaceAll('أ', 'ا')
+      .replaceAll('إ', 'ا')
+      .replaceAll('آ', 'ا')
+      .replaceAll('ة', 'ه')
+      .replaceAll('ى', 'ي');
 
-  // Actual search logic with friend and pending detection
+  /// Search logic with friend and pending detection
   Future<void> _onSearch(String raw) async {
     final me = FirebaseAuth.instance.currentUser;
     if (me == null) return;
@@ -313,30 +377,33 @@ class _SearchTabState extends State<_SearchTab> {
     if (q.isEmpty) {
       setState(() {
         _results = const [];
-        _hasSearched = false; // no query submitted
+        _hasSearched = false;
       });
       return;
     }
 
     setState(() {
       _loading = true;
-      _hasSearched = true; // mark that a search attempt happened
+      _hasSearched = true;
     });
 
     try {
       final fs = FirebaseFirestore.instance;
 
       // Current friends
-      final myFriendsSnap = await fs.collection('users').doc(me.uid).collection('friends').get();
+      final myFriendsSnap =
+      await fs.collection('users').doc(me.uid).collection('friends').get();
       final myFriends = myFriendsSnap.docs.map((d) => d.id).toSet();
 
       // Incoming requests to me
-      final myIncomingReqsSnap = await fs.collection('users').doc(me.uid).collection('friendRequests').get();
+      final myIncomingReqsSnap =
+      await fs.collection('users').doc(me.uid).collection('friendRequests').get();
       final incomingFrom = myIncomingReqsSnap.docs.map((d) => d.id).toSet();
 
-      // Prefix queries
+      // Prefix queries for username and name
       Future<QuerySnapshot<Map<String, dynamic>>> qBy(String field) {
-        return fs.collection('users')
+        return fs
+            .collection('users')
             .orderBy(field)
             .startAt([q]).endAt(['$q\uf8ff'])
             .limit(25)
@@ -355,15 +422,17 @@ class _SearchTabState extends State<_SearchTab> {
       void addDoc(QueryDocumentSnapshot<Map<String, dynamic>> d) {
         final uid = d.id;
         if (uid == me.uid) return;
-        // Still hide users who already sent me a request (shown in Requests tab)
+        // Hide users who already sent me a request (they appear in Requests tab)
         if (incomingFrom.contains(uid)) return;
 
-        final data = d.data();
+        final data     = d.data();
         final name     = (data['name'] ?? '') as String;
         final username = (data['username'] ?? '') as String;
         final photoUrl = (data['photoUrl'] as String?) ?? '';
 
-        final handle = username.isEmpty ? '' : (username.startsWith('@') ? username : '@$username');
+        final handle = username.isEmpty
+            ? ''
+            : (username.startsWith('@') ? username : '@$username');
 
         map[uid] = _FriendUser(
           uid: uid,
@@ -374,7 +443,9 @@ class _SearchTabState extends State<_SearchTab> {
       }
 
       for (final s in snaps) {
-        for (final d in s.docs) addDoc(d);
+        for (final d in s.docs) {
+          addDoc(d);
+        }
       }
 
       // Fallback: client-side filter if nothing matched
@@ -385,7 +456,7 @@ class _SearchTabState extends State<_SearchTab> {
           if (uid == me.uid) continue;
           if (incomingFrom.contains(uid)) continue;
 
-          final data = d.data();
+          final data     = d.data();
           final name     = (data['name'] ?? '') as String;
           final username = (data['username'] ?? '') as String;
 
@@ -394,7 +465,9 @@ class _SearchTabState extends State<_SearchTab> {
 
           if (nameN.contains(q) || userN.contains(q)) {
             final photoUrl = (data['photoUrl'] as String?) ?? '';
-            final handle = username.isEmpty ? '' : (username.startsWith('@') ? username : '@$username');
+            final handle = username.isEmpty
+                ? ''
+                : (username.startsWith('@') ? username : '@$username');
 
             map[uid] = _FriendUser(
               uid: uid,
@@ -407,13 +480,19 @@ class _SearchTabState extends State<_SearchTab> {
       }
 
       // Mark which of the results are already friends
-      map.updateAll((uid, user) => user.copyWith(isFriend: myFriends.contains(uid)));
+      map.updateAll(
+            (uid, user) => user.copyWith(isFriend: myFriends.contains(uid)),
+      );
 
       // Mark "pending" (outgoing request) for results if exists
       final uids = map.keys.toList();
       if (uids.isNotEmpty) {
         final futures = uids.map((otherUid) {
-          final doc = fs.collection('users').doc(otherUid).collection('friendRequests').doc(me.uid);
+          final doc = fs
+              .collection('users')
+              .doc(otherUid)
+              .collection('friendRequests')
+              .doc(me.uid);
           return doc.get().then((snap) => MapEntry(otherUid, snap.exists));
         }).toList();
 
@@ -429,28 +508,165 @@ class _SearchTabState extends State<_SearchTab> {
       setState(() => _results = map.values.toList());
     } catch (e) {
       if (!mounted) return;
-      FriendsPage._showAppSnack(context, 'فشل البحث: $e', icon: Icons.error_outline);
+      FriendsPage._showAppSnack(
+        context,
+        'فشل البحث: $e',
+        icon: Icons.error_outline,
+      );
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
-  // Send friend request (keep result item but toggle to pending)
+  /// Send friend request (toggle to pending in local list)
   Future<void> _sendRequest(String toUid) async {
     final me = FirebaseAuth.instance.currentUser!;
     final reqRef = FirebaseFirestore.instance
-        .collection('users').doc(toUid).collection('friendRequests').doc(me.uid);
+        .collection('users')
+        .doc(toUid)
+        .collection('friendRequests')
+        .doc(me.uid);
 
     try {
-      await reqRef.set({'fromUid': me.uid, 'createdAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
+      await reqRef.set(
+        {
+          'fromUid': me.uid,
+          'createdAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
 
       setState(() {
-        _results = _results.map((x) => x.uid == toUid ? x.copyWith(pending: true) : x).toList();
+        _results = _results
+            .map((x) => x.uid == toUid ? x.copyWith(pending: true) : x)
+            .toList();
       });
 
       FriendsPage._showAppSnack(context, 'تم إرسال الطلب ');
     } catch (e) {
-      FriendsPage._showAppSnack(context, 'تعذّر الإرسال: $e', icon: Icons.error_outline);
+      FriendsPage._showAppSnack(
+        context,
+        'تعذّر الإرسال: $e',
+        icon: Icons.error_outline,
+      );
+    }
+  }
+
+  /// Cancel outgoing friend request and revert back to "Add"
+  Future<void> _cancelRequest(String toUid) async {
+    final me = FirebaseAuth.instance.currentUser!;
+    final fs = FirebaseFirestore.instance;
+
+    final reqRef = fs
+        .collection('users')
+        .doc(toUid)
+        .collection('friendRequests')
+        .doc(me.uid);
+
+    try {
+      await reqRef.delete();
+
+      // Update local list: mark this user as not pending anymore
+      setState(() {
+        _results = _results
+            .map((x) => x.uid == toUid ? x.copyWith(pending: false) : x)
+            .toList();
+      });
+
+      FriendsPage._showAppSnack(context, 'تم إلغاء طلب الإضافة');
+    } catch (e) {
+      FriendsPage._showAppSnack(
+        context,
+        'تعذّر الإلغاء: $e',
+        icon: Icons.error_outline,
+      );
+    }
+  }
+
+  /// Confirmation dialog (same visual style as unfriend dialog in FriendDetailsPage)
+  Future<void> _confirmCancel(String toUid) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+          child: Directionality(
+            textDirection: TextDirection.rtl,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'تأكيد إلغاء طلب الإضافة',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: FriendsPage._darkGreen,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'هل أنت متأكد أنك تريد إلغاء طلب الإضافة؟',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: FriendsPage._confirm,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: const Text(
+                      'تأكيد',
+                      style: TextStyle(fontSize: 16, color: Colors.white),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFF2F2F2),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: Text(
+                      'إلغاء',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: FriendsPage._darkGreen,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    if (ok == true) {
+      await _cancelRequest(toUid);
     }
   }
 
@@ -466,8 +682,11 @@ class _SearchTabState extends State<_SearchTab> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.white, borderRadius: BorderRadius.circular(22),
-                  boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 6))],
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(22),
+                  boxShadow: const [
+                    BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 6)),
+                  ],
                 ),
                 child: Row(
                   children: [
@@ -477,7 +696,8 @@ class _SearchTabState extends State<_SearchTab> {
                       child: TextField(
                         controller: _controller,
                         decoration: const InputDecoration(
-                          hintText: 'ابحث بالاسم ', border: InputBorder.none,
+                          hintText: 'ابحث بالاسم ',
+                          border: InputBorder.none,
                         ),
                         onSubmitted: _onSearch,
                         textInputAction: TextInputAction.search,
@@ -501,16 +721,17 @@ class _SearchTabState extends State<_SearchTab> {
             ),
             const SizedBox(height: 8),
             if (_loading)
-              const Expanded(child: Center(child: CircularProgressIndicator()))
+              const Expanded(
+                child: Center(child: CircularProgressIndicator()),
+              )
             else
               Expanded(
                 child: _results.isEmpty
-                // Show a contextual message:
-                // - If the user has searched and found nothing: show classical Arabic message.
-                // - Otherwise: show the initial prompt.
                     ? Center(
                   child: Text(
-                    _hasSearched ? 'لا يوجد أحد بهذا الاسم.' : 'ابدأ البحث عن أصدقائك ✨',
+                    _hasSearched
+                        ? 'لا يوجد أحد بهذا الاسم.'
+                        : 'ابدأ البحث عن أصدقائك ',
                     style: const TextStyle(color: Colors.black54),
                   ),
                 )
@@ -521,16 +742,23 @@ class _SearchTabState extends State<_SearchTab> {
                     return _FriendCard(
                       name: f.name.isEmpty ? 'بدون اسم' : f.name,
                       handle: f.handle,
-                      avatar: (f.photoUrl == null) ? null : NetworkImage(f.photoUrl!),
+                      avatar: (f.photoUrl == null)
+                          ? null
+                          : NetworkImage(f.photoUrl!),
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => FriendDetailsPage(friendUid: f.uid)),
+                          MaterialPageRoute(
+                            builder: (_) => FriendDetailsPage(friendUid: f.uid),
+                          ),
                         );
                       },
                       trailing: f.isFriend
                           ? Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFF6F8E63).withOpacity(0.12),
                           borderRadius: BorderRadius.circular(10),
@@ -544,17 +772,25 @@ class _SearchTabState extends State<_SearchTab> {
                         ),
                       )
                           : f.pending
-                          ? Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF6F8E63).withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Text(
-                          'بانتظار القبول ⏳',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF6F8E63),
+                          ? InkWell(
+                        onTap: () => _confirmCancel(f.uid),
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF6F8E63)
+                                .withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Text(
+                            'بانتظار القبول ⏳',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF6F8E63),
+                            ),
                           ),
                         ),
                       )
@@ -576,7 +812,7 @@ class _SearchTabState extends State<_SearchTab> {
   }
 }
 
-// ========= Result user model (with pending + friend flag) =========
+// ========= Search result user model =========
 class _FriendUser {
   final String uid;
   final String name;
@@ -612,21 +848,33 @@ class _FriendCard extends StatelessWidget {
   final Widget? trailing;
   final VoidCallback? onTap;
 
-  const _FriendCard({required this.name, required this.handle, this.avatar, this.trailing, this.onTap});
+  const _FriendCard({
+    required this.name,
+    required this.handle,
+    this.avatar,
+    this.trailing,
+    this.onTap,
+  });
 
   static const Color _lightGreen = Color(0xFFC9DABF);
   static const Color _darkGreen  = Color(0xFF0E3A2C);
 
   @override
   Widget build(BuildContext context) {
-    final userTail = handle.startsWith('@') ? '${handle.substring(1)}@' : handle.isNotEmpty ? '$handle@' : '';
+    final userTail = handle.startsWith('@')
+        ? '${handle.substring(1)}@'
+        : handle.isNotEmpty
+        ? '$handle@'
+        : '';
 
     return Container(
       height: 66,
       decoration: BoxDecoration(
         color: _lightGreen.withOpacity(0.88),
         borderRadius: BorderRadius.circular(18),
-        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4))],
+        boxShadow: const [
+          BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4)),
+        ],
       ),
       child: ListTile(
         onTap: onTap,
@@ -634,14 +882,27 @@ class _FriendCard extends StatelessWidget {
           radius: 20,
           backgroundColor: Colors.white,
           backgroundImage: avatar,
-          child: avatar == null ? const Icon(Icons.person, color: Colors.black38) : null,
+          child: avatar == null
+              ? const Icon(Icons.person, color: Colors.black38)
+              : null,
         ),
         title: Text(
           name,
-          style: const TextStyle(color: _darkGreen, fontWeight: FontWeight.w700, fontSize: 14.5),
+          style: const TextStyle(
+            color: _darkGreen,
+            fontWeight: FontWeight.w700,
+            fontSize: 14.5,
+          ),
           overflow: TextOverflow.ellipsis,
         ),
-        subtitle: Text(userTail, style: const TextStyle(color: Colors.black54, fontSize: 12.5), overflow: TextOverflow.ellipsis),
+        subtitle: Text(
+          userTail,
+          style: const TextStyle(
+            color: Colors.black54,
+            fontSize: 12.5,
+          ),
+          overflow: TextOverflow.ellipsis,
+        ),
         trailing: trailing,
         dense: true,
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
@@ -655,20 +916,28 @@ class _FriendTileFromUid extends StatelessWidget {
   final String friendUid;
   final Widget? trailing;
   final VoidCallback? onTap;
+
   const _FriendTileFromUid({required this.friendUid, this.trailing, this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final userDoc = FirebaseFirestore.instance.collection('users').doc(friendUid);
+    final userDoc =
+    FirebaseFirestore.instance.collection('users').doc(friendUid);
+
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: userDoc.snapshots(),
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
           return Container(
-            height: 66, alignment: Alignment.centerLeft,
+            height: 66,
+            alignment: Alignment.centerLeft,
             child: const Padding(
               padding: EdgeInsetsDirectional.only(start: 16),
-              child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
             ),
           );
         }
@@ -676,17 +945,19 @@ class _FriendTileFromUid extends StatelessWidget {
           return const SizedBox.shrink();
         }
 
-        final data = snap.data!.data()!;
-        final name      = (data['name'] ?? '') as String;
-        final rawUser   = (data['username'] ?? data['handle'] ?? '') as String;
-        final photoUrl  = (data['photoUrl'] ?? '') as String?;
+        final data     = snap.data!.data()!;
+        final name     = (data['name'] ?? '') as String;
+        final rawUser  = (data['username'] ?? data['handle'] ?? '') as String;
+        final photoUrl = (data['photoUrl'] ?? '') as String?;
 
         final handle = rawUser;
 
         return _FriendCard(
           name: name.isEmpty ? 'بدون اسم' : name,
           handle: handle,
-          avatar: (photoUrl == null || photoUrl.isEmpty) ? null : NetworkImage(photoUrl),
+          avatar: (photoUrl == null || photoUrl.isEmpty)
+              ? null
+              : NetworkImage(photoUrl),
           trailing: trailing,
           onTap: onTap,
         );
@@ -701,7 +972,11 @@ class _TinyActionButton extends StatelessWidget {
   final Color color;
   final VoidCallback onTap;
 
-  const _TinyActionButton({required this.label, required this.color, required this.onTap});
+  const _TinyActionButton({
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -710,13 +985,18 @@ class _TinyActionButton extends StatelessWidget {
       child: TextButton(
         onPressed: onTap,
         style: TextButton.styleFrom(
-          backgroundColor: color, foregroundColor: Colors.white,
+          backgroundColor: color,
+          foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
-        child: Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+        child: Text(
+          label,
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
       ),
     );
   }
 }
-

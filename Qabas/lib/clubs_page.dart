@@ -26,6 +26,7 @@ const Color _lightGreen = Color(0xFFC9DABF);
 const Color _confirm = Color(0xFF6F8E63);
 const Color _danger = Color(0xFFB64B4B);
 const Color _pending = Color(0xFFB38A1B);
+const Color _canceled = Color(0xFF707070); // للحالة الملغاة
 
 class ClubsPage extends StatelessWidget {
   const ClubsPage({super.key});
@@ -369,7 +370,6 @@ class _JoinOrOpenButtonState extends State<_JoinOrOpenButton> {
                   child: FilledButton(
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFFF2F2F2),
-
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -572,11 +572,15 @@ class _CreateRequestTabState extends State<_CreateRequestTab> {
   bool _isValid = false;
 
   final _categories = const [
-    'الثقافة الإسلامية',
-    'الآداب',
-    'العلوم',
+    'الأدب والشعر',
+    'التاريخ والجغرافيا',
+    'التقنية والكمبيوتر',
+    'القصة والرواية',
+    'الكتب الإسلامية والدينية',
+    'كتب الأطفال',
+    'معلومات عامة',
     'تطوير الذات',
-    'علاقات إنسانية',
+    'أخرى',
   ];
 
   @override
@@ -718,8 +722,8 @@ class _CreateRequestTabState extends State<_CreateRequestTab> {
                           return;
                         }
 
-                        final uid = FirebaseAuth
-                            .instance.currentUser!.uid;
+                        final uid =
+                            FirebaseAuth.instance.currentUser!.uid;
                         await FirestoreClubsService.instance
                             .submitRequest(
                           uid: uid,
@@ -850,6 +854,8 @@ class _MyRequestsTab extends StatelessWidget {
         return _danger;
       case RequestStatus.pending:
         return _pending;
+      case RequestStatus.canceled:
+        return _canceled;
     }
   }
 
@@ -861,6 +867,146 @@ class _MyRequestsTab extends StatelessWidget {
         return 'مرفوض';
       case RequestStatus.pending:
         return 'معلق';
+      case RequestStatus.canceled:
+        return 'ملغى';
+    }
+  }
+
+  void _showSnack(BuildContext context, String message,
+      {IconData icon = Icons.check_circle}) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        backgroundColor: _confirm,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
+        content: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: const Color(0xFFE7C4DA)),
+            const SizedBox(width: 8),
+            Text(
+              message,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Future<bool> _confirmCancelDialog(
+      BuildContext context, ClubRequest r) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+          child: Directionality(
+            textDirection: TextDirection.rtl,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'إلغاء طلب إنشاء نادي',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: _darkGreen,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'هل أنت متأكد من إلغاء طلب إنشاء نادي "${r.title}"؟',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _confirm,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding:
+                      const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: const Text(
+                      'تأكيد',
+                      style:
+                      TextStyle(fontSize: 16, color: Colors.white),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFF2F2F2),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding:
+                      const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text(
+                      'إلغاء',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: _darkGreen,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    return ok == true;
+  }
+
+  Future<void> _cancelRequest(
+      BuildContext context, ClubRequest r) async {
+    final sure = await _confirmCancelDialog(context, r);
+    if (!sure) return;
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('clubRequests')
+          .doc(r.id)
+          .delete();
+
+      _showSnack(context, 'تم إلغاء طلب إنشاء النادي');
+    } catch (e) {
+      _showSnack(
+        context,
+        'حدث خطأ أثناء إلغاء الطلب',
+        icon: Icons.error_outline,
+      );
     }
   }
 
@@ -874,7 +1020,8 @@ class _MyRequestsTab extends StatelessWidget {
           child: Image.asset(background, fit: BoxFit.cover),
         ),
         StreamBuilder<List<ClubRequest>>(
-          stream: FirestoreClubsService.instance.streamMyRequests(uid),
+          stream:
+          FirestoreClubsService.instance.streamMyRequests(uid),
           builder: (context, snap) {
             if (snap.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
@@ -908,7 +1055,8 @@ class _MyRequestsTab extends StatelessWidget {
                         ),
                       ],
                     ),
-                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+                    padding:
+                    const EdgeInsets.fromLTRB(16, 14, 16, 12),
                     child: Row(
                       children: [
                         Expanded(
@@ -921,6 +1069,15 @@ class _MyRequestsTab extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 12),
+
+                        if (r.status == RequestStatus.pending) ...[
+                          _CancelRequestButton(
+                            onTap: () =>
+                                _cancelRequest(context, r),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+
                         _StatusPill(
                           label: _statusLabel(r.status),
                           color: _statusColor(r.status),
@@ -929,7 +1086,8 @@ class _MyRequestsTab extends StatelessWidget {
                     ),
                   );
                 },
-                separatorBuilder: (_, __) => const SizedBox(height: 14),
+                separatorBuilder: (_, __) =>
+                const SizedBox(height: 14),
                 itemCount: list.length,
               ),
             );
@@ -970,6 +1128,42 @@ class _StatusPill extends StatelessWidget {
         style: const TextStyle(
           color: Colors.white,
           fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
+class _CancelRequestButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _CancelRequestButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        height: 34,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: _confirm,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black12,
+              blurRadius: 6,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: const Text(
+          'إلغاء',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+          ),
         ),
       ),
     );
