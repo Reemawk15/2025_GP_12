@@ -5,7 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'home_screen.dart';
 import 'sign_up_page.dart';
-import 'admin_home_screen.dart'; //
+import 'admin_home_screen.dart';
 
 /// ======== Quick control for positioning/colors ========
 const double kSigninProgressTop      = 190;   // Progress bar position from the top
@@ -114,17 +114,7 @@ class _SignInPageState extends State<SignInPage> {
 
     final idInput = _identifier.text.trim();
     final passInput = _pass.text;
-    // Admin fixed credentials: username "Admin" and password "Admin1234_"
-    if (idInput.toLowerCase() == 'admin' && passInput == 'Admin1234_') {
-      if (!mounted) return;
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const AdminHomeScreen()),
-            (_) => false,
-      );
-      return;
-    }
-    // Otherwise: continue to the Firebase path
+
     setState(() => _loading = true);
     try {
       final email = await _resolveEmail(idInput);
@@ -146,15 +136,19 @@ class _SignInPageState extends State<SignInPage> {
         final isAdmin = (data['isAdmin'] == true);
 
         if (!mounted) return;
+
+        // If this is an admin account, do NOT allow login from the regular sign-in page
+        // Show a generic error without hinting about the admin role
         if (role == 'admin' || isAdmin) {
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (_) => const AdminHomeScreen()),
-                (_) => false,
+          await FirebaseAuth.instance.signOut();
+          _toast(
+            'بيانات الدخول غير صحيحة. تحقق من اسم المستخدم أو البريد الإلكتروني وكلمة المرور.',
+            color: Colors.red,
           );
           return;
         }
       }
+
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
         context,
@@ -284,7 +278,6 @@ class _SignInPageState extends State<SignInPage> {
                                   suffix: IconButton(
                                     tooltip: _obscure ? 'إظهار' : 'إخفاء',
                                     onPressed: () => setState(() => _obscure = !_obscure),
-                                    // When hidden, show the "hidden" icon (eye with slash)
                                     icon: Icon(
                                       _obscure ? Icons.visibility_off : Icons.visibility,
                                       color: _SigninTheme.primary,
@@ -321,35 +314,66 @@ class _SignInPageState extends State<SignInPage> {
                           ),
                           child: _loading
                               ? const SizedBox(
-                            height: 22, width: 22,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            height: 22,
+                            width: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
                           )
                               : const Text('تسجيل الدخول', style: TextStyle(fontWeight: FontWeight.w700)),
                         ),
                       ),
                       const SizedBox(height: 14),
 
-                      // No account yet?
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      // No account yet? + Admin login link
+                      Column(
                         children: [
-                          const Text('لا يوجد لديك حساب؟ ', style: TextStyle(color: _SigninTheme.textDark)),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Text(
+                                'لا يوجد لديك حساب؟ ',
+                                style: TextStyle(color: _SigninTheme.textDark),
+                              ),
+                              InkWell(
+                                onTap: _loading
+                                    ? null
+                                    : () {
+                                  Navigator.pushReplacement(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => const SignUpPage()),
+                                  );
+                                },
+                                child: const Text(
+                                  'سجّل الآن',
+                                  style: TextStyle(
+                                    color: _SigninTheme.textDark,
+                                    fontWeight: FontWeight.w700,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
                           InkWell(
                             onTap: _loading
                                 ? null
                                 : () {
-                              Navigator.pushReplacement(
+                              Navigator.push(
                                 context,
-                                MaterialPageRoute(builder: (_) => const SignUpPage()),
+                                MaterialPageRoute(builder: (_) => const AdminSignInPage()),
                               );
                             },
                             child: const Text(
-                              'سجّل الآن',
+                              'هل أنت مدير النظام؟ تسجيل دخول المشرف',
                               style: TextStyle(
                                 color: _SigninTheme.textDark,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w600,
                                 decoration: TextDecoration.underline,
                               ),
+                              textAlign: TextAlign.center,
                             ),
                           ),
                         ],
@@ -367,7 +391,6 @@ class _SignInPageState extends State<SignInPage> {
 }
 
 /// Simple progress bar + circular arrow button on the right for going back
-/// Simple progress bar + circular arrow button on the right for going back
 class _TopBarArrow extends StatelessWidget {
   final VoidCallback onTap;
   const _TopBarArrow({required this.onTap});
@@ -379,7 +402,7 @@ class _TopBarArrow extends StatelessWidget {
       // [extended track] then [space] then [circle with arrow] on the right
       textDirection: TextDirection.ltr,
       children: [
-        // Filled track (visual element similar to the design)
+        // Filled track (visual элемент similar to the design)
         Expanded(
           child: Container(
             height: 28,
@@ -404,12 +427,13 @@ class _TopBarArrow extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 10),
-        // Circular button with arrow (at the right of the bar, pointing right visually)
+        // Circular button with arrow
         InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(24),
           child: Container(
-            width: 44, height: 44,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
               color: _SigninTheme.fill,
               shape: BoxShape.circle,
@@ -418,6 +442,323 @@ class _TopBarArrow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ================== Admin Sign-In Page ==================
+
+class AdminSignInPage extends StatefulWidget {
+  const AdminSignInPage({super.key});
+
+  @override
+  State<AdminSignInPage> createState() => _AdminSignInPageState();
+}
+
+class _AdminSignInPageState extends State<AdminSignInPage> {
+  final _form = GlobalKey<FormState>();
+  final _identifier = TextEditingController(); // Email or username
+  final _pass       = TextEditingController();
+
+  bool _loading = false;
+  bool _obscure = true;
+
+  @override
+  void dispose() {
+    _identifier.dispose();
+    _pass.dispose();
+    super.dispose();
+  }
+
+  // Show simple toast-style SnackBar
+  void _toast(String msg, {Color? color}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg, textDirection: TextDirection.rtl),
+        backgroundColor: color,
+      ),
+    );
+  }
+
+  // Mask email for password reset message
+  String _maskEmailForDisplay(String email) {
+    final trimmed = email.trim();
+    if (!trimmed.contains('@')) {
+      final local = trimmed;
+      final keep = local.length >= 3 ? 3 : local.length;
+      final shown = local.substring(0, keep);
+      return '$shown**';
+    }
+    final parts = trimmed.split('@');
+    final local = parts[0];
+    final domain = parts[1];
+    final keep = local.length >= 3 ? 3 : local.length;
+    final shown = local.substring(0, keep);
+    return '$shown**@$domain';
+  }
+
+  // Resolve username to email based on Firestore user document
+  Future<String?> _resolveEmail(String input) async {
+    final id = input.trim();
+    if (id.isEmpty) return null;
+    if (id.contains('@')) return id;
+
+    try {
+      final col = FirebaseFirestore.instance.collection('users');
+      var q = await col.where('usernameLower', isEqualTo: id.toLowerCase()).limit(1).get();
+      if (q.docs.isEmpty) {
+        q = await col.where('username', isEqualTo: id).limit(1).get();
+      }
+      if (q.docs.isEmpty) return null;
+      final data = q.docs.first.data();
+      return (data['email'] as String?)?.trim();
+    } on FirebaseException {
+      return null;
+    }
+  }
+
+  String _authMessage(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'wrong-password':
+        return 'كلمة المرور غير صحيحة. تأكد منها ثم جرّب مرة أخرى.';
+      case 'user-not-found':
+        return 'لا يوجد حساب يطابق البريد الإلكتروني/اسم المستخدم المدخل.';
+      case 'invalid-credential':
+        return 'بيانات الدخول غير صحيحة. تحقق من اسم المستخدم أو البريد الإلكتروني وكلمة المرور.';
+      case 'invalid-email':
+        return 'صيغة البريد الإلكتروني غير صحيحة.';
+      case 'too-many-requests':
+        return 'محاولات كثيرة خلال وقت قصير. انتظر قليلًا ثم جرّب مجددًا.';
+      case 'network-request-failed':
+        return 'لا يوجد اتصال بالإنترنت. تحقّق من الشبكة ثم حاول مرة أخرى.';
+      case 'user-disabled':
+        return 'تم تعطيل هذا الحساب.';
+      default:
+        return 'تعذّر تسجيل الدخول. حاول لاحقًا.';
+    }
+  }
+
+  Future<void> _signInAdmin() async {
+    if (!_form.currentState!.validate()) return;
+
+    final idInput = _identifier.text.trim();
+    final passInput = _pass.text;
+
+    setState(() => _loading = true);
+    try {
+      final email = await _resolveEmail(idInput);
+      if (email == null) {
+        _toast('لا يوجد حساب يطابق البريد الإلكتروني/اسم المستخدم المدخل.', color: Colors.red);
+        return;
+      }
+
+      final cred = await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: email,
+        password: passInput,
+      );
+
+      final uid = cred.user?.uid;
+      if (uid == null) {
+        _toast('تعذّر تسجيل الدخول. حاول لاحقًا.', color: Colors.red);
+        return;
+      }
+
+      final snap = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      final data = snap.data() ?? {};
+      final role = (data['role'] as String?)?.toLowerCase();
+      final isAdmin = (data['isAdmin'] == true);
+
+      if (!mounted) return;
+
+      if (role == 'admin' || isAdmin) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const AdminHomeScreen()),
+              (_) => false,
+        );
+      } else {
+        // Not an admin -> sign out for safety and show message
+        await FirebaseAuth.instance.signOut();
+        _toast(
+          'هذا الحساب ليس حساب مدير النظام.\nيرجى استخدام شاشة تسجيل الدخول العادية.',
+          color: Colors.red,
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      _toast(_authMessage(e), color: Colors.red);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _resetPasswordInline() async {
+    setState(() => _loading = true);
+    try {
+      final email = await _resolveEmail(_identifier.text);
+      if (email == null) {
+        _toast('أدخل البريد الإلكتروني أو اسم المستخدم أولًا.', color: Colors.red);
+        return;
+      }
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+
+      final masked = _maskEmailForDisplay(email);
+      _toast('أرسلنا رابط إعادة تعيين كلمة المرور إلى $masked');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  InputDecoration _dec(String hint, {Widget? suffix}) {
+    const r = 22.0;
+    return InputDecoration(
+      hintText: hint,
+      hintTextDirection: TextDirection.rtl,
+      filled: true,
+      fillColor: _SigninTheme.inputFill.withOpacity(0.9),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      suffixIcon: suffix,
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(r),
+        borderSide: BorderSide(color: _SigninTheme.inputBorder.withOpacity(0.35)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(r),
+        borderSide: const BorderSide(color: _SigninTheme.inputBorder, width: 1.3),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        resizeToAvoidBottomInset: false,
+        backgroundColor: Colors.white,
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Background
+            Image.asset('assets/images/SignIn.png', fit: BoxFit.cover),
+
+            // Progress bar + arrow at top
+            Positioned(
+              top: kSigninProgressTop,
+              left: 24,
+              right: 24,
+              child: _TopBarArrow(onTap: () => Navigator.pop(context)),
+            ),
+
+            // Content bottom sheet
+            SafeArea(
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(24, 16, 24, kSigninBottomPadding),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'تسجيل دخول المشرف',
+                        style: TextStyle(
+                          color: _SigninTheme.textDark,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 24,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'هذه النافذة مخصّصة لمدير النظام فقط. يرجى إدخال بيانات حساب المشرف.',
+                        style: TextStyle(color: _SigninTheme.textDark),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 18),
+                      FractionallySizedBox(
+                        widthFactor: kSigninFieldWidthFactor,
+                        child: Form(
+                          key: _form,
+                          child: Column(
+                            children: [
+                              TextFormField(
+                                controller: _identifier,
+                                keyboardType: TextInputType.emailAddress,
+                                validator: (v) => (v == null || v.trim().isEmpty)
+                                    ? 'أدخل البريد الإلكتروني أو اسم المستخدم'
+                                    : null,
+                                decoration: _dec('البريد الإلكتروني أو اسم المستخدم'),
+                              ),
+                              const SizedBox(height: 12),
+                              TextFormField(
+                                controller: _pass,
+                                obscureText: _obscure,
+                                obscuringCharacter: '•',
+                                enableSuggestions: false,
+                                autocorrect: false,
+                                validator: (v) =>
+                                (v == null || v.isEmpty) ? 'أدخل كلمة المرور' : null,
+                                onFieldSubmitted: (_) => _signInAdmin(),
+                                decoration: _dec(
+                                  'كلمة المرور',
+                                  suffix: IconButton(
+                                    tooltip: _obscure ? 'إظهار' : 'إخفاء',
+                                    onPressed: () =>
+                                        setState(() => _obscure = !_obscure),
+                                    icon: Icon(
+                                      _obscure ? Icons.visibility_off : Icons.visibility,
+                                      color: _SigninTheme.primary,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Align(
+                        alignment: Alignment.center,
+                        child: TextButton(
+                          onPressed: _loading ? null : _resetPasswordInline,
+                          style: TextButton.styleFrom(
+                            foregroundColor: _SigninTheme.textDark,
+                          ),
+                          child: const Text('نسيت كلمة المرور؟'),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      FractionallySizedBox(
+                        widthFactor: 0.7,
+                        child: FilledButton(
+                          onPressed: _loading ? null : _signInAdmin,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: _SigninTheme.btnFill,
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size.fromHeight(54),
+                            shape: const StadiumBorder(),
+                          ),
+                          child: _loading
+                              ? const SizedBox(
+                            height: 22,
+                            width: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                              : const Text(
+                            'تسجيل الدخول',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

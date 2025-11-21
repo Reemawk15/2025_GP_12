@@ -223,6 +223,10 @@ class _SignUpPageState extends State<SignUpPage> {
         'photoUrl': '',
         'notificationsEnabled': _notifsEnabled,
         'createdAt': FieldValue.serverTimestamp(),
+
+        // Role-related fields (all new sign-ups are listeners / regular users)
+        'role': 'listener',
+        'isAdmin': false,
       });
 
       if (!mounted) return;
@@ -612,7 +616,7 @@ class _IntroBlock extends StatelessWidget {
 class _BottomSheetArea extends StatelessWidget {
   final Widget child;
   final double bottomPadding;
-  final double yShift; // + moves down, - moves up
+  final double yShift; // Positive moves down, negative moves up
 
   const _BottomSheetArea({
     required this.child,
