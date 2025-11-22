@@ -161,10 +161,12 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
         fit: StackFit.expand,
         children: [
           // نفس الخلفية المستخدمة في التسجيل
-          Image.asset('assets/images/back.png', fit: BoxFit.cover),
+          Image.asset('assets/images/pass.png', fit: BoxFit.cover),
 
           Scaffold(
             backgroundColor: Colors.transparent,
+            resizeToAvoidBottomInset: false, // 👈 مهم
+
             appBar: AppBar(
               backgroundColor: Colors.transparent,
               elevation: 0,
@@ -175,7 +177,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                   alignment: Alignment.centerRight,
                   child: IconButton(
                     tooltip: 'رجوع',
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                    icon: const Icon(Icons.arrow_back_ios_new_rounded,size:19),
                     color: _darkGreen,
                     onPressed: () => Navigator.pop(context),
                   ),
@@ -185,7 +187,8 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
             body: SafeArea(
               child: Center(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                  padding: EdgeInsets.fromLTRB(20, 0, 20, 24 + MediaQuery.of(context).viewInsets.bottom,
+                  ),
                   child: Container(
                     width: double.infinity,
                     constraints: const BoxConstraints(maxWidth: 480),

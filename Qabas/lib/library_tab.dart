@@ -1,68 +1,691 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
-import 'my_library.dart';
-import 'my_books.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
+
+import 'book_details_page.dart';
+import 'my_book_details_page.dart';
 
 const Color _darkGreen  = Color(0xFF0E3A2C);
 const Color _midGreen   = Color(0xFF2F5145);
-const Color _lightGreen = Color(0xFFC9DABF);
-const _confirmColor = Color(0xFF6F8E63);
+const Color _fillGreen  = Color(0xFFC9DABF);
+const Color _confirm    = Color(0xFF6F8E63);
 
+/// =============================
+/// LibraryTab: كل المكتبة الخاصة + كتبي
+/// =============================
 class LibraryTab extends StatelessWidget {
   const LibraryTab({super.key});
 
+  void _back(BuildContext context) {
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
+    // ولو هي داخل bottom nav ما يحتاج يسوي شيء
+  }
+
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: Stack(
-        children: [
-          // Background
-          Positioned.fill(
-            child: Image.asset(
-              'assets/images/back_private.png',
-              fit: BoxFit.cover,
+      child: DefaultTabController(
+        length: 4,
+        child: Stack(
+          children: [
+            // الخلفية العامة لكل الشلفز (كل التبويبات)
+            Positioned.fill(
+              child: Image.asset(
+                'assets/images/backttt.png',
+                fit: BoxFit.cover,
+              ),
+            ),
+            Scaffold(
+              backgroundColor: Colors.transparent,
+              floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+              floatingActionButton: user == null
+                  ? null
+                  : Padding(
+                padding: const EdgeInsets.only(bottom: 100), // زيدي/قلّلي القيمة اللي تريحك
+                child: FloatingActionButton(
+                  mini: true, // ← تصغير الزر
+                  backgroundColor: _confirm,
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const AddMyBookPage(),
+                      ),
+                    );
+                  },
+                  child: const Icon(Icons.add, color: Colors.white),
+                ),
+              ),
+              body: SafeArea(
+                child: Column(
+                  children: [
+                    const SizedBox(height: 60),
+
+                    // TabBar
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Container(
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(.9),
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: const TabBar(
+                          indicator: UnderlineTabIndicator(
+                            borderSide: BorderSide(width: 2),
+                          ),
+                          dividerColor: Colors.transparent,
+                          overlayColor: MaterialStatePropertyAll(Colors.transparent),
+                          labelColor: _midGreen,
+                          unselectedLabelColor: Colors.black54,
+                          labelStyle: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          unselectedLabelStyle: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          labelPadding: EdgeInsets.symmetric(horizontal: 3),
+                          tabs: [
+                            Tab(text: 'أرغب بالاستماع لها'),
+                            Tab(text: 'استمع لها الآن'),
+                            Tab(text: 'استمعت لها'),
+                            Tab(text: 'كتبي'),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    Expanded(
+                      child: user == null
+                          ? const Center(
+                        child: Text('الرجاء تسجيل الدخول لعرض مكتبتك'),
+                      )
+                          : TabBarView(
+                        physics: const BouncingScrollPhysics(),
+                        children: [
+                          _LibraryShelf(status: 'want',       uid: user.uid),
+                          _LibraryShelf(status: 'listen_now', uid: user.uid),
+                          _LibraryShelf(status: 'listened',   uid: user.uid),
+                          _MyBooksShelfTab(uid: user.uid),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+//
+// =======================
+// جزء مكتبة المستخدم (users/{uid}/library)
+// =======================
+
+class Book {
+  final String id;
+  final String title;
+  final ImageProvider? cover;
+  final String status;
+  const Book({
+    required this.id,
+    required this.title,
+    this.cover,
+    required this.status,
+  });
+}
+
+class _LibraryShelf extends StatefulWidget {
+  final String status;
+  final String uid;
+  const _LibraryShelf({required this.status, required this.uid});
+
+  @override
+  State<_LibraryShelf> createState() => _LibraryShelfState();
+}
+
+class _LibraryShelfState extends State<_LibraryShelf> {
+  List<Book> _lastNonEmpty = const [];
+  final Set<String> _locallyHidden = <String>{};
+
+  void _onMovedLocally(String docId) {
+    setState(() {
+      _locallyHidden.add(docId);
+      _lastNonEmpty = _lastNonEmpty.where((b) => b.id != docId).toList();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final q = FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.uid)
+        .collection('library')
+        .where('status', isEqualTo: widget.status)
+        .orderBy('addedAt', descending: true);
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: q.snapshots(),
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          if (_lastNonEmpty.isNotEmpty) {
+            return _ShelfView(
+              books: _lastNonEmpty,
+              uid: widget.uid,
+              onMoved: _onMovedLocally,
+            );
+          }
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snap.hasError) {
+          if (_lastNonEmpty.isNotEmpty) {
+            return _ShelfView(
+              books: _lastNonEmpty,
+              uid: widget.uid,
+              onMoved: _onMovedLocally,
+            );
+          }
+          return const Center(child: Text('لا توجد كتب في هذه القائمة بعد'));
+        }
+
+        final docs = snap.data?.docs ?? [];
+        final all = docs.map((d) {
+          final m = d.data() as Map<String, dynamic>? ?? {};
+          final title = (m['title'] ?? '') as String;
+          final cover = (m['coverUrl'] ?? '') as String;
+          final status = (m['status'] ?? 'want') as String;
+          return Book(
+            id: d.id,
+            title: title.isEmpty ? 'كتاب' : title,
+            cover: cover.isNotEmpty ? NetworkImage(cover) : null,
+            status: status,
+          );
+        }).toList();
+
+        final current =
+        all.where((b) => !_locallyHidden.contains(b.id)).toList();
+
+        if (current.isNotEmpty) {
+          _lastNonEmpty = current;
+          return _ShelfView(
+            books: current,
+            uid: widget.uid,
+            onMoved: _onMovedLocally,
+          );
+        }
+
+        if (_lastNonEmpty.isNotEmpty) {
+          return _ShelfView(
+            books: _lastNonEmpty,
+            uid: widget.uid,
+            onMoved: _onMovedLocally,
+          );
+        }
+
+        return const Center(child: Text('لا توجد كتب في هذه القائمة بعد'));
+      },
+    );
+  }
+}
+
+class ShelfRect {
+  final double leftFrac, rightFrac, topFrac, heightFrac;
+  const ShelfRect({
+    required this.leftFrac,
+    required this.rightFrac,
+    required this.topFrac,
+    required this.heightFrac,
+  });
+}
+
+class _ShelfView extends StatefulWidget {
+  final List<Book> books;
+  final String uid;
+  final void Function(String docId) onMoved;
+  const _ShelfView({
+    required this.books,
+    required this.uid,
+    required this.onMoved,
+  });
+
+  @override
+  State<_ShelfView> createState() => _ShelfViewState();
+}
+
+class _ShelfViewState extends State<_ShelfView> {
+  static const List<ShelfRect> _shelfRects = [
+    ShelfRect(leftFrac: 0.18, rightFrac: 0.18, topFrac: 0.09, heightFrac: 0.11),
+    ShelfRect(leftFrac: 0.18, rightFrac: 0.18, topFrac: 0.29, heightFrac: 0.11),
+    ShelfRect(leftFrac: 0.18, rightFrac: 0.18, topFrac: 0.50, heightFrac: 0.11),
+    ShelfRect(leftFrac: 0.18, rightFrac: 0.18, topFrac: 0.70, heightFrac: 0.11),
+  ];
+
+  static const int _perShelf = 4;
+  static const int _shelvesPerPage = 4;
+  static const int _booksPerPage = _perShelf * _shelvesPerPage;
+  static const double _spacing = 1;
+  static const double _bookAspect = .25;
+  static const double _bookStretch = 1.2;
+
+  final PageController _pageController = PageController();
+  late List<List<Book>> _pages;
+
+  @override
+  void initState() {
+    super.initState();
+    _pages = _paginate(widget.books, _booksPerPage);
+  }
+
+  @override
+  void didUpdateWidget(covariant _ShelfView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.books.length != widget.books.length) {
+      _pages = _paginate(widget.books, _booksPerPage);
+    }
+  }
+
+  List<List<Book>> _paginate(List<Book> list, int size) {
+    final pages = <List<Book>>[];
+    for (var i = 0; i < list.length; i += size) {
+      pages.add(
+        list.sublist(i, i + size > list.length ? list.length : i + size),
+      );
+    }
+    if (pages.isEmpty) pages.add(const []);
+    return pages;
+  }
+
+  List<List<Book>> _chunk(List<Book> list, int size) {
+    final chunks = <List<Book>>[];
+    for (var i = 0; i < list.length; i += size) {
+      chunks.add(
+        list.sublist(i, i + size > list.length ? list.length : i + size),
+      );
+    }
+    return chunks;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pages = _pages;
+
+    return Stack(
+      children: [
+        PageView.builder(
+          controller: _pageController,
+          physics: const BouncingScrollPhysics(),
+          itemCount: pages.length,
+          itemBuilder: (context, pageIndex) {
+            final pageBooks = pages[pageIndex];
+            final groups = _chunk(pageBooks, _perShelf);
+
+            return LayoutBuilder(
+              builder: (context, c) {
+                final W = c.maxWidth;
+                final H = c.maxHeight;
+
+                return Stack(
+                  children: List.generate(_shelfRects.length, (i) {
+                    final rect = _shelfRects[i];
+                    final shelfBooks =
+                    i < groups.length ? groups[i] : const <Book>[];
+
+                    final left = rect.leftFrac * W;
+                    final right = rect.rightFrac * W;
+                    final top = rect.topFrac * H;
+                    final height = rect.heightFrac * H;
+                    final width = W - left - right;
+
+                    final slots = _perShelf;
+                    final totalSpacing = _spacing * (slots - 1);
+                    final bookWidth =
+                    ((width - totalSpacing) / slots * 0.9).clamp(40.0, 140.0);
+                    final bookHeight =
+                    (bookWidth / _bookAspect * _bookStretch);
+
+                    return Positioned(
+                      left: left,
+                      right: right,
+                      top: top,
+                      height: height,
+                      child: SizedBox(
+                        width: width,
+                        height: height,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: List.generate(slots, (slot) {
+                            final book =
+                            slot < shelfBooks.length ? shelfBooks[slot] : null;
+                            return SizedBox(
+                              width: bookWidth,
+                              height: bookHeight,
+                              child: book == null
+                                  ? const SizedBox.shrink()
+                                  : _BookCard(
+                                book: book,
+                                uid: widget.uid,
+                                onMoved: widget.onMoved,
+                              ),
+                            );
+                          }),
+                        ),
+                      ),
+                    );
+                  }),
+                );
+              },
+            );
+          },
+        ),
+
+        // page indicator
+        Positioned(
+          bottom: 25,
+          right: 0,
+          left: 0,
+          child: Center(
+            child: AnimatedBuilder(
+              animation: _pageController,
+              builder: (context, child) {
+                final current = _pageController.hasClients
+                    ? (_pageController.page ?? 0).round()
+                    : 0;
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: List.generate(pages.length, (i) {
+                    final active = i == current;
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      margin: const EdgeInsets.symmetric(horizontal: 3),
+                      width: active ? 18 : 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: active
+                            ? const Color(0xFFE26AA2)
+                            : Colors.black26,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    );
+                  }),
+                );
+              },
             ),
           ),
-          Scaffold(
-            backgroundColor: Colors.transparent,
-            appBar: AppBar(
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              toolbarHeight: 8, // Thin bar with no title
+        ),
+      ],
+    );
+  }
+}
+
+class _BookCard extends StatelessWidget {
+  final Book book;
+  final String uid;
+  final void Function(String docId) onMoved;
+  const _BookCard({
+    required this.book,
+    required this.uid,
+    required this.onMoved,
+  });
+
+  static const Map<String, String> _arabicStatus = {
+    'want': 'أرغب بالاستماع لها',
+    'listen_now': 'استمع لها الآن',
+    'listened': 'استمعت لها',
+  };
+
+  void _showSnack(BuildContext context, String message,
+      {IconData icon = Icons.check_circle}) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        backgroundColor: _confirm,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
+        content: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: const Color(0xFFE7C4DA)),
+            const SizedBox(width: 8),
+            Text(
+              message,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
             ),
-            body: SafeArea(
-              child: Center(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _ActionCard(
-                        title: 'مكتبتي الخاصة',
-                        subtitle: 'يمكنك إدارة مكتبتك في قَبَس وإضافة الكتب الصوتية بالضغط على الزر أدناه',
-                        buttonText: 'مكتبتي',
-                        onPressed: () {
-                          // Navigate to a separate page
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const MyLibraryPage()),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 20),
-                      _ActionCard(
-                        title: 'إضافة كتب',
-                        subtitle: 'إضافة كتابك الخاص',
-                        buttonText: 'أضف كتاب جديد',
-                        onPressed: () {
-                          // Navigate to a separate page
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const MyBooksPage()),
-                          );
-                        },
-                      ),
-                    ],
+          ],
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  Future<void> _removeFromList(BuildContext context) async {
+    final ref = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('library')
+        .doc(book.id);
+    try {
+      await ref.delete();
+      onMoved(book.id);
+      _showSnack(context, 'تم الحذف من قائمتك', icon: Icons.check_circle);
+    } catch (e) {
+      _showSnack(
+        context,
+        'تعذّر الحذف. حاول مجددًا',
+        icon: Icons.error_outline,
+      );
+    }
+  }
+
+  Future<void> _moveToStatus(
+      BuildContext sheetContext, String newStatus) async {
+    final ref = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('library')
+        .doc(book.id);
+    try {
+      await ref.set(
+        {
+          'status': newStatus,
+          'addedAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+      onMoved(book.id);
+      Navigator.pop(sheetContext);
+      _showSnack(
+        sheetContext,
+        'نُقل إلى "${_arabicStatus[newStatus] ?? newStatus}"',
+        icon: Icons.check_circle,
+      );
+    } catch (e) {
+      _showSnack(
+        sheetContext,
+        'تعذّر النقل. حاول مجددًا',
+        icon: Icons.error_outline,
+      );
+    }
+  }
+
+  void _showOptionsMenu(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetContext) {
+        final List<Widget> tiles = [];
+
+        tiles.add(
+          ListTile(
+            leading: const Icon(Icons.delete_outline, color: Colors.red),
+            title: const Text('حذف من القائمة'),
+            onTap: () async {
+              Navigator.pop(sheetContext);
+              await _removeFromList(context);
+            },
+          ),
+        );
+        tiles.add(const Divider(height: 0));
+
+        if (book.status == 'want') {
+          tiles.add(
+            ListTile(
+              leading: const Icon(Icons.play_arrow_outlined, color: Colors.teal),
+              title: const Text('نقل إلى: استمع لها الآن'),
+              onTap: () => _moveToStatus(sheetContext, 'listen_now'),
+            ),
+          );
+        } else if (book.status == 'listened') {
+          tiles.add(
+            ListTile(
+              leading: const Icon(Icons.bookmark_border, color: Colors.teal),
+              title: const Text('نقل إلى: أرغب بالاستماع لها'),
+              onTap: () => _moveToStatus(sheetContext, 'want'),
+            ),
+          );
+          tiles.add(
+            ListTile(
+              leading: const Icon(Icons.play_arrow_outlined, color: Colors.teal),
+              title: const Text('نقل إلى: استمع لها الآن'),
+              onTap: () => _moveToStatus(sheetContext, 'listen_now'),
+            ),
+          );
+        } else if (book.status == 'listen_now') {
+          tiles.add(
+            ListTile(
+              leading: const Icon(Icons.bookmark_border, color: Colors.teal),
+              title: const Text('نقل إلى: أرغب بالاستماع لها'),
+              onTap: () => _moveToStatus(sheetContext, 'want'),
+            ),
+          );
+          tiles.add(
+            ListTile(
+              leading:
+              const Icon(Icons.check_circle_outline, color: Colors.teal),
+              title: const Text('نقل إلى: استمعت لها'),
+              onTap: () => _moveToStatus(sheetContext, 'listened'),
+            ),
+          );
+        }
+
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 8),
+                Container(
+                  height: 4,
+                  width: 42,
+                  decoration: BoxDecoration(
+                    color: Colors.black26,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ...tiles,
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(8);
+    return InkWell(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => BookDetailsPage(bookId: book.id),
+          ),
+        );
+      },
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: radius,
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x33000000),
+                  blurRadius: 6,
+                  offset: Offset(0, 3),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: radius,
+              child: book.cover != null
+                  ? Image(image: book.cover!, fit: BoxFit.cover)
+                  : Container(
+                color: const Color(0xFFF6F2F7),
+                padding: const EdgeInsets.all(8),
+                alignment: Alignment.center,
+                child: Text(
+                  book.title,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 12, height: 1.2),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: -2,
+            left: 8,
+            child: GestureDetector(
+              onTap: () => _showOptionsMenu(context),
+              child: Container(
+                width: 18,
+                height: 24,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFE26AA2),
+                  borderRadius: BorderRadius.only(
+                    bottomLeft: Radius.circular(4),
+                    bottomRight: Radius.circular(4),
+                  ),
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.more_vert,
+                    size: 14,
+                    color: Colors.white,
                   ),
                 ),
               ),
@@ -74,84 +697,532 @@ class LibraryTab extends StatelessWidget {
   }
 }
 
-// Action card widget
-class _ActionCard extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final String buttonText;
-  final VoidCallback onPressed;
+//
+// =======================
+// تبويب "كتبي" (users/{uid}/mybooks)
+// =======================
 
-  const _ActionCard({
+class MyBook {
+  final String id;
+  final String title;
+  final String coverUrl;
+  MyBook({
+    required this.id,
     required this.title,
-    required this.subtitle,
-    required this.buttonText,
-    required this.onPressed,
+    required this.coverUrl,
   });
+}
+
+class _MyBooksShelfTab extends StatelessWidget {
+  final String uid;
+  const _MyBooksShelfTab({required this.uid});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 160, // Fixed card height
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(22, 20, 22, 16),
-      decoration: BoxDecoration(
-        color: _lightGreen.withOpacity(0.88),
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 10,
-            offset: Offset(0, 6),
-          ),
-        ],
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: SafeArea(
+        child: StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('users')
+              .doc(uid)
+              .collection('mybooks')
+              .orderBy('createdAt', descending: true)
+              .snapshots(),
+          builder: (context, snap) {
+            if (snap.connectionState == ConnectionState.waiting) {
+              return const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(_midGreen),
+                ),
+              );
+            }
+            if (!snap.hasData || snap.data!.docs.isEmpty) {
+              return const Center(
+                child: Text('لا توجد كتب مضافة حتى الآن'),
+              );
+            }
+
+            final docs = snap.data!.docs;
+            final books = docs.map((doc) {
+              final data = doc.data() as Map<String, dynamic>? ?? {};
+              final title = (data['title'] ?? '') as String;
+              final coverUrl = (data['coverUrl'] ?? '') as String? ?? '';
+              return MyBook(
+                id: doc.id,
+                title: title.isEmpty ? 'كتاب بدون عنوان' : title,
+                coverUrl: coverUrl,
+              );
+            }).toList();
+
+            return _MyShelfView(
+              books: books,
+              uid: uid,
+            );
+          },
+        ),
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween, // Distribute title/subtitle and button
-        children: [
-          Column(
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  color: _darkGreen,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  height: 1.3,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  color: Colors.black54,
-                  fontSize: 13,
-                  height: 1.5,
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 2, // Prevents overflow
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
+    );
+  }
+}
+
+class _ShelfRect {
+  final double leftFrac, rightFrac, topFrac, heightFrac;
+  const _ShelfRect({
+    required this.leftFrac,
+    required this.rightFrac,
+    required this.topFrac,
+    required this.heightFrac,
+  });
+}
+
+class _MyShelfView extends StatefulWidget {
+  final List<MyBook> books;
+  final String uid;
+  const _MyShelfView({
+    required this.books,
+    required this.uid,
+  });
+
+  @override
+  State<_MyShelfView> createState() => _MyShelfViewState();
+}
+
+class _MyShelfViewState extends State<_MyShelfView> {
+  static const List<_ShelfRect> _shelfRects = [
+    _ShelfRect(leftFrac: 0.18, rightFrac: 0.18, topFrac: 0.09, heightFrac: 0.11),
+    _ShelfRect(leftFrac: 0.18, rightFrac: 0.18, topFrac: 0.29, heightFrac: 0.11),
+    _ShelfRect(leftFrac: 0.18, rightFrac: 0.18, topFrac: 0.49, heightFrac: 0.11),
+    _ShelfRect(leftFrac: 0.18, rightFrac: 0.18, topFrac: 0.69, heightFrac: 0.11),
+  ];
+
+  static const int _perShelf = 4;
+  static const int _shelvesPerPage = 4;
+  static const int _booksPerPage = _perShelf * _shelvesPerPage;
+  static const double _spacing = 1;
+  static const double _bookAspect = .25;
+  static const double _bookStretch = 1.2;
+
+  final PageController _pageController = PageController();
+  late List<List<MyBook>> _pages;
+
+  @override
+  void initState() {
+    super.initState();
+    _pages = _paginate(widget.books, _booksPerPage);
+  }
+
+  @override
+  void didUpdateWidget(covariant _MyShelfView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.books.length != widget.books.length) {
+      _pages = _paginate(widget.books, _booksPerPage);
+    }
+  }
+
+  List<List<MyBook>> _paginate(List<MyBook> list, int size) {
+    final pages = <List<MyBook>>[];
+    for (var i = 0; i < list.length; i += size) {
+      pages.add(
+        list.sublist(i, i + size > list.length ? list.length : i + size),
+      );
+    }
+    if (pages.isEmpty) pages.add(const []);
+    return pages;
+  }
+
+  List<List<MyBook>> _chunk(List<MyBook> list, int size) {
+    final chunks = <List<MyBook>>[];
+    for (var i = 0; i < list.length; i += size) {
+      chunks.add(
+        list.sublist(i, i + size > list.length ? list.length : i + size),
+      );
+    }
+    return chunks;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pages = _pages;
+
+    return Stack(
+      children: [
+        PageView.builder(
+          controller: _pageController,
+          physics: const BouncingScrollPhysics(),
+          itemCount: pages.length,
+          itemBuilder: (context, pageIndex) {
+            final pageBooks = pages[pageIndex];
+            final groups = _chunk(pageBooks, _perShelf);
+
+            return LayoutBuilder(
+              builder: (context, c) {
+                final W = c.maxWidth;
+                final H = c.maxHeight;
+
+                return Stack(
+                  children: List.generate(_shelfRects.length, (i) {
+                    final rect = _shelfRects[i];
+                    final shelfBooks =
+                    i < groups.length ? groups[i] : const <MyBook>[];
+
+                    final left = rect.leftFrac * W;
+                    final right = rect.rightFrac * W;
+                    final top = rect.topFrac * H;
+                    final height = rect.heightFrac * H;
+                    final width = W - left - right;
+
+                    final slots = _perShelf;
+                    final totalSpacing = _spacing * (slots - 1);
+                    final bookWidth =
+                    ((width - totalSpacing) / slots * 0.9).clamp(40.0, 140.0);
+                    final bookHeight =
+                    (bookWidth / _bookAspect * _bookStretch);
+
+                    return Positioned(
+                      left: left,
+                      right: right,
+                      top: top,
+                      height: height,
+                      child: SizedBox(
+                        width: width,
+                        height: height,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: List.generate(slots, (slot) {
+                            final book =
+                            slot < shelfBooks.length ? shelfBooks[slot] : null;
+                            return SizedBox(
+                              width: bookWidth,
+                              height: bookHeight,
+                              child: book == null
+                                  ? const SizedBox.shrink()
+                                  : _MyBookCard(
+                                book: book,
+                                uid: widget.uid,
+                              ),
+                            );
+                          }),
+                        ),
+                      ),
+                    );
+                  }),
+                );
+              },
+            );
+          },
+        ),
+
+        Positioned(
+          bottom: 25,
+          right: 0,
+          left: 0,
+          child: Center(
+            child: AnimatedBuilder(
+              animation: _pageController,
+              builder: (context, child) {
+                final current = _pageController.hasClients
+                    ? (_pageController.page ?? 0).round()
+                    : 0;
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: List.generate(pages.length, (i) {
+                    final active = i == current;
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      margin: const EdgeInsets.symmetric(horizontal: 3),
+                      width: active ? 18 : 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: active
+                            ? const Color(0xFFE26AA2)
+                            : Colors.black26,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    );
+                  }),
+                );
+              },
+            ),
           ),
-          SizedBox(
-            height: 40,
-            child: ElevatedButton(
-              onPressed: onPressed,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _confirmColor,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                elevation: 0,
+        ),
+      ],
+    );
+  }
+}
+
+class _MyBookCard extends StatelessWidget {
+  final MyBook book;
+  final String uid;
+  const _MyBookCard({
+    required this.book,
+    required this.uid,
+  });
+
+  void _showSnack(BuildContext context, String message,
+      {IconData icon = Icons.check_circle}) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        backgroundColor: _confirm,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
+        content: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: const Color(0xFFE7C4DA)),
+            const SizedBox(width: 8),
+            Text(
+              message,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
               ),
-              child: Text(
-                buttonText,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
+            ),
+          ],
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  Future<void> _deleteMyBook(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+          child: Directionality(
+            textDirection: TextDirection.rtl,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'تأكيد حذف الكتاب',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: _darkGreen,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'هل أنت متأكد أنك تريد حذف هذا الكتاب من مكتبتك؟',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _confirm,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: const Text(
+                      'تأكيد',
+                      style: TextStyle(fontSize: 16, color: Colors.white),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.grey[300],
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text(
+                      'إلغاء',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: _darkGreen,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    if (ok != true) return;
+
+    try {
+      final storage = FirebaseStorage.instance;
+      final baseRef = storage.ref('users/$uid/mybooks/${book.id}');
+
+      await Future.wait([
+        baseRef.child('book.pdf').delete().catchError((_) {}),
+        baseRef.child('cover.jpg').delete().catchError((_) {}),
+      ]);
+
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('mybooks')
+          .doc(book.id)
+          .delete();
+
+      _showSnack(context, 'تم حذف الكتاب', icon: Icons.check_circle);
+    } catch (e) {
+      _showSnack(
+        context,
+        'تعذّر الحذف: $e',
+        icon: Icons.error_outline,
+      );
+    }
+  }
+
+  void _showOptionsMenu(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetContext) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 8),
+                Container(
+                  height: 4,
+                  width: 42,
+                  decoration: BoxDecoration(
+                    color: Colors.black26,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ListTile(
+                  leading:
+                  const Icon(Icons.delete_outline, color: Colors.red),
+                  title: const Text('حذف الكتاب'),
+                  onTap: () async {
+                    Navigator.pop(sheetContext);
+                    await _deleteMyBook(context);
+                  },
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(8);
+    return InkWell(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => MyBookDetailsPage(bookId: book.id),
+          ),
+        );
+      },
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: radius,
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x33000000),
+                  blurRadius: 6,
+                  offset: Offset(0, 3),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: radius,
+              child: book.coverUrl.isNotEmpty
+                  ? Image.network(
+                book.coverUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) {
+                  return Container(
+                    color: const Color(0xFFF6F2F7),
+                    padding: const EdgeInsets.all(8),
+                    alignment: Alignment.center,
+                    child: Text(
+                      book.title,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style:
+                      const TextStyle(fontSize: 12, height: 1.2),
+                    ),
+                  );
+                },
+              )
+                  : Container(
+                color: const Color(0xFFF6F2F7),
+                padding: const EdgeInsets.all(8),
+                alignment: Alignment.center,
+                child: Text(
+                  book.title,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 12, height: 1.2),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: -2,
+            left: 8,
+            child: GestureDetector(
+              onTap: () => _showOptionsMenu(context),
+              child: Container(
+                width: 18,
+                height: 24,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFE26AA2),
+                  borderRadius: BorderRadius.only(
+                    bottomLeft: Radius.circular(4),
+                    bottomRight: Radius.circular(4),
+                  ),
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.more_vert,
+                    size: 14,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),
@@ -160,4 +1231,340 @@ class _ActionCard extends StatelessWidget {
       ),
     );
   }
+}
+
+//
+// =======================
+// صفحة إضافة كتاب (نفس كودك، كـ شاشة كاملة)
+// =======================
+
+class AddMyBookPage extends StatefulWidget {
+  const AddMyBookPage({super.key});
+
+  @override
+  State<AddMyBookPage> createState() => _AddMyBookPageState();
+}
+
+class _AddMyBookPageState extends State<AddMyBookPage> {
+  final _formKey = GlobalKey<FormState>();
+  final _titleCtrl = TextEditingController();
+  File? _pdfFile;
+  File? _coverFile;
+  bool _saving = false;
+  bool _forceValidate = false;
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    super.dispose();
+  }
+
+  bool get _isReadyToSave =>
+      _titleCtrl.text.trim().isNotEmpty &&
+          _pdfFile != null &&
+          !_saving;
+
+  void _showSnack(String message, {IconData icon = Icons.check_circle}) {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        backgroundColor: _confirm,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        content: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: const Color(0xFFE7C4DA)),
+            const SizedBox(width: 8),
+            Text(
+              message,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  Future<void> _pickPdf() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['pdf'],
+      withData: false,
+    );
+    if (!mounted) return;
+    if (result != null && result.files.single.path != null) {
+      setState(() {
+        _pdfFile = File(result.files.single.path!);
+        _forceValidate = true;
+      });
+    }
+  }
+
+  Future<void> _pickCover() async {
+    final picker = ImagePicker();
+    final x = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+    if (!mounted) return;
+    if (x != null) {
+      setState(() => _coverFile = File(x.path));
+    }
+  }
+
+  Future<void> _saveBook() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      _showSnack('الرجاء تسجيل الدخول لإضافة كتاب', icon: Icons.login_rounded);
+      return;
+    }
+
+    if (_titleCtrl.text.trim().isEmpty || _pdfFile == null) {
+      setState(() => _forceValidate = true);
+    }
+    if (_titleCtrl.text.trim().isEmpty || _pdfFile == null) {
+      _showSnack(_missingFriendlyMessage(), icon: Icons.info_outline);
+      return;
+    }
+
+    if (!_formKey.currentState!.validate()) {
+      _showSnack('فضلاً أكمل الحقول المطلوبة', icon: Icons.info_outline);
+      return;
+    }
+
+    try {
+      setState(() => _saving = true);
+
+      final docRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('mybooks')
+          .doc();
+
+      final storage = FirebaseStorage.instance;
+      final baseRef = storage.ref('users/${user.uid}/mybooks/${docRef.id}');
+      final pdfRef = baseRef.child('book.pdf');
+
+      final pdfTask = await pdfRef.putFile(_pdfFile!);
+      final pdfUrl  = await pdfTask.ref.getDownloadURL();
+
+      String? coverUrl;
+      if (_coverFile != null) {
+        final coverRef = baseRef.child('cover.jpg');
+        final coverTask = await coverRef.putFile(_coverFile!);
+        coverUrl = await coverTask.ref.getDownloadURL();
+      }
+
+      await docRef.set({
+        'title': _titleCtrl.text.trim(),
+        'pdfUrl': pdfUrl,
+        'coverUrl': coverUrl,
+        'ownerUid': user.uid,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      if (!mounted) return;
+      Navigator.pop(context); // رجوع للمكتبة بعد الإضافة
+    } catch (e) {
+      if (mounted) {
+        _showSnack('حدث خطأ أثناء الحفظ: $e', icon: Icons.error_outline);
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  String _missingFriendlyMessage() {
+    final nameMissing = _titleCtrl.text.trim().isEmpty;
+    final pdfMissing = _pdfFile == null;
+    if (nameMissing && pdfMissing) {
+      return 'أضيف اسم الكتاب واختار ملف PDF أولاً ';
+    } else if (nameMissing) {
+      return 'أضيف اسم الكتاب أولاً ✍';
+    } else {
+      return 'اختار ملف الكتاب (PDF) أولاً ';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final nameMissing = _titleCtrl.text.trim().isEmpty;
+    final pdfMissing  = _pdfFile == null;
+    final showPdfValidation =
+        _forceValidate || _titleCtrl.text.trim().isNotEmpty;
+
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/back.png',
+              fit: BoxFit.cover,
+            ),
+          ),
+          Scaffold(
+            backgroundColor: Colors.transparent,
+            appBar: AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              toolbarHeight: 160, // ← زوّدي هذا الرقم لين يصير مناسب
+
+              leading: IconButton(
+                icon: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: _midGreen,
+                  size: 20,
+                ),
+                onPressed: () => Navigator.pop(context),
+              ),
+              centerTitle: true,
+              title: const Text(
+                '',
+                style: TextStyle(color: _darkGreen),
+              ),
+            ),
+            body: SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+                child: AbsorbPointer(
+                  absorbing: _saving,
+                  child: Opacity(
+                    opacity: _saving ? 0.6 : 1,
+                    child: Form(
+                      key: _formKey,
+                      autovalidateMode: _forceValidate
+                          ? AutovalidateMode.always
+                          : AutovalidateMode.onUserInteraction,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Align(
+                            alignment: Alignment.centerRight,
+                            child: Text(
+                              'الحقول المشار إليها بـ * مطلوبة',
+                              style: TextStyle(
+                                color: Colors.black54,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+
+                          _fieldContainer(
+                            isError: _forceValidate && nameMissing,
+                            child: TextFormField(
+                              controller: _titleCtrl,
+                              textAlign: TextAlign.right,
+                              decoration: const InputDecoration(
+                                labelText: 'اسم الكتاب *',
+                                border: InputBorder.none,
+                                contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 14,
+                                ),
+                                labelStyle: TextStyle(color: _darkGreen),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+
+                          _fileButton(
+                            text: _pdfFile == null
+                                ? 'اختيار ملف PDF *'
+                                : 'تم اختيار: ${_pdfFile!.path.split('/').last}',
+                            icon: Icons.picture_as_pdf,
+                            onPressed: _pickPdf,
+                            required: true,
+                            isMissing: showPdfValidation && pdfMissing,
+                          ),
+                          const SizedBox(height: 14),
+
+                          _fileButton(
+                            text: _coverFile == null
+                                ? 'اختيار صورة الغلاف (اختياري)'
+                                : 'تم اختيار الغلاف',
+                            icon: Icons.image_outlined,
+                            onPressed: _pickCover,
+                          ),
+
+                          const SizedBox(height: 8),
+
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: _isReadyToSave ? _saveBook : null,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _confirm,
+                                disabledBackgroundColor:
+                                _confirm.withOpacity(0.45),
+                                disabledForegroundColor: Colors.white70,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: Text(
+                                _saving ? 'جارٍ الحفظ...' : 'حفظ',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+//
+// =============
+// Helpers
+// =============
+
+Widget _fieldContainer({required Widget child, bool isError = false}) {
+  return Container(
+    decoration: BoxDecoration(
+      color: _fillGreen,
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: child,
+  );
+}
+
+Widget _fileButton({
+  required String text,
+  required IconData icon,
+  required VoidCallback onPressed,
+  bool required = false,
+  bool isMissing = false,
+}) {
+  return OutlinedButton.icon(
+    onPressed: onPressed,
+    icon: Icon(icon, color: _darkGreen),
+    label: Text(text, style: const TextStyle(color: _darkGreen)),
+    style: OutlinedButton.styleFrom(
+      side: const BorderSide(color: _darkGreen),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      backgroundColor: _fillGreen,
+    ),
+  );
 }

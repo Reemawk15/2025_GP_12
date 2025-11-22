@@ -91,6 +91,9 @@ flutter:
     - assets/images/admin2.png
     - assets/images/signup.png
     - assets/images/back.png
+    - assets/images/backt.png
+    - assets/images/backtt.png
+    - assets/images/backttt.png
     - assets/images/back.jpeg
     - assets/images/home_bg.png
     - assets/images/private.png
@@ -101,6 +104,7 @@ flutter:
     - assets/images/back1.jpeg
     - assets/images/back7.png
     - assets/images/book7.png
+    - assets/images/pass.png
 
 
 
