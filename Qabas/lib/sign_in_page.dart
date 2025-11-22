@@ -590,7 +590,7 @@ class _AdminSignInPageState extends State<AdminSignInPage> {
         // Not an admin -> sign out for safety and show message
         await FirebaseAuth.instance.signOut();
         _toast(
-          'هذا الحساب ليس حساب مدير النظام.\nيرجى استخدام شاشة تسجيل الدخول العادية.',
+          'بيانات الدخول غير صحيحة.\n تحقق من اسم المستخدم أو البريد الإلكتروني وكلمة المرور.',//////
           color: Colors.red,
         );
       }
@@ -679,7 +679,7 @@ class _AdminSignInPageState extends State<AdminSignInPage> {
                       ),
                       const SizedBox(height: 6),
                       const Text(
-                        'هذه النافذة مخصّصة لمدير النظام فقط. يرجى إدخال بيانات حساب المشرف.',
+                        'هذه النافذة مخصّصة لمشرف النظام فقط. يرجى إدخال بيانات حساب المشرف.',
                         style: TextStyle(color: _SigninTheme.textDark),
                         textAlign: TextAlign.center,
                       ),
