@@ -368,7 +368,7 @@ class _SearchTabState extends State<_SearchTab> {
       .replaceAll('ة', 'ه')
       .replaceAll('ى', 'ي');
 
-  /// Search logic with friend and pending detection
+  /// Search logic with friend and pending detection (initial snapshot)
   Future<void> _onSearch(String raw) async {
     final me = FirebaseAuth.instance.currentUser;
     if (me == null) return;
@@ -479,12 +479,12 @@ class _SearchTabState extends State<_SearchTab> {
         }
       }
 
-      // Mark which of the results are already friends
+      // Mark which of the results are already friends (initial snapshot only)
       map.updateAll(
             (uid, user) => user.copyWith(isFriend: myFriends.contains(uid)),
       );
 
-      // Mark "pending" (outgoing request) for results if exists
+      // Mark "pending" (outgoing request) for results if exists (initial snapshot only)
       final uids = map.keys.toList();
       if (uids.isNotEmpty) {
         final futures = uids.map((otherUid) {
@@ -520,7 +520,7 @@ class _SearchTabState extends State<_SearchTab> {
     }
   }
 
-  /// Send friend request (toggle to pending in local list)
+  /// Send friend request (Firestore write; UI will be updated by streams)
   Future<void> _sendRequest(String toUid) async {
     final me = FirebaseAuth.instance.currentUser!;
     final reqRef = FirebaseFirestore.instance
@@ -538,12 +538,6 @@ class _SearchTabState extends State<_SearchTab> {
         SetOptions(merge: true),
       );
 
-      setState(() {
-        _results = _results
-            .map((x) => x.uid == toUid ? x.copyWith(pending: true) : x)
-            .toList();
-      });
-
       FriendsPage._showAppSnack(context, 'تم إرسال الطلب ');
     } catch (e) {
       FriendsPage._showAppSnack(
@@ -554,7 +548,7 @@ class _SearchTabState extends State<_SearchTab> {
     }
   }
 
-  /// Cancel outgoing friend request and revert back to "Add"
+  /// Cancel outgoing friend request
   Future<void> _cancelRequest(String toUid) async {
     final me = FirebaseAuth.instance.currentUser!;
     final fs = FirebaseFirestore.instance;
@@ -567,13 +561,6 @@ class _SearchTabState extends State<_SearchTab> {
 
     try {
       await reqRef.delete();
-
-      // Update local list: mark this user as not pending anymore
-      setState(() {
-        _results = _results
-            .map((x) => x.uid == toUid ? x.copyWith(pending: false) : x)
-            .toList();
-      });
 
       FriendsPage._showAppSnack(context, 'تم إلغاء طلب الإضافة');
     } catch (e) {
@@ -739,13 +726,9 @@ class _SearchTabState extends State<_SearchTab> {
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                   itemBuilder: (_, i) {
                     final f = _results[i];
-                    return _FriendCard(
-                      name: f.name.isEmpty ? 'بدون اسم' : f.name,
-                      handle: f.handle,
-                      avatar: (f.photoUrl == null)
-                          ? null
-                          : NetworkImage(f.photoUrl!),
-                      onTap: () {
+                    return _SearchResultRow(
+                      user: f,
+                      onOpenDetails: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -753,52 +736,8 @@ class _SearchTabState extends State<_SearchTab> {
                           ),
                         );
                       },
-                      trailing: f.isFriend
-                          ? Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF6F8E63).withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Text(
-                          'صديق',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF6F8E63),
-                          ),
-                        ),
-                      )
-                          : f.pending
-                          ? InkWell(
-                        onTap: () => _confirmCancel(f.uid),
-                        borderRadius: BorderRadius.circular(10),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF6F8E63)
-                                .withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Text(
-                            'بانتظار القبول ⏳',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF6F8E63),
-                            ),
-                          ),
-                        ),
-                      )
-                          : _TinyActionButton(
-                        label: 'إضافة',
-                        color: const Color(0xFF6F8E63),
-                        onTap: () => _sendRequest(f.uid),
-                      ),
+                      onAdd: () => _sendRequest(f.uid),
+                      onCancel: () => _confirmCancel(f.uid),
                     );
                   },
                   separatorBuilder: (_, __) => const SizedBox(height: 12),
@@ -812,14 +751,134 @@ class _SearchTabState extends State<_SearchTab> {
   }
 }
 
+/// Row widget that listens in real time to friend and pending state
+class _SearchResultRow extends StatelessWidget {
+  final _FriendUser user;
+  final VoidCallback onOpenDetails;
+  final VoidCallback onAdd;
+  final VoidCallback onCancel;
+
+  const _SearchResultRow({
+    required this.user,
+    required this.onOpenDetails,
+    required this.onAdd,
+    required this.onCancel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final me = FirebaseAuth.instance.currentUser;
+    if (me == null) {
+      return const SizedBox.shrink();
+    }
+
+    final fs = FirebaseFirestore.instance;
+
+    final myFriendStream = fs
+        .collection('users')
+        .doc(me.uid)
+        .collection('friends')
+        .doc(user.uid)
+        .snapshots();
+
+    final pendingStream = fs
+        .collection('users')
+        .doc(user.uid)
+        .collection('friendRequests')
+        .doc(me.uid)
+        .snapshots();
+
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: myFriendStream,
+      builder: (context, friendSnap) {
+        final isFriend = friendSnap.data?.exists == true;
+
+        if (isFriend) {
+          // Already a friend
+          return _FriendCard(
+            name: user.name.isEmpty ? 'بدون اسم' : user.name,
+            handle: user.handle,
+            avatar: (user.photoUrl == null || user.photoUrl!.isEmpty)
+                ? null
+                : NetworkImage(user.photoUrl!),
+            onTap: onOpenDetails,
+            trailing: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF6F8E63).withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Text(
+                'صديق',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF6F8E63),
+                ),
+              ),
+            ),
+          );
+        }
+
+        // Not a friend -> check pending request in real time
+        return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          stream: pendingStream,
+          builder: (context, pendingSnap) {
+            final pending = pendingSnap.data?.exists == true;
+
+            Widget trailing;
+            if (pending) {
+              // Pending request -> show cancel dialog on tap
+              trailing = InkWell(
+                onTap: onCancel,
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF6F8E63).withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Text(
+                    'بانتظار القبول ⏳',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF6F8E63),
+                    ),
+                  ),
+                ),
+              );
+            } else {
+              // No pending request -> show Add button
+              trailing = _TinyActionButton(
+                label: 'إضافة',
+                color: const Color(0xFF6F8E63),
+                onTap: onAdd,
+              );
+            }
+
+            return _FriendCard(
+              name: user.name.isEmpty ? 'بدون اسم' : user.name,
+              handle: user.handle,
+              avatar: (user.photoUrl == null || user.photoUrl!.isEmpty)
+                  ? null
+                  : NetworkImage(user.photoUrl!),
+              onTap: onOpenDetails,
+              trailing: trailing,
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
 // ========= Search result user model =========
 class _FriendUser {
   final String uid;
   final String name;
   final String handle;
   final String? photoUrl;
-  final bool pending;   // Whether there is an outgoing request awaiting approval
-  final bool isFriend;  // Whether this user is already a friend
+  final bool pending;   // Initial pending snapshot (not used for real-time state)
+  final bool isFriend;  // Initial friend snapshot (not used for real-time state)
 
   _FriendUser({
     required this.uid,

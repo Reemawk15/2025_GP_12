@@ -224,18 +224,24 @@ class _DynamicFriendAction extends StatelessWidget {
           builder: (context, reqSnap) {
             final waiting = reqSnap.data?.exists == true;
             if (waiting) {
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: _confirm.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text(
-                  'بانتظار القبول ⏳',
-                  style: TextStyle(fontWeight: FontWeight.w700, color: _confirm),
+              // Pending state: tapping shows the same cancel-request dialog as in Friends search tab
+              return InkWell(
+                onTap: () => _HeaderAndTabs.confirmCancelPendingRequest(context, friendUid),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _confirm.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    'بانتظار القبول ⏳',
+                    style: TextStyle(fontWeight: FontWeight.w700, color: _confirm),
+                  ),
                 ),
               );
             }
+            // Default: user is not friend and no pending request -> show Add button
             return GestureDetector(
               onTap: () => _HeaderAndTabs.sendFriendRequest(context, friendUid),
               behavior: HitTestBehavior.opaque,
@@ -307,9 +313,10 @@ class _TabsOnly extends StatelessWidget {
 }
 
 /// ===============================
-/// Friend operations (send request / unfriend)
+/// Friend operations (send request / unfriend / cancel pending)
 /// ===============================
 class _HeaderAndTabs {
+  /// Send new friend request from FriendDetails header
   static Future<void> sendFriendRequest(BuildContext context, String friendUid) async {
     final me = FirebaseAuth.instance.currentUser;
     if (me == null) return;
@@ -329,7 +336,7 @@ class _HeaderAndTabs {
     }
   }
 
-  /// Unfriend confirmation dialog using same style as club leave dialog
+  /// Confirmation dialog to unfriend (same style as club leave dialog)
   static Future<void> _confirmUnfollow(
       BuildContext context,
       String friendName,
@@ -421,6 +428,7 @@ class _HeaderAndTabs {
     }
   }
 
+  /// Remove friend relationship in both directions and clean any pending requests
   static Future<void> _unfriend(String myUid, String friendUid) async {
     final fs = FirebaseFirestore.instance;
     final batch = fs.batch();
@@ -437,6 +445,110 @@ class _HeaderAndTabs {
     batch.delete(reqMeHasFromHim);
 
     await batch.commit();
+  }
+
+  /// Public helper used from the pending badge in header.
+  /// Shows "Cancel friend request" confirmation dialog (same style as search tab).
+  static Future<void> confirmCancelPendingRequest(
+      BuildContext context,
+      String friendUid,
+      ) async {
+    final me = FirebaseAuth.instance.currentUser;
+    if (me == null) return;
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+          child: Directionality(
+            textDirection: TextDirection.rtl,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'تأكيد إلغاء طلب الإضافة',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: _darkGreen,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'هل أنت متأكد أنك تريد إلغاء طلب الإضافة؟',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _confirm,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: const Text(
+                      'تأكيد',
+                      style: TextStyle(fontSize: 16, color: Colors.white),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFF2F2F2),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text(
+                      'إلغاء',
+                      style: TextStyle(fontSize: 16, color: _darkGreen),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    if (ok == true) {
+      await _cancelPendingRequest(me.uid, friendUid);
+      if (!context.mounted) return;
+      _showAppSnack(context, 'تم إلغاء طلب الإضافة');
+      // No need to manually update UI; StreamBuilder on friendRequests will update in real time.
+    }
+  }
+
+  /// Delete outgoing friend request document from Firestore.
+  static Future<void> _cancelPendingRequest(String myUid, String friendUid) async {
+    final fs = FirebaseFirestore.instance;
+    final reqRef = fs
+        .collection('users')
+        .doc(friendUid)
+        .collection('friendRequests')
+        .doc(myUid);
+
+    await reqRef.delete();
   }
 }
 
