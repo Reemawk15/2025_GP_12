@@ -111,7 +111,6 @@ class _SignInPageState extends State<SignInPage> {
 
   Future<void> _signIn() async {
     if (!_form.currentState!.validate()) return;
-
     final idInput = _identifier.text.trim();
     final passInput = _pass.text;
 
@@ -133,13 +132,12 @@ class _SignInPageState extends State<SignInPage> {
         final snap = await FirebaseFirestore.instance.collection('users').doc(uid).get();
         final data = snap.data() ?? {};
         final role = (data['role'] as String?)?.toLowerCase();
-        final isAdmin = (data['isAdmin'] == true);
 
         if (!mounted) return;
 
         // If this is an admin account, do NOT allow login from the regular sign-in page
         // Show a generic error without hinting about the admin role
-        if (role == 'admin' || isAdmin) {
+        if (role == 'admin') {
           await FirebaseAuth.instance.signOut();
           _toast(
             'بيانات الدخول غير صحيحة. تحقق من اسم المستخدم أو البريد الإلكتروني وكلمة المرور.',
@@ -412,7 +410,7 @@ class _TopBarArrow extends StatelessWidget {
       // [extended track] then [space] then [circle with arrow] on the right
       textDirection: TextDirection.ltr,
       children: [
-        // Filled track (visual элемент similar to the design)
+        // Filled track (visual element similar to the design)
         Expanded(
           child: Container(
             height: 28,
@@ -576,11 +574,10 @@ class _AdminSignInPageState extends State<AdminSignInPage> {
       final snap = await FirebaseFirestore.instance.collection('users').doc(uid).get();
       final data = snap.data() ?? {};
       final role = (data['role'] as String?)?.toLowerCase();
-      final isAdmin = (data['isAdmin'] == true);
 
       if (!mounted) return;
 
-      if (role == 'admin' || isAdmin) {
+      if (role == 'admin') {
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (_) => const AdminHomeScreen()),
@@ -590,7 +587,7 @@ class _AdminSignInPageState extends State<AdminSignInPage> {
         // Not an admin -> sign out for safety and show message
         await FirebaseAuth.instance.signOut();
         _toast(
-          'بيانات الدخول غير صحيحة.\n تحقق من اسم المستخدم أو البريد الإلكتروني وكلمة المرور.',//////
+          'بيانات الدخول غير صحيحة.\n تحقق من اسم المستخدم أو البريد الإلكتروني وكلمة المرور.',
           color: Colors.red,
         );
       }

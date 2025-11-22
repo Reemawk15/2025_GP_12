@@ -249,7 +249,6 @@ class _SignUpPageState extends State<SignUpPage> {
 
         // Role-related fields (all new sign-ups are listeners / regular users)
         'role': 'listener',
-        'isAdmin': false,
       });
 
       if (!mounted) return;
@@ -515,7 +514,7 @@ class _SignUpPageState extends State<SignUpPage> {
                       ]),
                     ),
 
-                    // 5) Notifications (آخر خطوة + تسجيل)
+                    // 5) Notifications
                     _BottomSheetArea(
                       bottomPadding: kContentBottomPadding,
                       yShift: kShiftNotifs,
