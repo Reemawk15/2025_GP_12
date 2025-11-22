@@ -164,30 +164,15 @@ class _ClubsListTab extends StatelessWidget {
             }
             final clubs = snap.data ?? const [];
 
+
             if (clubs.isEmpty) {
-              return Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  16,
-                  kListTopPadding,
-                  16,
-                  24,
-                ),
-                child: ListView(
-                  padding: EdgeInsets.zero,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: _lightGreen.withOpacity(0.65),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: const Text(
-                        'لا توجد أندية منشورة حتى الآن.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.black87),
-                      ),
-                    ),
-                  ],
+              return const Center(
+                child: Text(
+                  'لا توجد أندية منشورة حتى الآن',
+                  style: TextStyle(
+                    color: Colors.black87,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               );
             }

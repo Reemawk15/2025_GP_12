@@ -84,16 +84,21 @@ flutter:
     - assets/images/friends2.png
     - assets/images/friend.png
     - assets/images/clubs1.png
+    - assets/images/clubs1.jpeg
     - assets/images/clubs2.png
 
+    - assets/images/admin1.png
+    - assets/images/admin2.png
     - assets/images/signup.png
     - assets/images/back.png
+    - assets/images/back.jpeg
     - assets/images/home_bg.png
     - assets/images/private.png
     - assets/images/private2.png
     - assets/images/back_private.png
     - assets/images/back_private2.png
     - assets/images/back1.png
+    - assets/images/back1.jpeg
     - assets/images/back7.png
     - assets/images/book7.png
 

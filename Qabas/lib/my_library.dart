@@ -112,8 +112,8 @@ class MyLibraryPage extends StatelessWidget {
                           labelPadding:
                           const EdgeInsets.symmetric(horizontal: 12),
                           tabs: const [
-                            Tab(text: 'استمع لها الآن'),
                             Tab(text: 'أرغب بالاستماع لها'),
+                            Tab(text: 'استمع لها الآن'),
                             Tab(text: 'استمعت لها'),
                           ],
                         ),
@@ -131,8 +131,8 @@ class MyLibraryPage extends StatelessWidget {
                           : TabBarView(
                         physics: const BouncingScrollPhysics(),
                         children: [
-                          _LibraryShelf(status: 'listen_now', uid: user.uid),
                           _LibraryShelf(status: 'want', uid: user.uid),
+                          _LibraryShelf(status: 'listen_now', uid: user.uid),
                           _LibraryShelf(status: 'listened', uid: user.uid),
                         ],
                       ),
@@ -274,10 +274,10 @@ class _ShelfView extends StatefulWidget {
 
 class _ShelfViewState extends State<_ShelfView> {
   static const List<ShelfRect> _shelfRects = [
-    ShelfRect(leftFrac: 0.18, rightFrac: 0.18, topFrac: 0.08, heightFrac: 0.11),
-    ShelfRect(leftFrac: 0.18, rightFrac: 0.18, topFrac: 0.28, heightFrac: 0.11),
+    ShelfRect(leftFrac: 0.18, rightFrac: 0.18, topFrac: 0.09, heightFrac: 0.11),
+    ShelfRect(leftFrac: 0.18, rightFrac: 0.18, topFrac: 0.29, heightFrac: 0.11),
     ShelfRect(leftFrac: 0.18, rightFrac: 0.18, topFrac: 0.48, heightFrac: 0.11),
-    ShelfRect(leftFrac: 0.18, rightFrac: 0.18, topFrac: 0.68, heightFrac: 0.11),
+    ShelfRect(leftFrac: 0.18, rightFrac: 0.18, topFrac: 0.69, heightFrac: 0.11),
   ];
 
   static const int _perShelf = 4;
@@ -448,8 +448,8 @@ class _BookCard extends StatelessWidget {
   });
 
   static const Map<String, String> _arabicStatus = {
-    'listen_now': 'استمع لها الآن',
     'want': 'أرغب بالاستماع لها',
+    'listen_now': 'استمع لها الآن',
     'listened': 'استمعت لها',
   };
 

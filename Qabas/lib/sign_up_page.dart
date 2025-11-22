@@ -14,12 +14,12 @@ const double kContentBottomPadding = 240; // Content distance from bottom
 
 /// Optional offsets for each page (negative = move up, positive = move down)
 const double kShiftIntro     = 0;
-const double kShiftName      = 0;
+const double kShiftName      = -15;
 const double kShiftNotifs    = 0;
 const double kShiftGreat     = 0;
-const double kShiftEmail     = 20;
-const double kShiftPassword  = 100;
-const double kShiftUsername  = 30;
+const double kShiftEmail     = 10;
+const double kShiftPassword  = 30;
+const double kShiftUsername  = 20;
 
 /// Input fields height
 const double kFieldHeight = 90;
@@ -95,15 +95,22 @@ class _SignUpPageState extends State<SignUpPage> {
 
   void _to(int i) {
     setState(() => _index = i);
-    _pc.animateToPage(i, duration: const Duration(milliseconds: 280), curve: Curves.easeInOut);
+    _pc.animateToPage(
+      i,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeInOut,
+    );
   }
 
-  void _next() => _to((_index + 1).clamp(0, 6));
-  void _back() => _to((_index - 1).clamp(0, 6));
+  void _next() => _to((_index + 1).clamp(0, 5));
+  void _back() => _to((_index - 1).clamp(0, 5));
 
   void _snack(String msg, {Color? color}) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg, textDirection: TextDirection.rtl), backgroundColor: color),
+      SnackBar(
+        content: Text(msg, textDirection: TextDirection.rtl),
+        backgroundColor: color,
+      ),
     );
   }
 
@@ -120,17 +127,31 @@ class _SignUpPageState extends State<SignUpPage> {
 
   bool _canGoNext() {
     switch (_index) {
-      case 0: return true; // Intro
-      case 1: return _nameCtrl.text.trim().length >= 2;
-      case 2: return true; // Notifications are optional
-      case 3: return true; // "Great" screen
+      case 0:
+        return true; // Intro
+
+      case 1:
+      // الاسم
+        return _nameCtrl.text.trim().length >= 2;
+
+      case 2:
+      // اسم المستخدم
+        return _usernameCtrl.text.trim().length >= 3;
+
+      case 3:
+      // الإيميل
+        return RegExp(r'^[^@]+@[^@]+\.[^@]+$')
+            .hasMatch(_emailCtrl.text.trim());
+
       case 4:
-        return RegExp(r'^[^@]+@[^@]+\.[^@]+$').hasMatch(_emailCtrl.text.trim());
-      case 5:
+      // كلمة المرور + التأكيد
         final p = _passCtrl.text, p2 = _pass2Ctrl.text;
         return _validatePassword(p) == null && p2 == p;
-      case 6:
-        return _usernameCtrl.text.trim().length >= 3 && !_loading;
+
+      case 5:
+      // الإشعارات (آخر خطوة - زر التسجيل)
+        return !_loading;
+
       default:
         return true;
     }
@@ -143,7 +164,9 @@ class _SignUpPageState extends State<SignUpPage> {
         Widget? suffix,
       }) {
     const r = 22.0;
-    final borderColor = error ? Colors.red : _SignupTheme.inputBorder.withOpacity(0.35);
+    final borderColor = error
+        ? Colors.red
+        : _SignupTheme.inputBorder.withOpacity(0.35);
     final focusColor  = error ? Colors.red : _SignupTheme.inputBorder;
     return InputDecoration(
       hintText: hint,
@@ -255,15 +278,22 @@ class _SignUpPageState extends State<SignUpPage> {
         textDirection: TextDirection.rtl,
         child: AlertDialog(
           backgroundColor: const Color(0xFFE7EEE8),
-          title: const Text('يبدو أنك جزء من قبس!', textAlign: TextAlign.center),
+          title: const Text(
+            'يبدو أنك جزء من قبس!',
+            textAlign: TextAlign.center,
+          ),
           content: const Text(
             'هذا البريد أو الاسم مستخدم من قبل.\nيمكنك تسجيل الدخول أو تجربة بيانات أخرى.',
             textAlign: TextAlign.center,
           ),
           actionsAlignment: MainAxisAlignment.spaceBetween,
-          actionsPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          actionsPadding:
+          const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('حسنًا')),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('حسنًا'),
+            ),
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
@@ -336,160 +366,14 @@ class _SignUpPageState extends State<SignUpPage> {
                           ),
                         ),
                         const SizedBox(height: 20),
-                        _RoundMainButton(label: 'التالي', onTap: _canGoNext() ? _next : null),
+                        _RoundMainButton(
+                          label: 'التالي',
+                          onTap: _canGoNext() ? _next : null,
+                        ),
                       ]),
                     ),
 
-                    // 2) Notifications
-                    _BottomSheetArea(
-                      bottomPadding: kContentBottomPadding,
-                      yShift: kShiftNotifs,
-                      child: _FormCols(children: [
-                        const _Title('خلك دايمًا قريب من الكتاب'),
-                        const Text(
-                          'خلّنا نساعدك بالتذكير عشان تحقّق هدفك القرائي اليومي',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: _SignupTheme.bodyColor),
-                        ),
-                        const SizedBox(height: 14),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: _SignupTheme.inputBorder.withOpacity(0.35)),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                _notifsEnabled ? Icons.check_circle : Icons.radio_button_unchecked,
-                                color: _SignupTheme.inputBorder,
-                                size: 24,
-                              ),
-                              const SizedBox(width: 8),
-                              const Expanded(child: Text('الإشعارات', style: TextStyle(height: 1.2))),
-                              const SizedBox(width: 8),
-                              Switch(
-                                value: _notifsEnabled,
-                                onChanged: (v) => setState(() => _notifsEnabled = v),
-                                activeColor: _SignupTheme.inputBorder,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        _RoundMainButton(label: 'التالي', onTap: _next),
-                      ]),
-                    ),
-
-                    // 3) "Great" screen
-                    _BottomSheetArea(
-                      bottomPadding: kContentBottomPadding,
-                      yShift: kShiftGreat,
-                      child: _FormCols(children: [
-                        const _Title('رائع'),
-                        const Text(
-                          'جاهزون للبدء، لنقم بإنشاء حسابك لحفظ تفضيلاتك وتخصيص تجربتك',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: _SignupTheme.bodyColor),
-                        ),
-                        const SizedBox(height: 20),
-                        _RoundMainButton(label: 'حسنًا', onTap: _next),
-                      ]),
-                    ),
-
-                    // 4) Email
-                    _BottomSheetArea(
-                      bottomPadding: kContentBottomPadding,
-                      yShift: kShiftEmail,
-                      child: _FormCols(children: [
-                        const _Title('ما هو بريدك الإلكتروني؟'),
-                        FractionallySizedBox(
-                          widthFactor: 0.85,
-                          child: SizedBox(
-                            height: kFieldHeight,
-                            child: TextField(
-                              controller: _emailCtrl,
-                              keyboardType: TextInputType.emailAddress,
-                              decoration: _dec(
-                                'البريد الإلكتروني',
-                                error: _emailCtrl.text.isNotEmpty &&
-                                    !RegExp(r'^[^@]+@[^@]+\.[^@]+$').hasMatch(_emailCtrl.text),
-                                helper: 'أدخل بريدًا صالحًا',
-                              ),
-                              onChanged: (_) => setState(() {}),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        _RoundMainButton(label: 'التالي', onTap: _canGoNext() ? _next : null),
-                      ]),
-                    ),
-
-                    // 5) Password
-                    _BottomSheetArea(
-                      bottomPadding: kContentBottomPadding,
-                      yShift: kShiftPassword,
-                      child: _FormCols(children: [
-                        const _Title('كلمة المرور'),
-                        FractionallySizedBox(
-                          widthFactor: 0.85,
-                          child: SizedBox(
-                            height: kFieldHeight,
-                            child: TextField(
-                              controller: _passCtrl,
-                              obscureText: _obscurePass,
-                              obscuringCharacter: '•',
-                              onChanged: (_) => setState(() {}),
-                              decoration: _dec(
-                                'كلمة المرور',
-                                error: _livePassError != null,
-                                helper: _livePassError ??
-                                    'كلمة المرور يجب أن تكون ٨ أحرف على الأقل\nوتضمّ حرفًا كبيرًا وحرفًا صغيرًا ورقمًا ورمزًا خاصًا.',
-                                suffix: IconButton(
-                                  tooltip: _obscurePass ? 'إظهار' : 'إخفاء',
-                                  onPressed: () => setState(() => _obscurePass = !_obscurePass),
-                                  icon: Icon(
-                                    _obscurePass ? Icons.visibility_off : Icons.visibility,
-                                    color: _SignupTheme.primary,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        FractionallySizedBox(
-                          widthFactor: 0.85,
-                          child: SizedBox(
-                            height: kFieldHeight,
-                            child: TextField(
-                              controller: _pass2Ctrl,
-                              obscureText: _obscurePass2,
-                              obscuringCharacter: '•',
-                              onChanged: (_) => setState(() {}),
-                              decoration: _dec(
-                                'تأكيد كلمة المرور',
-                                error: _livePass2Error != null,
-                                helper: _livePass2Error,
-                                suffix: IconButton(
-                                  tooltip: _obscurePass2 ? 'إظهار' : 'إخفاء',
-                                  onPressed: () => setState(() => _obscurePass2 = !_obscurePass2),
-                                  icon: Icon(
-                                    _obscurePass2 ? Icons.visibility_off : Icons.visibility,
-                                    color: _SignupTheme.primary,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 18),
-                        _RoundMainButton(label: 'التالي', onTap: _canGoNext() ? _next : null),
-                      ]),
-                    ),
-
-                    // 6) Username + register
+                    // 2) Username
                     _BottomSheetArea(
                       bottomPadding: kContentBottomPadding,
                       yShift: kShiftUsername,
@@ -519,6 +403,171 @@ class _SignUpPageState extends State<SignUpPage> {
                         ),
                         const SizedBox(height: 20),
                         _RoundMainButton(
+                          label: 'التالي',
+                          onTap: _canGoNext() ? _next : null,
+                        ),
+                      ]),
+                    ),
+
+                    // 3) Email
+                    _BottomSheetArea(
+                      bottomPadding: kContentBottomPadding,
+                      yShift: kShiftEmail,
+                      child: _FormCols(children: [
+                        const _Title('ما هو بريدك الإلكتروني؟'),
+                        FractionallySizedBox(
+                          widthFactor: 0.85,
+                          child: SizedBox(
+                            height: kFieldHeight,
+                            child: TextField(
+                              controller: _emailCtrl,
+                              keyboardType: TextInputType.emailAddress,
+                              decoration: _dec(
+                                'البريد الإلكتروني',
+                                error: _emailCtrl.text.isNotEmpty &&
+                                    !RegExp(r'^[^@]+@[^@]+\.[^@]+$')
+                                        .hasMatch(_emailCtrl.text),
+                                helper: 'أدخل بريدًا صالحًا',
+                              ),
+                              onChanged: (_) => setState(() {}),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        _RoundMainButton(
+                          label: 'التالي',
+                          onTap: _canGoNext() ? _next : null,
+                        ),
+                      ]),
+                    ),
+
+                    // 4) Password
+                    _BottomSheetArea(
+                      bottomPadding: kContentBottomPadding,
+                      yShift: kShiftPassword,
+                      child: _FormCols(children: [
+                        const _Title('كلمة المرور'),
+                        FractionallySizedBox(
+                          widthFactor: 0.85,
+                          child: SizedBox(
+                            height: kFieldHeight,
+                            child: TextField(
+                              controller: _passCtrl,
+                              obscureText: _obscurePass,
+                              obscuringCharacter: '•',
+                              onChanged: (_) => setState(() {}),
+                              decoration: _dec(
+                                'كلمة المرور',
+                                error: _livePassError != null,
+                                helper: _livePassError ??
+                                    'كلمة المرور يجب أن تكون ٨ أحرف على الأقل\n'
+                                        'وتضمّ حرفًا كبيرًا وحرفًا صغيرًا ورقمًا ورمزًا خاصًا.',
+                                suffix: IconButton(
+                                  tooltip: _obscurePass ? 'إظهار' : 'إخفاء',
+                                  onPressed: () => setState(
+                                          () => _obscurePass = !_obscurePass),
+                                  icon: Icon(
+                                    _obscurePass
+                                        ? Icons.visibility_off
+                                        : Icons.visibility,
+                                    color: _SignupTheme.primary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        FractionallySizedBox(
+                          widthFactor: 0.85,
+                          child: SizedBox(
+                            height: kFieldHeight,
+                            child: TextField(
+                              controller: _pass2Ctrl,
+                              obscureText: _obscurePass2,
+                              obscuringCharacter: '•',
+                              onChanged: (_) => setState(() {}),
+                              decoration: _dec(
+                                'تأكيد كلمة المرور',
+                                error: _livePass2Error != null,
+                                helper: _livePass2Error,
+                                suffix: IconButton(
+                                  tooltip:
+                                  _obscurePass2 ? 'إظهار' : 'إخفاء',
+                                  onPressed: () => setState(
+                                          () => _obscurePass2 = !_obscurePass2),
+                                  icon: Icon(
+                                    _obscurePass2
+                                        ? Icons.visibility_off
+                                        : Icons.visibility,
+                                    color: _SignupTheme.primary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        _RoundMainButton(
+                          label: 'التالي',
+                          onTap: _canGoNext() ? _next : null,
+                        ),
+                      ]),
+                    ),
+
+                    // 5) Notifications (آخر خطوة + تسجيل)
+                    _BottomSheetArea(
+                      bottomPadding: kContentBottomPadding,
+                      yShift: kShiftNotifs,
+                      child: _FormCols(children: [
+                        const _Title('خلك دايمًا قريب من الكتاب'),
+                        const Text(
+                          'خلّنا نساعدك بالتذكير عشان تحقّق هدفك القرائي اليومي',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: _SignupTheme.bodyColor),
+                        ),
+                        const SizedBox(height: 14),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: _SignupTheme.inputBorder
+                                  .withOpacity(0.35),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                _notifsEnabled
+                                    ? Icons.check_circle
+                                    : Icons.radio_button_unchecked,
+                                color: _SignupTheme.inputBorder,
+                                size: 24,
+                              ),
+                              const SizedBox(width: 8),
+                              const Expanded(
+                                child: Text(
+                                  'الإشعارات',
+                                  style: TextStyle(height: 1.2),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Switch(
+                                value: _notifsEnabled,
+                                onChanged: (v) =>
+                                    setState(() => _notifsEnabled = v),
+                                activeColor: _SignupTheme.inputBorder,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        _RoundMainButton(
                           label: _loading ? '...جاري' : 'سجّل',
                           onTap: _canGoNext() ? _tryRegister : null,
                         ),
@@ -535,7 +584,7 @@ class _SignUpPageState extends State<SignUpPage> {
                 right: 24,
                 child: _ProgressWithArrow(
                   step: _index,
-                  total: 7,
+                  total: 6, // صار عدد الصفحات 6
                   onArrowTap: () {
                     if (_index > 0) {
                       _back();
@@ -544,7 +593,9 @@ class _SignUpPageState extends State<SignUpPage> {
                     } else {
                       Navigator.pushReplacement(
                         context,
-                        MaterialPageRoute(builder: (_) => const SignInPage()),
+                        MaterialPageRoute(
+                          builder: (_) => const SignInPage(),
+                        ),
                       );
                     }
                   },
@@ -664,7 +715,10 @@ class _RoundMainButton extends StatelessWidget {
           backgroundColor: _SignupTheme.btnFill,
           foregroundColor: Colors.white,
           shape: const StadiumBorder(),
-          textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+          textStyle: const TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 16,
+          ),
         ),
         child: Text(label),
       ),
@@ -690,7 +744,9 @@ class _ProgressBarRtl extends StatelessWidget {
             decoration: BoxDecoration(
               color: _SignupTheme.track,
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: _SignupTheme.inputBorder.withOpacity(0.35)),
+              border: Border.all(
+                color: _SignupTheme.inputBorder.withOpacity(0.35),
+              ),
             ),
           ),
           Align(

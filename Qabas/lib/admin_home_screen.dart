@@ -81,7 +81,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           // Background image covering the full screen
           Positioned.fill(
             child: Image.asset(
-              'assets/images/back.png',
+              'assets/images/admin1.png',
               fit: BoxFit.cover,
             ),
           ),
@@ -248,7 +248,7 @@ class AdminStatsPage extends StatelessWidget {
       child: Stack(
         children: [
           Positioned.fill(
-            child: Image.asset('assets/images/back.png', fit: BoxFit.cover),
+            child: Image.asset('assets/images/admin1.png', fit: BoxFit.cover),
           ),
           Scaffold(
             backgroundColor: Colors.transparent,

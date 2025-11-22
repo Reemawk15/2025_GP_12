@@ -377,7 +377,7 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
       child: Stack(
         children: [
           Positioned.fill(
-            child: Image.asset('assets/images/back1.png', fit: BoxFit.cover),
+            child: Image.asset('assets/images/admin2.png', fit: BoxFit.cover),
           ),
           SafeArea(
             child: SingleChildScrollView(
@@ -564,7 +564,7 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
       child: Stack(
         children: [
           Positioned.fill(
-            child: Image.asset('assets/images/back1.png', fit: BoxFit.cover),
+            child: Image.asset('assets/images/admin2.png', fit: BoxFit.cover),
           ),
           SafeArea(
             child: StreamBuilder<QuerySnapshot>(
@@ -675,7 +675,7 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
         child: Stack(
           children: [
             Positioned.fill(
-              child: Image.asset('assets/images/back1.png', fit: BoxFit.cover),
+              child: Image.asset('assets/images/admin2.png', fit: BoxFit.cover),
             ),
             Scaffold(
               backgroundColor: Colors.transparent,
@@ -1019,7 +1019,7 @@ class _EditBookPageState extends State<_EditBookPage> {
       child: Stack(
         children: [
           Positioned.fill(
-            child: Image.asset('assets/images/back1.png', fit: BoxFit.cover),
+            child: Image.asset('assets/images/back1.jpeg', fit: BoxFit.cover),
           ),
           Scaffold(
             backgroundColor: Colors.transparent,

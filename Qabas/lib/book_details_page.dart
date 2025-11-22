@@ -768,7 +768,7 @@ class _AddReviewSheet extends StatefulWidget {
 }
 
 class _AddReviewSheetState extends State<_AddReviewSheet> {
-  int _rating = 4;
+  int _rating = 0;
   final _ctrl = TextEditingController();
   bool _saving = false;
 

@@ -378,7 +378,7 @@ class _AdminCommunityTabState extends State<AdminCommunityTab> {
         children: [
           Positioned.fill(
             child: Image.asset(
-              'assets/images/clubs1.png',
+              'assets/images/clubs1.jpeg',
               fit: BoxFit.cover,
             ),
           ),

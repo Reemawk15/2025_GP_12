@@ -4,6 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';          // Auth
 import 'package:cloud_firestore/cloud_firestore.dart';       // Firestore
 import 'package:firebase_storage/firebase_storage.dart';     // Storage
 
+import 'change_password.dart';
+
 class EditProfilePage extends StatefulWidget {
   const EditProfilePage({super.key});
 
@@ -21,7 +23,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
   final _name = TextEditingController();
   final _username = TextEditingController();
   final _email = TextEditingController();
-  final _password = TextEditingController();
 
   String? _photoUrl;
   bool _loading = true;
@@ -139,7 +140,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 ),
                 const SizedBox(height: 24),
 
-
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
@@ -159,7 +159,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 ),
 
                 const SizedBox(height: 10),
-
 
                 SizedBox(
                   width: double.infinity,
@@ -213,37 +212,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
   }
 
-  // Firebase Auth error messages (Arabic text in UI)
-  String _authErrorAr(FirebaseAuthException e) {
-    switch (e.code) {
-      case 'requires-recent-login':
-        return 'لا يمكن إكمال العملية الآن. سجّل خروجًا ثم ادخل من جديد وأعيد المحاولة.';
-      case 'weak-password':
-        return 'كلمة المرور ضعيفة.';
-      case 'too-many-requests':
-        return 'طلبات كثيرة مؤخرًا. يرجى المحاولة لاحقًا.';
-      case 'network-request-failed':
-        return 'تعذر الاتصال. تحقق من الشبكة.';
-      default:
-        return 'تعذّر تنفيذ العملية. (${e.code})';
-    }
-  }
-
-  // Simple password format validation (optional)
-  String? _validatePassword(String? v) {
-    final t = (v ?? '').trim();
-    if (t.isEmpty) return null; // optional
-    final hasUpper   = t.contains(RegExp(r'[A-Z]'));
-    final hasLower   = t.contains(RegExp(r'[a-z]'));
-    final hasDigit   = t.contains(RegExp(r'\d'));
-    final hasSymbol  = t.contains(RegExp(r'[!@#\$%^&*()_+\-=\[\]{};:"\\|,.<>/?`~]'));
-    final noSpaces   = !t.contains(' ');
-    if (t.length < 8 || !hasUpper || !hasLower || !hasDigit || !hasSymbol || !noSpaces) {
-      return 'كلمة المرور يجب أن تكون ٨ أحرف على الأقل\n وتضمّ حرفًا كبيرًا وحرفًا صغيرًا ورقمًا ورمزًا خاصًا.';
-    }
-    return null;
-  }
-
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -253,20 +221,15 @@ class _EditProfilePageState extends State<EditProfilePage> {
     final currentPhoto = _user.photoURL ?? '';
 
     final newName   = _name.text.trim();
-    final newUser   = _username.text.trim();  // not editable (kept for completeness)
-    final newEmail  = _email.text.trim();     // not editable (kept for completeness)
-    final newPass   = _password.text.trim();
     final newPhoto  = _photoUrl ?? '';
 
     final nameChanged  = newName.isNotEmpty && newName != currentName;
     final photoChanged = newPhoto != currentPhoto;
-    final passProvided = newPass.isNotEmpty;
 
     bool anySuccess = false;
-    bool anyError   = false;
 
     try {
-      // 1) Firestore document update
+      // 1) تحديث بيانات المستخدم في Firestore
       final profilePayload = <String, dynamic>{
         if (nameChanged) ...{
           'name': newName,
@@ -297,29 +260,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
         await _user.reload();
       }
 
-      // 3) Password update (optional)
-      if (passProvided) {
-        final passError = _validatePassword(newPass);
-        if (passError != null) {
-          anyError = true;
-          _showSnack(passError, icon: Icons.error_outline);
-        } else {
-          try {
-            await _user.updatePassword(newPass);
-            anySuccess = true;
-            _showSnack('تم تحديث كلمة المرور', icon: Icons.check_circle);
-          } on FirebaseAuthException catch (e) {
-            anyError = true;
-            _showSnack(_authErrorAr(e), icon: Icons.error_outline);
-          }
-        }
-      }
-
-      // Final message / navigation
-      if (anySuccess && !anyError) {
+      if (anySuccess) {
         _showSnack('تم حفظ التعديلات ', icon: Icons.check_circle);
         if (mounted) Navigator.pop(context);
-      } else if (!anySuccess && !anyError) {
+      } else {
         _showSnack('لا توجد تغييرات لحفظها.', icon: Icons.info_outline);
       }
 
@@ -392,7 +336,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                 borderRadius: BorderRadius.circular(16),
                                 child: CircleAvatar(
                                   radius: 16,
-                                  backgroundColor: Colors.red.shade600,
+                                  backgroundColor: Colors.redAccent,
                                   child: const Icon(Icons.delete_outline,
                                       size: 16, color: Colors.white),
                                 ),
@@ -456,7 +400,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                   _field(
                                     controller: _username,
                                     hint: '@username',
-                                    enabled: false, //  Not editable
+                                    enabled: false, // غير قابل للتعديل
                                     suffixIcon: const Icon(
                                       Icons.lock_outline,
                                       size: 18,
@@ -469,7 +413,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                     controller: _email,
                                     keyboard: TextInputType.emailAddress,
                                     hint: 'name@example.com',
-                                    enabled: false, //  Not editable
+                                    enabled: false, // غير قابل للتعديل
                                     suffixIcon: const Icon(
                                       Icons.lock_outline,
                                       size: 18,
@@ -479,12 +423,38 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                   const SizedBox(height: 12),
 
                                   _label('كلمة المرور'),
-                                  _field(
-                                    controller: _password,
-                                    hint: '••••••••',
-                                    obscure: true,
-                                    validator: _validatePassword,
+                                  SizedBox(
+                                    height: 48,
+                                    child: OutlinedButton(
+                                      style: OutlinedButton.styleFrom(
+                                        side: const BorderSide(
+                                            color: _confirm, width: 1.6),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                          BorderRadius.circular(26),
+                                        ),
+                                        backgroundColor: Colors.white,
+                                      ),
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                            const ChangePasswordPage(),
+                                          ),
+                                        );
+                                      },
+                                      child: const Text(
+                                        'تغيير كلمة المرور',
+                                        style: TextStyle(
+                                          fontSize: 14.5,
+                                          fontWeight: FontWeight.w600,
+                                          color: _darkGreen,
+                                        ),
+                                      ),
+                                    ),
                                   ),
+
                                   const SizedBox(height: 20),
 
                                   SizedBox(

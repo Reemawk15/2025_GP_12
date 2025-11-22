@@ -357,24 +357,34 @@ class _SignInPageState extends State<SignInPage> {
                             ],
                           ),
                           const SizedBox(height: 8),
-                          InkWell(
-                            onTap: _loading
-                                ? null
-                                : () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (_) => const AdminSignInPage()),
-                              );
-                            },
-                            child: const Text(
-                              'هل أنت مدير النظام؟ تسجيل دخول المشرف',
-                              style: TextStyle(
-                                color: _SigninTheme.textDark,
-                                fontWeight: FontWeight.w600,
-                                decoration: TextDecoration.underline,
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Text(
+                                'هل أنت مشرف النظام؟ ',
+                                style: TextStyle(
+                                  color: _SigninTheme.textDark,
+                                ),
                               ),
-                              textAlign: TextAlign.center,
-                            ),
+                              InkWell(
+                                onTap: _loading
+                                    ? null
+                                    : () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => const AdminSignInPage()),
+                                  );
+                                },
+                                child: const Text(
+                                  'سجّل الدخول',
+                                  style: TextStyle(
+                                    color: _SigninTheme.textDark,
+                                    fontWeight: FontWeight.w700,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
