@@ -490,23 +490,24 @@ class _ReviewTile extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Book cover
+          // Book cover (تظهر كاملة بدون قص)
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: (coverUrl != null && coverUrl!.isNotEmpty)
-                ? Image.network(
-              coverUrl!,
+            child: Container(
               width: _coverWidth,
               height: _coverHeight,
-              fit: BoxFit.cover,
-            )
-                : Container(
-              width: _coverWidth,
-              height: _coverHeight,
-              color: Colors.white.withOpacity(0.6),
-              child: const Icon(
+              color: Colors.white, // خلفية بيضاء حوالين الغلاف
+              child: (coverUrl != null && coverUrl!.isNotEmpty)
+                  ? Image.network(
+                coverUrl!,
+                fit: BoxFit
+                    .contain, // ← كذا الغلاف يطلع كامل داخل الإطار
+                alignment: Alignment.center,
+              )
+                  : const Icon(
                 Icons.menu_book,
                 color: _darkGreen,
+                size: 36,
               ),
             ),
           ),
