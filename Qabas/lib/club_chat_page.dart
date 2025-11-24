@@ -7,13 +7,15 @@ import 'friend_details_page.dart';
 class ClubChatPage extends StatefulWidget {
   final String clubId;
   final String clubTitle;
-  final bool showWelcome; // جديد
+  final bool showWelcome;       // هل نعرض جملة الترحيب
+  final bool enableProfileTap;  // هل نسمح بفتح حساب الشخص من الصورة
 
   const ClubChatPage({
     super.key,
     required this.clubId,
     required this.clubTitle,
-    this.showWelcome = true, // اليوزر الافتراضي
+    this.showWelcome = true,
+    this.enableProfileTap = true, // الافتراضي: يسمح بفتح البروفايل
   });
 
   @override
@@ -50,9 +52,7 @@ class _ClubChatPageState extends State<ClubChatPage> {
           elevation: 0,
           toolbarHeight: 90,
           centerTitle: false,
-          // خليه صفر أو قريب منه عشان العنوان يجي ملاصق لمنطقة التايتل
           titleSpacing: 0,
-          // نخلي مساحة كافية للسهم
           leadingWidth: 56,
           title: widget.showWelcome
               ? FutureBuilder<({String name, String? photoUrl})>(
@@ -63,7 +63,6 @@ class _ClubChatPageState extends State<ClubChatPage> {
                   : snap.data!.name;
 
               return Padding(
-                // نرفع التايتل شوي لتحت البار
                 padding: const EdgeInsets.only(top: 16, right: 4),
                 child: Align(
                   alignment: Alignment.centerRight,
@@ -103,7 +102,7 @@ class _ClubChatPageState extends State<ClubChatPage> {
             },
           )
               : Padding(
-            padding: const EdgeInsets.only(top: 16, right: 24), // 👈 هنا زدتها
+            padding: const EdgeInsets.only(top: 16, right: 24),
             child: Align(
               alignment: Alignment.centerRight,
               child: Text(
@@ -136,7 +135,10 @@ class _ClubChatPageState extends State<ClubChatPage> {
         body: Stack(
           children: [
             Positioned.fill(
-              child: Image.asset('assets/images/clubs2.png', fit: BoxFit.cover),
+              child: Image.asset(
+                'assets/images/clubs2.png',
+                fit: BoxFit.cover,
+              ),
             ),
             Column(
               children: [
@@ -147,11 +149,15 @@ class _ClubChatPageState extends State<ClubChatPage> {
                         .streamMessages(widget.clubId),
                     builder: (context, snap) {
                       if (snap.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
+                        return const Center(
+                          child: CircularProgressIndicator(),
+                        );
                       }
                       final docs = snap.data?.docs ?? [];
                       if (docs.isEmpty) {
-                        return const Center(child: Text('ابدأ المحادثة…'));
+                        return const Center(
+                          child: Text('ابدأ المحادثة…'),
+                        );
                       }
                       return ListView.builder(
                         padding: const EdgeInsets.fromLTRB(12, 20, 12, 12),
@@ -162,16 +168,21 @@ class _ClubChatPageState extends State<ClubChatPage> {
                           final text = (m['text'] ?? '') as String;
                           final senderUid = (m['uid'] ?? '') as String;
 
-                          final fallbackName  = (m['displayName'] ?? '').toString().trim();
-                          final fallbackPhoto = (m['photoUrl'] ?? '').toString().trim();
+                          final fallbackName =
+                          (m['displayName'] ?? '').toString().trim();
+                          final fallbackPhoto =
+                          (m['photoUrl'] ?? '').toString().trim();
 
                           return _ChatRow(
                             mine: mine,
                             uid: senderUid,
                             text: text,
-                            fallbackName: fallbackName.isEmpty ? null : fallbackName,
-                            fallbackPhotoUrl: fallbackPhoto.isEmpty ? null : fallbackPhoto,
+                            fallbackName:
+                            fallbackName.isEmpty ? null : fallbackName,
+                            fallbackPhotoUrl:
+                            fallbackPhoto.isEmpty ? null : fallbackPhoto,
                             bubbleColor: mine ? _bubbleMe : _bubbleOther,
+                            enableProfileTap: widget.enableProfileTap,
                           );
                         },
                       );
@@ -191,7 +202,8 @@ class _ClubChatPageState extends State<ClubChatPage> {
                             style: TextButton.styleFrom(
                               backgroundColor: _confirm,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              padding:
+                              const EdgeInsets.symmetric(horizontal: 16),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -205,7 +217,8 @@ class _ClubChatPageState extends State<ClubChatPage> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            padding:
+                            const EdgeInsets.symmetric(horizontal: 14),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(22),
@@ -302,6 +315,7 @@ class _ChatRow extends StatelessWidget {
   final String? fallbackName;
   final String? fallbackPhotoUrl;
   final Color bubbleColor;
+  final bool enableProfileTap;
 
   const _ChatRow({
     required this.mine,
@@ -310,13 +324,12 @@ class _ChatRow extends StatelessWidget {
     required this.bubbleColor,
     this.fallbackName,
     this.fallbackPhotoUrl,
+    this.enableProfileTap = true,
   });
 
   @override
   Widget build(BuildContext context) {
-    // نسمع لتغيّر بيانات المستخدم من users/{uid}
-    return StreamBuilder<
-        DocumentSnapshot<Map<String, dynamic>>>(
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance
           .collection('users')
           .doc(uid)
@@ -334,8 +347,7 @@ class _ChatRow extends StatelessWidget {
               .toString()
               .trim();
           photoUrl =
-              (data['photoUrl'] ?? data['avatarUrl'] ?? photoUrl)
-                  ?.toString();
+              (data['photoUrl'] ?? data['avatarUrl'] ?? photoUrl)?.toString();
         }
 
         if (name.isEmpty) name = 'مستخدم';
@@ -354,9 +366,12 @@ class _ChatRow extends StatelessWidget {
               : null,
         );
 
-        final tappableAvatar = GestureDetector(
+        // لو enableProfileTap = false → مجرد صورة بدون onTap
+        final tappableAvatar = enableProfileTap
+            ? GestureDetector(
           onTap: () {
-            if (mine || uid.isEmpty) return;
+            // لو ما تبين الأدمن يدخل حساب أحد: لاحقًا نخليها false عنده
+            if (uid.isEmpty || mine) return;
             Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => FriendDetailsPage(friendUid: uid),
@@ -364,7 +379,8 @@ class _ChatRow extends StatelessWidget {
             );
           },
           child: avatar,
-        );
+        )
+            : avatar;
 
         final bubble = Container(
           constraints: const BoxConstraints(maxWidth: 280),

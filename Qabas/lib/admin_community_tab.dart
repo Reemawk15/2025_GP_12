@@ -212,7 +212,8 @@ class _AdminCommunityTabState extends State<AdminCommunityTab> {
           builder: (_) => ClubChatPage(
             clubId: clubId,
             clubTitle: clubTitle,
-            showWelcome: false, // الأدمن بدون الترحيب
+            showWelcome: false,      // الأدمن بدون الترحيب
+            enableProfileTap: false, // 👈 هنا المهم: لا يقدر يفتح حسابات من الصورة
           ),
         ),
       );
