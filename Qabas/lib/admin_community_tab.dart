@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';       // <-- مهم
 import 'firestore_clubs_service.dart';
+import 'club_chat_page.dart';
 
 class AdminCommunityTab extends StatefulWidget {
   const AdminCommunityTab({super.key});
@@ -172,11 +174,56 @@ class _AdminCommunityTabState extends State<AdminCommunityTab> {
 
     if (confirm != true) return;
 
-    // Run club deletion logic
     await FirestoreClubsService.instance.cancelClubForRequest(r);
 
     if (!mounted) return;
     _showClubCancelledSnack();
+  }
+
+  // ==========================
+  // فتح الشات المرتبط بطلب معيّن
+  // ==========================
+  Future<void> _openClubChatForRequest(ClubRequest r) async {
+    try {
+      // ندور على النادي اللي requestId فيه يساوي id حق الطلب
+      final snap = await FirebaseFirestore.instance
+          .collection('clubs')
+          .where('requestId', isEqualTo: r.id)
+          .limit(1)
+          .get();
+
+      if (snap.docs.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('لا يوجد نادي مربوط بهذا الطلب حتى الآن'),
+          ),
+        );
+        return;
+      }
+
+      final clubDoc = snap.docs.first;
+      final clubId = clubDoc.id;
+      final clubTitle = (clubDoc.data()['title'] ?? r.title) as String;
+
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ClubChatPage(
+            clubId: clubId,
+            clubTitle: clubTitle,
+            showWelcome: false, // الأدمن بدون الترحيب
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تعذر فتح المحادثة لهذا النادي'),
+        ),
+      );
+    }
   }
 
   // ==========================
@@ -273,7 +320,6 @@ class _AdminCommunityTabState extends State<AdminCommunityTab> {
             itemBuilder: (_, i) {
               final r = list[i];
 
-              // Decide chip text & color based on status
               String statusLabel;
               Color statusColor;
 
@@ -299,19 +345,24 @@ class _AdminCommunityTabState extends State<AdminCommunityTab> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      r.title,
-                      style: const TextStyle(
-                        color: _darkGreen,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                    // ===== عنوان النادي قابل للضغط =====
+                    InkWell(
+                      onTap: isAccepted
+                          ? () => _openClubChatForRequest(r)
+                          : null,
+                      child: Text(
+                        r.title,
+                        style: const TextStyle(
+                          color: _darkGreen,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          decoration: TextDecoration.underline,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 10),
-
                     Row(
                       children: [
-                        // حبة حالة الطلب
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 12,
@@ -329,10 +380,7 @@ class _AdminCommunityTabState extends State<AdminCommunityTab> {
                             ),
                           ),
                         ),
-
                         const SizedBox(width: 8),
-
-                        // زر "إلغاء النادي" بنفس شكل مقبول وبجنبه
                         if (isAccepted)
                           InkWell(
                             onTap: () => _cancelClub(r),
@@ -343,7 +391,7 @@ class _AdminCommunityTabState extends State<AdminCommunityTab> {
                                 vertical: 6,
                               ),
                               decoration: BoxDecoration(
-                                color: _midGreen,        // نفس لون مقبول
+                                color: _midGreen,
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: const Text(
@@ -382,11 +430,9 @@ class _AdminCommunityTabState extends State<AdminCommunityTab> {
               fit: BoxFit.cover,
             ),
           ),
-
           Scaffold(
             backgroundColor: Colors.transparent,
             extendBodyBehindAppBar: true,
-
             appBar: AppBar(
               backgroundColor: Colors.transparent,
               elevation: 0,
@@ -405,7 +451,6 @@ class _AdminCommunityTabState extends State<AdminCommunityTab> {
                 ),
               ),
             ),
-
             body: Padding(
               padding: const EdgeInsets.fromLTRB(16, 150, 16, 24),
               child: DefaultTabController(
@@ -441,7 +486,7 @@ class _AdminCommunityTabState extends State<AdminCommunityTab> {
   }
 }
 
-// Hosts for TabBarView (same technique as admin books)
+// Hosts for TabBarView
 class _CurrentTabHost extends StatelessWidget {
   const _CurrentTabHost();
 
@@ -463,9 +508,10 @@ class _HistoryTabHost extends StatelessWidget {
 }
 
 // ===============================
-// Request details page (same as before)
+// Request details page (نفسه)
 // ===============================
 enum _Decision { accepted, rejected }
+
 
 class _RequestDetailsPage extends StatelessWidget {
   const _RequestDetailsPage({
