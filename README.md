@@ -27,16 +27,17 @@ Qabas is an Arabic audiobook mobile application that allows users to convert Ara
 
 ---
 
-## Launching Instructions
+##  Launching Instructions
 
--Open the 2025_GP_12 repository on GitHub.
--Click the Code button and download the project as a .zip file.
--Unzip the file.
--Open the project in Android Studio.
--Run flutter pub get to install dependencies.
--Connect an emulator or device.
--Run the application using:
-  flutter run
+- Open the 2025_GP_12 repository on GitHub.
+- Click the Code button and download the project as a .zip file.
+- Unzip the file.
+- Open the project in Android Studio.
+- Run `flutter pub get` to install dependencies.
+- Connect an emulator or device.
+- Run the application using: `flutter run`
+
+
 
 
 ## Repository Link
