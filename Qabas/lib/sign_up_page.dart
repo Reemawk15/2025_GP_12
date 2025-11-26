@@ -519,9 +519,9 @@ class _SignUpPageState extends State<SignUpPage> {
                       bottomPadding: kContentBottomPadding,
                       yShift: kShiftNotifs,
                       child: _FormCols(children: [
-                        const _Title('خلك دايمًا قريب من الكتاب'),
+                        const _Title('كن قريبًا دائمًا'),
                         const Text(
-                          'خلّنا نساعدك بالتذكير عشان تحقّق هدفك القرائي اليومي',
+                          'دعنا نساعدك بالتذكير لتحقّق هدفك القرائي الأسبوعي',
                           textAlign: TextAlign.center,
                           style: TextStyle(color: _SignupTheme.bodyColor),
                         ),
@@ -567,7 +567,7 @@ class _SignUpPageState extends State<SignUpPage> {
                         ),
                         const SizedBox(height: 20),
                         _RoundMainButton(
-                          label: _loading ? '...جاري' : 'سجّل',
+                          label: _loading ? 'جاري التسجيل...' : 'سجّل',
                           onTap: _canGoNext() ? _tryRegister : null,
                         ),
                       ]),
@@ -583,7 +583,7 @@ class _SignUpPageState extends State<SignUpPage> {
                 right: 24,
                 child: _ProgressWithArrow(
                   step: _index,
-                  total: 6, // صار عدد الصفحات 6
+                  total: 6,
                   onArrowTap: () {
                     if (_index > 0) {
                       _back();
