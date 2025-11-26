@@ -22,6 +22,8 @@ Qabas is an Arabic audiobook mobile application that allows users to convert Ara
 ![TTS](https://img.shields.io/badge/TTS-FF6F00?logo=googleassistant&logoColor=white)
 ![GitHub](https://img.shields.io/badge/GitHub-181717?logo=github&logoColor=white)
 ![Jira](https://img.shields.io/badge/Jira-0052CC?logo=jira&logoColor=white)
+![Firebase](https://img.shields.io/badge/Firebase-FFCA28?logo=firebase&logoColor=black)
+![Firebase](https://img.shields.io/badge/Firebase-FFCA28?logo=firebase&logoColor=black)
 
 ---
 
