@@ -1458,7 +1458,21 @@ class _AddMyBookPageState extends State<AddMyBookPage> {
                               ),
                             ),
                           ),
-                          const SizedBox(height: 14),
+                          const SizedBox(height: 8),
+
+                          const Align(
+                            alignment: Alignment.centerRight,
+                            child: Text(
+                              'تنبيه: يدعم النظام معالجة ملفات PDF العربية فقط. الملفات المكتوبة بلغات أخرى لن تظهر لها نتائج.',
+                              textAlign: TextAlign.right,
+                              style: TextStyle(
+                                color: Colors.black54,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 6),
                           _fileButton(
                             text: _pdfFile == null
                                 ? 'اختيار ملف PDF *'
