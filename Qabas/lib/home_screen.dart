@@ -168,20 +168,22 @@ class _HomeScreenState extends State<HomeScreen> {
           .doc(user.uid)
           .snapshots()
           .listen((doc) {
-        String? name;
-        if (doc.exists) {
-          final data = doc.data() ?? {};
-          name = (data['name'] ??
-              data['fullName'] ??
-              data['displayName'] ??
-              '') as String?;
-          if ((name ?? '').trim().isEmpty) name = null;
-        }
-        name ??= user.displayName;
-        if (mounted) {
-          setState(() => _displayName = name);
-        }
-      }, onError: (_) {});
+            String? name;
+            if (doc.exists) {
+              final data = doc.data() ?? {};
+              name =
+                  (data['name'] ??
+                          data['fullName'] ??
+                          data['displayName'] ??
+                          '')
+                      as String?;
+              if ((name ?? '').trim().isEmpty) name = null;
+            }
+            name ??= user.displayName;
+            if (mounted) {
+              setState(() => _displayName = name);
+            }
+          }, onError: (_) {});
     }
   }
 
@@ -196,10 +198,9 @@ class _HomeScreenState extends State<HomeScreen> {
           .get();
       if (doc.exists) {
         final data = doc.data() ?? {};
-        name = (data['name'] ??
-            data['fullName'] ??
-            data['displayName'] ??
-            '') as String;
+        name =
+            (data['name'] ?? data['fullName'] ?? data['displayName'] ?? '')
+                as String;
         if (name.trim().isEmpty) name = null;
       }
     } catch (_) {}
@@ -223,12 +224,13 @@ class _HomeScreenState extends State<HomeScreen> {
         .doc(user.uid)
         .snapshots()
         .map((doc) {
-      final data = doc.data();
-      String? name =
-      (data?['name'] ?? data?['fullName'] ?? data?['displayName']) as String?;
-      if ((name ?? '').trim().isEmpty) name = null;
-      return name;
-    });
+          final data = doc.data();
+          String? name =
+              (data?['name'] ?? data?['fullName'] ?? data?['displayName'])
+                  as String?;
+          if ((name ?? '').trim().isEmpty) name = null;
+          return name;
+        });
   }
 
   // Search state
@@ -270,18 +272,14 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!_booksScrollController.hasClients) return;
 
     // Move by one "page" of visible covers
-    final double delta =
-        coverW * visibleCount + coverGap * (visibleCount - 1);
+    final double delta = coverW * visibleCount + coverGap * (visibleCount - 1);
 
     // In RTL UI we still treat forward as increasing offset
-    final double target = _booksScrollController.offset +
-        (forward ? delta : -delta);
+    final double target =
+        _booksScrollController.offset + (forward ? delta : -delta);
 
     _booksScrollController.animateTo(
-      target.clamp(
-        0.0,
-        _booksScrollController.position.maxScrollExtent,
-      ),
+      target.clamp(0.0, _booksScrollController.position.maxScrollExtent),
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeOut,
     );
@@ -296,11 +294,7 @@ class _HomeScreenState extends State<HomeScreen> {
         color: Colors.white.withOpacity(0.9),
         shape: BoxShape.circle,
         boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 6,
-            offset: Offset(0, 2),
-          ),
+          BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 2)),
         ],
       ),
       child: IconButton(
@@ -308,7 +302,9 @@ class _HomeScreenState extends State<HomeScreen> {
         iconSize: 18,
         onPressed: () => _scrollBooks(forward: isLeft),
         icon: Icon(
-          isLeft ? Icons.keyboard_double_arrow_left : Icons.keyboard_double_arrow_right,
+          isLeft
+              ? Icons.keyboard_double_arrow_left
+              : Icons.keyboard_double_arrow_right,
           color: _HomeColors.unselected,
         ),
       ),
@@ -326,16 +322,16 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context, c) {
         final w = c.maxWidth;
         final visibleWidth = cardW * count + gap * (count - 1);
-        final double sidePad =
-        ((w - visibleWidth) / 2).clamp(0.0, double.infinity).toDouble();
+        final double sidePad = ((w - visibleWidth) / 2)
+            .clamp(0.0, double.infinity)
+            .toDouble();
 
         return SizedBox(
           height: cardH + 30.0,
           child: Stack(
             children: [
               // Books horizontal list
-              StreamBuilder<
-                  List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+              StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
                 stream: _booksStream(),
                 builder: (context, snap) {
                   if (snap.connectionState == ConnectionState.waiting) {
@@ -379,15 +375,15 @@ class _HomeScreenState extends State<HomeScreen> {
                               clipBehavior: Clip.antiAlias,
                               child: cover.isNotEmpty
                                   ? Image.network(
-                                cover,
-                                fit: BoxFit
-                                    .contain, // Show full cover without cropping
-                              )
+                                      cover,
+                                      fit: BoxFit
+                                          .contain, // Show full cover without cropping
+                                    )
                                   : const Icon(
-                                Icons.menu_book,
-                                size: 48,
-                                color: _HomeColors.unselected,
-                              ),
+                                      Icons.menu_book,
+                                      size: 48,
+                                      color: _HomeColors.unselected,
+                                    ),
                             ),
                             const SizedBox(height: 6),
                             SizedBox(
@@ -452,6 +448,7 @@ class _HomeScreenState extends State<HomeScreen> {
               SizedBox(height: _topSpacingUnderHeader),
 
               // Greeting (live from Firestore)
+              /*
               StreamBuilder<String?>(
                 stream: _userNameStream(),
                 builder: (context, snap) {
@@ -477,6 +474,37 @@ class _HomeScreenState extends State<HomeScreen> {
                   );
                 },
               ),
+              */
+              // New update
+              StreamBuilder<String?>(
+                stream: _userNameStream(),
+                builder: (context, snap) {
+                  final liveName = snap.data;
+                  final fallbackName =
+                      _displayName ??
+                      FirebaseAuth.instance.currentUser?.displayName ??
+                      'صديقي';
+                  final name = (liveName == null || liveName.trim().isEmpty)
+                      ? fallbackName
+                      : liveName;
+
+                  final hour = DateTime.now().hour;
+                  final greeting = (hour < 12) ? "صباحك سعيد" : "مساؤك سعيد";
+
+                  return Transform.translate(
+                    offset: const Offset(0, -11),
+                    child: Text(
+                      '$greeting $name',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: _HomeColors.selected,
+                      ),
+                    ),
+                  );
+                },
+              ),
+
               const SizedBox(height: 26),
 
               // Search box
@@ -694,12 +722,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: GridView.builder(
                         padding: const EdgeInsets.only(bottom: 12),
                         gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          mainAxisSpacing: 12,
-                          crossAxisSpacing: 12,
-                          childAspectRatio: 3.2,
-                        ),
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              mainAxisSpacing: 12,
+                              crossAxisSpacing: 12,
+                              childAspectRatio: 3.2,
+                            ),
                         itemCount: _categories.length,
                         itemBuilder: (context, i) {
                           final cat = _categories[i];
@@ -739,12 +767,12 @@ class _HomeScreenState extends State<HomeScreen> {
                             icon: const Icon(Icons.clear),
                             label: const Text('مسح الكل'),
                             style: OutlinedButton.styleFrom(
-                              minimumSize:
-                              const Size.fromHeight(48), // Same height
+                              minimumSize: const Size.fromHeight(
+                                48,
+                              ), // Same height
                               foregroundColor: _HomeColors.selected,
                               side: BorderSide(
-                                color:
-                                _HomeColors.selected.withOpacity(0.6),
+                                color: _HomeColors.selected.withOpacity(0.6),
                               ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(14),
@@ -759,12 +787,12 @@ class _HomeScreenState extends State<HomeScreen> {
                               Navigator.pop(context);
                               setState(() {}); // Apply filters on page
                             },
-                            icon:
-                            const Icon(Icons.check_circle_outline),
+                            icon: const Icon(Icons.check_circle_outline),
                             label: const Text('تطبيق التصفية'),
                             style: ElevatedButton.styleFrom(
-                              minimumSize:
-                              const Size.fromHeight(48), // Same height
+                              minimumSize: const Size.fromHeight(
+                                48,
+                              ), // Same height
                               backgroundColor: _HomeColors.selected,
                               foregroundColor: Colors.white,
                               shape: RoundedRectangleBorder(
