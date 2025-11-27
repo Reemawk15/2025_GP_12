@@ -15,9 +15,7 @@ const Color _midGreen   = Color(0xFF2F5145);
 const Color _fillGreen  = Color(0xFFC9DABF);
 const Color _confirm    = Color(0xFF6F8E63);
 
-/// =============================
-/// LibraryTab: كل المكتبة الخاصة + كتبي
-/// =============================
+/// Main tab that shows private shelves + "My Books"
 class LibraryTab extends StatelessWidget {
   const LibraryTab({super.key});
 
@@ -25,7 +23,7 @@ class LibraryTab extends StatelessWidget {
     if (Navigator.of(context).canPop()) {
       Navigator.of(context).pop();
     }
-    // ولو هي داخل bottom nav ما يحتاج يسوي شيء
+    // If inside bottom navigation root, nothing happens
   }
 
   @override
@@ -38,7 +36,7 @@ class LibraryTab extends StatelessWidget {
         length: 4,
         child: Stack(
           children: [
-            // الخلفية العامة لكل الشلفز (كل التبويبات)
+            // Global background for all shelves (all tabs)
             Positioned.fill(
               child: Image.asset(
                 'assets/images/backttt.png',
@@ -51,9 +49,10 @@ class LibraryTab extends StatelessWidget {
               floatingActionButton: user == null
                   ? null
                   : Padding(
-                padding: const EdgeInsets.only(bottom: 100), // زيدي/قلّلي القيمة اللي تريحك
+                // Adjust this value to move the FAB up/down
+                padding: const EdgeInsets.only(bottom: 100),
                 child: FloatingActionButton(
-                  mini: true, // ← تصغير الزر
+                  mini: true, // Smaller FAB
                   backgroundColor: _confirm,
                   onPressed: () {
                     Navigator.of(context).push(
@@ -70,7 +69,7 @@ class LibraryTab extends StatelessWidget {
                   children: [
                     const SizedBox(height: 60),
 
-                    // TabBar
+                    // Tab bar to switch between shelves
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Container(
@@ -84,7 +83,8 @@ class LibraryTab extends StatelessWidget {
                             borderSide: BorderSide(width: 2),
                           ),
                           dividerColor: Colors.transparent,
-                          overlayColor: MaterialStatePropertyAll(Colors.transparent),
+                          overlayColor:
+                          MaterialStatePropertyAll(Colors.transparent),
                           labelColor: _midGreen,
                           unselectedLabelColor: Colors.black54,
                           labelStyle: TextStyle(
@@ -116,9 +116,11 @@ class LibraryTab extends StatelessWidget {
                           : TabBarView(
                         physics: const BouncingScrollPhysics(),
                         children: [
-                          _LibraryShelf(status: 'want',       uid: user.uid),
-                          _LibraryShelf(status: 'listen_now', uid: user.uid),
-                          _LibraryShelf(status: 'listened',   uid: user.uid),
+                          _LibraryShelf(status: 'want', uid: user.uid),
+                          _LibraryShelf(
+                              status: 'listen_now', uid: user.uid),
+                          _LibraryShelf(
+                              status: 'listened', uid: user.uid),
                           _MyBooksShelfTab(uid: user.uid),
                         ],
                       ),
@@ -134,11 +136,7 @@ class LibraryTab extends StatelessWidget {
   }
 }
 
-//
-// =======================
-// جزء مكتبة المستخدم (users/{uid}/library)
-// =======================
-
+/// Model for a book inside users/{uid}/library
 class Book {
   final String id;
   final String title;
@@ -152,6 +150,7 @@ class Book {
   });
 }
 
+/// One shelf category: want / listen_now / listened
 class _LibraryShelf extends StatefulWidget {
   final String status;
   final String uid;
@@ -185,6 +184,7 @@ class _LibraryShelfState extends State<_LibraryShelf> {
       stream: q.snapshots(),
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
+          // While waiting, show cache if available
           if (_lastNonEmpty.isNotEmpty) {
             return _ShelfView(
               books: _lastNonEmpty,
@@ -196,6 +196,7 @@ class _LibraryShelfState extends State<_LibraryShelf> {
         }
 
         if (snap.hasError) {
+          // On error, fallback to last non-empty page if exists
           if (_lastNonEmpty.isNotEmpty) {
             return _ShelfView(
               books: _lastNonEmpty,
@@ -246,6 +247,7 @@ class _LibraryShelfState extends State<_LibraryShelf> {
   }
 }
 
+/// Physical rectangle of a shelf relative to background
 class ShelfRect {
   final double leftFrac, rightFrac, topFrac, heightFrac;
   const ShelfRect({
@@ -256,6 +258,7 @@ class ShelfRect {
   });
 }
 
+/// Grid of books on the decorative shelves (for library statuses)
 class _ShelfView extends StatefulWidget {
   final List<Book> books;
   final String uid;
@@ -271,6 +274,7 @@ class _ShelfView extends StatefulWidget {
 }
 
 class _ShelfViewState extends State<_ShelfView> {
+  // Physical positions of the 4 shelves on the background image
   static const List<ShelfRect> _shelfRects = [
     ShelfRect(leftFrac: 0.18, rightFrac: 0.18, topFrac: 0.09, heightFrac: 0.11),
     ShelfRect(leftFrac: 0.18, rightFrac: 0.18, topFrac: 0.29, heightFrac: 0.11),
@@ -397,7 +401,7 @@ class _ShelfViewState extends State<_ShelfView> {
           },
         ),
 
-        // page indicator
+        // Page indicator for shelves
         Positioned(
           bottom: 25,
           right: 0,
@@ -436,6 +440,7 @@ class _ShelfViewState extends State<_ShelfView> {
   }
 }
 
+/// Single book card used inside library shelves
 class _BookCard extends StatelessWidget {
   final Book book;
   final String uid;
@@ -461,9 +466,8 @@ class _BookCard extends StatelessWidget {
         backgroundColor: _confirm,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
+        shape:
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         content: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -558,7 +562,8 @@ class _BookCard extends StatelessWidget {
         if (book.status == 'want') {
           tiles.add(
             ListTile(
-              leading: const Icon(Icons.play_arrow_outlined, color: Colors.teal),
+              leading:
+              const Icon(Icons.play_arrow_outlined, color: Colors.teal),
               title: const Text('نقل إلى: استمع لها الآن'),
               onTap: () => _moveToStatus(sheetContext, 'listen_now'),
             ),
@@ -566,22 +571,8 @@ class _BookCard extends StatelessWidget {
         } else if (book.status == 'listened') {
           tiles.add(
             ListTile(
-              leading: const Icon(Icons.bookmark_border, color: Colors.teal),
-              title: const Text('نقل إلى: أرغب بالاستماع لها'),
-              onTap: () => _moveToStatus(sheetContext, 'want'),
-            ),
-          );
-          tiles.add(
-            ListTile(
-              leading: const Icon(Icons.play_arrow_outlined, color: Colors.teal),
-              title: const Text('نقل إلى: استمع لها الآن'),
-              onTap: () => _moveToStatus(sheetContext, 'listen_now'),
-            ),
-          );
-        } else if (book.status == 'listen_now') {
-          tiles.add(
-            ListTile(
-              leading: const Icon(Icons.bookmark_border, color: Colors.teal),
+              leading:
+              const Icon(Icons.bookmark_border, color: Colors.teal),
               title: const Text('نقل إلى: أرغب بالاستماع لها'),
               onTap: () => _moveToStatus(sheetContext, 'want'),
             ),
@@ -589,7 +580,24 @@ class _BookCard extends StatelessWidget {
           tiles.add(
             ListTile(
               leading:
-              const Icon(Icons.check_circle_outline, color: Colors.teal),
+              const Icon(Icons.play_arrow_outlined, color: Colors.teal),
+              title: const Text('نقل إلى: استمع لها الآن'),
+              onTap: () => _moveToStatus(sheetContext, 'listen_now'),
+            ),
+          );
+        } else if (book.status == 'listen_now') {
+          tiles.add(
+            ListTile(
+              leading:
+              const Icon(Icons.bookmark_border, color: Colors.teal),
+              title: const Text('نقل إلى: أرغب بالاستماع لها'),
+              onTap: () => _moveToStatus(sheetContext, 'want'),
+            ),
+          );
+          tiles.add(
+            ListTile(
+              leading: const Icon(Icons.check_circle_outline,
+                  color: Colors.teal),
               title: const Text('نقل إلى: استمعت لها'),
               onTap: () => _moveToStatus(sheetContext, 'listened'),
             ),
@@ -697,11 +705,7 @@ class _BookCard extends StatelessWidget {
   }
 }
 
-//
-// =======================
-// تبويب "كتبي" (users/{uid}/mybooks)
-// =======================
-
+/// Model for a book uploaded by the user (users/{uid}/mybooks)
 class MyBook {
   final String id;
   final String title;
@@ -713,6 +717,7 @@ class MyBook {
   });
 }
 
+/// Tab that shows "My Books" grid from users/{uid}/mybooks
 class _MyBooksShelfTab extends StatelessWidget {
   final String uid;
   const _MyBooksShelfTab({required this.uid});
@@ -766,6 +771,7 @@ class _MyBooksShelfTab extends StatelessWidget {
   }
 }
 
+/// Physical rectangle for "My Books" shelves
 class _ShelfRect {
   final double leftFrac, rightFrac, topFrac, heightFrac;
   const _ShelfRect({
@@ -776,6 +782,7 @@ class _ShelfRect {
   });
 }
 
+/// Grid of books on the decorative shelves (for My Books)
 class _MyShelfView extends StatefulWidget {
   final List<MyBook> books;
   final String uid;
@@ -789,6 +796,7 @@ class _MyShelfView extends StatefulWidget {
 }
 
 class _MyShelfViewState extends State<_MyShelfView> {
+  // Physical positions of the 4 shelves on the "My Books" background
   static const List<_ShelfRect> _shelfRects = [
     _ShelfRect(leftFrac: 0.18, rightFrac: 0.18, topFrac: 0.09, heightFrac: 0.11),
     _ShelfRect(leftFrac: 0.18, rightFrac: 0.18, topFrac: 0.29, heightFrac: 0.11),
@@ -914,6 +922,7 @@ class _MyShelfViewState extends State<_MyShelfView> {
           },
         ),
 
+        // Page indicator for "My Books"
         Positioned(
           bottom: 25,
           right: 0,
@@ -952,6 +961,7 @@ class _MyShelfViewState extends State<_MyShelfView> {
   }
 }
 
+/// Single book card used inside "My Books"
 class _MyBookCard extends StatelessWidget {
   final MyBook book;
   final String uid;
@@ -969,9 +979,8 @@ class _MyBookCard extends StatelessWidget {
         backgroundColor: _confirm,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
+        shape:
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         content: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -1233,11 +1242,7 @@ class _MyBookCard extends StatelessWidget {
   }
 }
 
-//
-// =======================
-// صفحة إضافة كتاب (نفس كودك، كـ شاشة كاملة)
-// =======================
-
+/// Full-screen form to add a new book (PDF + optional cover)
 class AddMyBookPage extends StatefulWidget {
   const AddMyBookPage({super.key});
 
@@ -1260,9 +1265,7 @@ class _AddMyBookPageState extends State<AddMyBookPage> {
   }
 
   bool get _isReadyToSave =>
-      _titleCtrl.text.trim().isNotEmpty &&
-          _pdfFile != null &&
-          !_saving;
+      _titleCtrl.text.trim().isNotEmpty && _pdfFile != null && !_saving;
 
   void _showSnack(String message, {IconData icon = Icons.check_circle}) {
     if (!mounted) return;
@@ -1273,7 +1276,8 @@ class _AddMyBookPageState extends State<AddMyBookPage> {
         backgroundColor: _confirm,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape:
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         content: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -1311,7 +1315,8 @@ class _AddMyBookPageState extends State<AddMyBookPage> {
 
   Future<void> _pickCover() async {
     final picker = ImagePicker();
-    final x = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+    final x =
+    await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
     if (!mounted) return;
     if (x != null) {
       setState(() => _coverFile = File(x.path));
@@ -1321,64 +1326,45 @@ class _AddMyBookPageState extends State<AddMyBookPage> {
   Future<void> _saveBook() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      _showSnack('الرجاء تسجيل الدخول لإضافة كتاب', icon: Icons.login_rounded);
-      return;
-    }
-
+      _showSnack('الرجاء تسجيل الدخول لإضافة كتاب',
+          icon: Icons.login_rounded);
+      return; }
     if (_titleCtrl.text.trim().isEmpty || _pdfFile == null) {
-      setState(() => _forceValidate = true);
-    }
+      setState(() => _forceValidate = true); }
     if (_titleCtrl.text.trim().isEmpty || _pdfFile == null) {
       _showSnack(_missingFriendlyMessage(), icon: Icons.info_outline);
-      return;
-    }
-
+      return; }
     if (!_formKey.currentState!.validate()) {
       _showSnack('فضلاً أكمل الحقول المطلوبة', icon: Icons.info_outline);
-      return;
-    }
-
+      return; }
     try {
       setState(() => _saving = true);
-
-      final docRef = FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .collection('mybooks')
-          .doc();
-
+      final docRef = FirebaseFirestore.instance.collection('users').doc(user.uid).collection('mybooks').doc();
       final storage = FirebaseStorage.instance;
       final baseRef = storage.ref('users/${user.uid}/mybooks/${docRef.id}');
       final pdfRef = baseRef.child('book.pdf');
-
       final pdfTask = await pdfRef.putFile(_pdfFile!);
-      final pdfUrl  = await pdfTask.ref.getDownloadURL();
+      final pdfUrl = await pdfTask.ref.getDownloadURL();
 
       String? coverUrl;
       if (_coverFile != null) {
         final coverRef = baseRef.child('cover.jpg');
         final coverTask = await coverRef.putFile(_coverFile!);
-        coverUrl = await coverTask.ref.getDownloadURL();
-      }
-
+        coverUrl = await coverTask.ref.getDownloadURL(); }
       await docRef.set({
         'title': _titleCtrl.text.trim(),
         'pdfUrl': pdfUrl,
         'coverUrl': coverUrl,
         'ownerUid': user.uid,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-
+        'createdAt': FieldValue.serverTimestamp(), });
       if (!mounted) return;
-      Navigator.pop(context); // رجوع للمكتبة بعد الإضافة
+      // Return back to library after adding the book
+      Navigator.pop(context);
     } catch (e) {
       if (mounted) {
-        _showSnack('حدث خطأ أثناء الحفظ: $e', icon: Icons.error_outline);
-      }
+        _showSnack('حدث خطأ أثناء الحفظ: $e', icon: Icons.error_outline); }
     } finally {
-      if (mounted) setState(() => _saving = false);
-    }
-  }
+      if (mounted) setState(() => _saving = false); }}
 
   String _missingFriendlyMessage() {
     final nameMissing = _titleCtrl.text.trim().isEmpty;
@@ -1395,7 +1381,7 @@ class _AddMyBookPageState extends State<AddMyBookPage> {
   @override
   Widget build(BuildContext context) {
     final nameMissing = _titleCtrl.text.trim().isEmpty;
-    final pdfMissing  = _pdfFile == null;
+    final pdfMissing = _pdfFile == null;
     final showPdfValidation =
         _forceValidate || _titleCtrl.text.trim().isNotEmpty;
 
@@ -1414,8 +1400,8 @@ class _AddMyBookPageState extends State<AddMyBookPage> {
             appBar: AppBar(
               backgroundColor: Colors.transparent,
               elevation: 0,
-              toolbarHeight: 160, // ← زوّدي هذا الرقم لين يصير مناسب
-
+              // Increase this to align with the background design
+              toolbarHeight: 160,
               leading: IconButton(
                 icon: const Icon(
                   Icons.arrow_back_ios_new_rounded,
@@ -1456,7 +1442,6 @@ class _AddMyBookPageState extends State<AddMyBookPage> {
                             ),
                           ),
                           const SizedBox(height: 8),
-
                           _fieldContainer(
                             isError: _forceValidate && nameMissing,
                             child: TextFormField(
@@ -1473,8 +1458,21 @@ class _AddMyBookPageState extends State<AddMyBookPage> {
                               ),
                             ),
                           ),
-                          const SizedBox(height: 14),
+                          const SizedBox(height: 8),
 
+                          const Align(
+                            alignment: Alignment.centerRight,
+                            child: Text(
+                              'تنبيه: يدعم النظام معالجة ملفات PDF العربية فقط. الملفات المكتوبة بلغات أخرى لن تظهر لها نتائج.',
+                              textAlign: TextAlign.right,
+                              style: TextStyle(
+                                color: Colors.black54,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 6),
                           _fileButton(
                             text: _pdfFile == null
                                 ? 'اختيار ملف PDF *'
@@ -1485,7 +1483,6 @@ class _AddMyBookPageState extends State<AddMyBookPage> {
                             isMissing: showPdfValidation && pdfMissing,
                           ),
                           const SizedBox(height: 14),
-
                           _fileButton(
                             text: _coverFile == null
                                 ? 'اختيار صورة الغلاف (اختياري)'
@@ -1493,9 +1490,7 @@ class _AddMyBookPageState extends State<AddMyBookPage> {
                             icon: Icons.image_outlined,
                             onPressed: _pickCover,
                           ),
-
                           const SizedBox(height: 8),
-
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton(
@@ -1505,7 +1500,8 @@ class _AddMyBookPageState extends State<AddMyBookPage> {
                                 disabledBackgroundColor:
                                 _confirm.withOpacity(0.45),
                                 disabledForegroundColor: Colors.white70,
-                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                padding:
+                                const EdgeInsets.symmetric(vertical: 14),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
@@ -1534,10 +1530,7 @@ class _AddMyBookPageState extends State<AddMyBookPage> {
   }
 }
 
-//
-// =============
-// Helpers
-// =============
+/// Shared UI helpers
 
 Widget _fieldContainer({required Widget child, bool isError = false}) {
   return Container(

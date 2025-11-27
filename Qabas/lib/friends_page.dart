@@ -126,9 +126,10 @@ class _FriendsTabBar extends StatelessWidget {
     return TabBar(
       labelColor: _darkGreen,
       unselectedLabelColor: Colors.black54,
+      indicatorSize: TabBarIndicatorSize.tab,
       indicator: const UnderlineTabIndicator(
         borderSide: BorderSide(width: 4, color: _darkGreen),
-        insets: EdgeInsets.symmetric(horizontal: 24),
+        insets: EdgeInsets.symmetric(horizontal: 35), // ← هنا تتحكمين بطول الخط
       ),
       labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
       unselectedLabelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),

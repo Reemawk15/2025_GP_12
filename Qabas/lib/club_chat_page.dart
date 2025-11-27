@@ -7,7 +7,16 @@ import 'friend_details_page.dart';
 class ClubChatPage extends StatefulWidget {
   final String clubId;
   final String clubTitle;
-  const ClubChatPage({super.key, required this.clubId, required this.clubTitle});
+  final bool showWelcome;       // هل نعرض جملة الترحيب
+  final bool enableProfileTap;  // هل نسمح بفتح حساب الشخص من الصورة
+
+  const ClubChatPage({
+    super.key,
+    required this.clubId,
+    required this.clubTitle,
+    this.showWelcome = true,
+    this.enableProfileTap = true, // الافتراضي: يسمح بفتح البروفايل
+  });
 
   @override
   State<ClubChatPage> createState() => _ClubChatPageState();
@@ -21,7 +30,6 @@ class _ClubChatPageState extends State<ClubChatPage> {
   static const Color _titleColor  = Color(0xFF0E3A2C);
 
   final _controller = TextEditingController();
-
   late final Future<({String name, String? photoUrl})> _myProfileFuture;
 
   @override
@@ -44,27 +52,25 @@ class _ClubChatPageState extends State<ClubChatPage> {
           elevation: 0,
           toolbarHeight: 90,
           centerTitle: false,
-          // Move the title closer to the right (near the leading edge)
-          titleSpacing: -4,
-          // Keep it small so it does not push the title to the left
-          leadingWidth: 48,
-          title: FutureBuilder<({String name, String? photoUrl})>(
+          titleSpacing: 0,
+          leadingWidth: 56,
+          title: widget.showWelcome
+              ? FutureBuilder<({String name, String? photoUrl})>(
             future: _myProfileFuture,
             builder: (context, snap) {
               final userName = (snap.data?.name ?? '').trim().isEmpty
                   ? 'ضيفنا الكريم'
                   : snap.data!.name;
 
-              return Align(
-                alignment: Alignment.centerRight,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    // First line slightly to the left
-                    Transform.translate(
-                      offset: const Offset(-13, 0),
-                      child: Text(
+              return Padding(
+                padding: const EdgeInsets.only(top: 16, right: 4),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
                         'حللت أهلاً ووطِئت سهلاً $userName',
                         textAlign: TextAlign.right,
                         style: const TextStyle(
@@ -76,12 +82,8 @@ class _ClubChatPageState extends State<ClubChatPage> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    // Second line slightly to the right
-                    Transform.translate(
-                      offset: const Offset(14, 0),
-                      child: Text(
+                      const SizedBox(height: 2),
+                      Text(
                         'مرحبًا بك في نادي ${widget.clubTitle}',
                         textAlign: TextAlign.right,
                         style: const TextStyle(
@@ -93,41 +95,69 @@ class _ClubChatPageState extends State<ClubChatPage> {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               );
             },
+          )
+              : Padding(
+            padding: const EdgeInsets.only(top: 16, right: 24),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                'نادي ${widget.clubTitle}',
+                textAlign: TextAlign.right,
+                style: const TextStyle(
+                  color: _titleColor,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18,
+                  height: 1.2,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ),
           leading: Padding(
             padding: const EdgeInsets.only(top: 40, right: 8),
             child: IconButton(
               tooltip: 'رجوع',
               onPressed: () => Navigator.of(context).maybePop(),
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF2F5145), size: 20),
+              icon: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: Color(0xFF2F5145),
+                size: 20,
+              ),
             ),
           ),
         ),
         body: Stack(
           children: [
             Positioned.fill(
-              child: Image.asset('assets/images/clubs2.png', fit: BoxFit.cover),
+              child: Image.asset(
+                'assets/images/clubs2.png',
+                fit: BoxFit.cover,
+              ),
             ),
             Column(
               children: [
                 const SizedBox(height: 140),
-
-                // Messages in real time
                 Expanded(
                   child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                    stream: FirestoreClubsService.instance.streamMessages(widget.clubId),
+                    stream: FirestoreClubsService.instance
+                        .streamMessages(widget.clubId),
                     builder: (context, snap) {
                       if (snap.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
+                        return const Center(
+                          child: CircularProgressIndicator(),
+                        );
                       }
                       final docs = snap.data?.docs ?? [];
                       if (docs.isEmpty) {
-                        return const Center(child: Text('ابدأ المحادثة…'));
+                        return const Center(
+                          child: Text('ابدأ المحادثة…'),
+                        );
                       }
                       return ListView.builder(
                         padding: const EdgeInsets.fromLTRB(12, 20, 12, 12),
@@ -138,30 +168,27 @@ class _ClubChatPageState extends State<ClubChatPage> {
                           final text = (m['text'] ?? '') as String;
                           final senderUid = (m['uid'] ?? '') as String;
 
-                          // Older messages might not have name/photo — use a fallback
-                          String name = (m['displayName'] ?? '').toString().trim();
-                          String photoUrl = (m['photoUrl'] ?? '').toString().trim();
-
-                          if (name.isEmpty && mine) {
-                            final me = FirebaseAuth.instance.currentUser;
-                            name = (me?.displayName ?? '').trim();
-                          }
+                          final fallbackName =
+                          (m['displayName'] ?? '').toString().trim();
+                          final fallbackPhoto =
+                          (m['photoUrl'] ?? '').toString().trim();
 
                           return _ChatRow(
                             mine: mine,
                             uid: senderUid,
-                            name: name.isEmpty ? 'مستخدم' : name,
                             text: text,
-                            photoUrl: photoUrl.isEmpty ? null : photoUrl,
+                            fallbackName:
+                            fallbackName.isEmpty ? null : fallbackName,
+                            fallbackPhotoUrl:
+                            fallbackPhoto.isEmpty ? null : fallbackPhoto,
                             bubbleColor: mine ? _bubbleMe : _bubbleOther,
+                            enableProfileTap: widget.enableProfileTap,
                           );
                         },
                       );
                     },
                   ),
                 ),
-
-                // Input bar
                 SafeArea(
                   top: false,
                   child: Padding(
@@ -175,8 +202,11 @@ class _ClubChatPageState extends State<ClubChatPage> {
                             style: TextButton.styleFrom(
                               backgroundColor: _confirm,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              padding:
+                              const EdgeInsets.symmetric(horizontal: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
                             child: const Text(
                               'إرسال',
@@ -187,7 +217,8 @@ class _ClubChatPageState extends State<ClubChatPage> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            padding:
+                            const EdgeInsets.symmetric(horizontal: 14),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(22),
@@ -224,23 +255,29 @@ class _ClubChatPageState extends State<ClubChatPage> {
     );
   }
 
-  // Fetch user's name and photo from users/{uid} first, then fall back to FirebaseAuth data
   Future<({String name, String? photoUrl})> _resolveCurrentUserProfile() async {
     final user = FirebaseAuth.instance.currentUser!;
     String name = (user.displayName ?? '').trim();
     String? photo = user.photoURL;
 
     try {
-      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
       if (doc.exists) {
         final data = doc.data()!;
-        name = (data['name'] ?? data['fullName'] ?? data['username'] ?? name ?? '')
+        name = (data['name'] ??
+            data['fullName'] ??
+            data['username'] ??
+            name ??
+            '')
             .toString()
             .trim();
         photo = (data['photoUrl'] ?? data['avatarUrl'] ?? photo)?.toString();
       }
     } catch (_) {
-      // Ignore errors and keep FirebaseAuth data only
+      // تجاهل الأخطاء
     }
 
     if (name.isEmpty) name = 'بدون اسم';
@@ -252,8 +289,8 @@ class _ClubChatPageState extends State<ClubChatPage> {
     if (t.isEmpty) return;
 
     final profile = await _resolveCurrentUserProfile();
-
     final user = FirebaseAuth.instance.currentUser!;
+
     await FirestoreClubsService.instance.sendMessage(
       clubId: widget.clubId,
       uid: user.uid,
@@ -274,89 +311,120 @@ class _ClubChatPageState extends State<ClubChatPage> {
 class _ChatRow extends StatelessWidget {
   final bool mine;
   final String uid;
-  final String name;
   final String text;
-  final String? photoUrl;
+  final String? fallbackName;
+  final String? fallbackPhotoUrl;
   final Color bubbleColor;
+  final bool enableProfileTap;
 
   const _ChatRow({
     required this.mine,
     required this.uid,
-    required this.name,
     required this.text,
     required this.bubbleColor,
-    this.photoUrl,
+    this.fallbackName,
+    this.fallbackPhotoUrl,
+    this.enableProfileTap = true,
   });
 
   @override
   Widget build(BuildContext context) {
-    final avatar = CircleAvatar(
-      radius: 16,
-      backgroundColor: Colors.white,
-      backgroundImage: (photoUrl != null && photoUrl!.isNotEmpty) ? NetworkImage(photoUrl!) : null,
-      child: (photoUrl == null || photoUrl!.isEmpty)
-          ? Text(
-        name.isNotEmpty ? name.characters.first : 'ش',
-        style: const TextStyle(color: Colors.black54),
-      )
-          : null,
-    );
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .snapshots(),
+      builder: (context, snap) {
+        String name = fallbackName ?? '';
+        String? photoUrl = fallbackPhotoUrl;
 
-    // Avatar is tappable only for other users, not for the current user
-    final tappableAvatar = GestureDetector(
-      onTap: () {
-        // Do nothing if this is my own message or uid is empty
-        if (mine || uid.isEmpty) return;
+        if (snap.hasData && snap.data!.exists) {
+          final data = snap.data!.data()!;
+          name = (data['name'] ??
+              data['fullName'] ??
+              data['username'] ??
+              name)
+              .toString()
+              .trim();
+          photoUrl =
+              (data['photoUrl'] ?? data['avatarUrl'] ?? photoUrl)?.toString();
+        }
 
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => FriendDetailsPage(friendUid: uid),
+        if (name.isEmpty) name = 'مستخدم';
+
+        final avatar = CircleAvatar(
+          radius: 16,
+          backgroundColor: Colors.white,
+          backgroundImage: (photoUrl != null && photoUrl!.isNotEmpty)
+              ? NetworkImage(photoUrl!)
+              : null,
+          child: (photoUrl == null || photoUrl!.isEmpty)
+              ? Text(
+            name.isNotEmpty ? name.characters.first : 'ش',
+            style: const TextStyle(color: Colors.black54),
+          )
+              : null,
+        );
+
+        // لو enableProfileTap = false → مجرد صورة بدون onTap
+        final tappableAvatar = enableProfileTap
+            ? GestureDetector(
+          onTap: () {
+            // لو ما تبين الأدمن يدخل حساب أحد: لاحقًا نخليها false عنده
+            if (uid.isEmpty || mine) return;
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => FriendDetailsPage(friendUid: uid),
+              ),
+            );
+          },
+          child: avatar,
+        )
+            : avatar;
+
+        final bubble = Container(
+          constraints: const BoxConstraints(maxWidth: 280),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: bubbleColor,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                name,
+                style: const TextStyle(fontSize: 11, color: Colors.black54),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                text,
+                style: const TextStyle(color: Colors.black87),
+              ),
+            ],
+          ),
+        );
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(
+            mainAxisAlignment:
+            mine ? MainAxisAlignment.end : MainAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: mine
+                ? [
+              bubble,
+              const SizedBox(width: 8),
+              tappableAvatar,
+            ]
+                : [
+              tappableAvatar,
+              const SizedBox(width: 8),
+              bubble,
+            ],
           ),
         );
       },
-      child: avatar,
-    );
-
-    final bubble = Container(
-      constraints: const BoxConstraints(maxWidth: 280),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: bubbleColor,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            name,
-            style: const TextStyle(fontSize: 11, color: Colors.black54),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            text,
-            style: const TextStyle(color: Colors.black87),
-          ),
-        ],
-      ),
-    );
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        mainAxisAlignment: mine ? MainAxisAlignment.end : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: mine
-            ? [
-          bubble,
-          const SizedBox(width: 8),
-          tappableAvatar,
-        ]
-            : [
-          tappableAvatar,
-          const SizedBox(width: 8),
-          bubble,
-        ],
-      ),
     );
   }
 }

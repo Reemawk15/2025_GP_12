@@ -128,6 +128,18 @@ class _HomeScreenState extends State<HomeScreen> {
   double coverGap = 12; // Gap between covers
   int visibleCount = 3; // How many covers are centered at once
 
+  String _timeGreeting() {
+  final hour = DateTime.now().hour;
+
+  if (hour >= 0 && hour < 12) {
+  // من 12 بالليل إلى 11:59 صباحاً
+  return 'صباحك سعيد';
+  } else {
+  // من 12 الظهر إلى 11:59 مساءً
+  return 'مساؤك سعيد';
+  }
+  }
+
   final _items = const [
     BottomNavItem(Icons.home, 'الرئيسية'),
     BottomNavItem(Icons.group, 'المجتمع'),
@@ -464,7 +476,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   return Transform.translate(
                     offset: const Offset(0, -11),
                     child: Text(
-                      'مساؤك سعيد $name',
+                      '${_timeGreeting()} $name',
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,

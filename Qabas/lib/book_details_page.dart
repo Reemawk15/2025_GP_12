@@ -584,6 +584,7 @@ class _ReviewsList extends StatelessWidget {
           children: items.map((d) {
             final m = d.data() as Map<String, dynamic>? ?? {};
             final userName = (m['userName'] ?? 'قارئ') as String;
+            final userImageUrl = (m['userImageUrl'] ?? '') as String;
             final rating = (m['rating'] ?? 0);
             final ratingDouble = rating is int
                 ? rating.toDouble()
@@ -591,13 +592,23 @@ class _ReviewsList extends StatelessWidget {
             final text = (m['text'] ?? '') as String;
             final userId = (m['userId'] ?? '') as String;
 
+            final bool hasImage = userImageUrl.isNotEmpty;
+
             final avatar = CircleAvatar(
+              radius: 22,
               backgroundColor: _accent.withOpacity(0.25),
-              child: Text(
+              backgroundImage: hasImage ? NetworkImage(userImageUrl) : null,
+              child: !hasImage
+                  ? Text(
                 userName.isNotEmpty
                     ? userName.characters.first
                     : 'ق',
-              ),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: _darkGreen,
+                ),
+              )
+                  : null,
             );
 
             // Make avatar tappable to navigate to friend details page
@@ -793,6 +804,8 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
     setState(() => _saving = true);
 
     String userName = user.displayName ?? 'قارئ';
+    String userImageUrl = user.photoURL ?? '';
+
     try {
       final u = await FirebaseFirestore.instance
           .collection('users')
@@ -800,11 +813,19 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
           .get();
       if (u.exists) {
         final data = u.data() ?? {};
-        final candidate = (data['name'] ??
+
+        final candidateName = (data['name'] ??
             data['fullName'] ??
             data['displayName'] ??
             '') as String;
-        if (candidate.trim().isNotEmpty) userName = candidate;
+        if (candidateName.trim().isNotEmpty) {
+          userName = candidateName;
+        }
+
+        final candidateImage = (data['photoUrl'] ?? '') as String;
+        if (candidateImage.trim().isNotEmpty) {
+          userImageUrl = candidateImage;
+        }
       }
     } catch (_) {}
 
@@ -825,6 +846,7 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
     final payload = {
       'userId': user.uid,
       'userName': userName,
+      'userImageUrl': userImageUrl,
       'bookId': widget.bookId,
       'bookTitle': widget.bookTitle,
       'bookCover': widget.bookCover,
@@ -833,13 +855,9 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
       'createdAt': FieldValue.serverTimestamp(),
     };
 
-    await Future.wait([
-          () async {
-        batch.set(bookReviewRef, payload);
-        batch.set(userReviewRef, payload);
-        await batch.commit();
-      }(),
-    ]);
+    batch.set(bookReviewRef, payload);
+    batch.set(userReviewRef, payload);
+    await batch.commit();
 
     if (!mounted) return;
     Navigator.pop(context);
