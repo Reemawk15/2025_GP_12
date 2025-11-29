@@ -9,7 +9,7 @@ import 'admin_home_screen.dart';
 
 /// ======== Quick control for positioning/colors ========
 const double kSigninProgressTop      = 190;   // Progress bar position from the top
-const double kSigninBottomPadding    = 190;   // Bottom padding between content and background
+const double kSigninBottomPadding    = 160;   // Bottom padding between content and background
 const double kSigninFieldWidthFactor = 0.85;  // Field width relative to screen width
 
 class _SigninTheme {
@@ -661,25 +661,27 @@ class _AdminSignInPageState extends State<AdminSignInPage> {
               child: Align(
                 alignment: Alignment.bottomCenter,
                 child: SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(24, 16, 24, kSigninBottomPadding),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text(
-                        'تسجيل دخول المشرف',
-                        style: TextStyle(
-                          color: _SigninTheme.textDark,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 24,
+                  padding: EdgeInsets.fromLTRB(24, 0, 24, kSigninBottomPadding),
+                  child: Transform.translate(
+                    offset: const Offset(0, -80),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'تسجيل دخول المشرف',
+                          style: TextStyle(
+                            color: _SigninTheme.textDark,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 24,
+                          ),
+                          textAlign: TextAlign.center,
                         ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 6),
-                      const Text(
-                        'هذه النافذة مخصّصة لمشرف النظام فقط. يرجى إدخال بيانات حساب المشرف.',
-                        style: TextStyle(color: _SigninTheme.textDark),
-                        textAlign: TextAlign.center,
-                      ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'هذه النافذة مخصّصة لمشرف النظام فقط. يرجى إدخال بيانات حساب المشرف.',
+                          style: TextStyle(color: _SigninTheme.textDark),
+                          textAlign: TextAlign.center,
+                        ),
                       const SizedBox(height: 18),
                       FractionallySizedBox(
                         widthFactor: kSigninFieldWidthFactor,
@@ -762,6 +764,7 @@ class _AdminSignInPageState extends State<AdminSignInPage> {
                   ),
                 ),
               ),
+            ),
             ),
           ],
         ),

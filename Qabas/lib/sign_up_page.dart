@@ -14,12 +14,12 @@ const double kContentBottomPadding = 240; // Content distance from bottom
 
 /// Optional offsets for each page (negative = move up, positive = move down)
 const double kShiftIntro     = 0;
-const double kShiftName      = -15;
+const double kShiftName      = -20;
 const double kShiftNotifs    = 0;
 const double kShiftGreat     = 0;
-const double kShiftEmail     = 10;
-const double kShiftPassword  = 30;
-const double kShiftUsername  = 20;
+const double kShiftEmail     = -16;
+const double kShiftPassword  = 0;
+const double kShiftUsername  = -16;
 
 /// Input fields height
 const double kFieldHeight = 90;
