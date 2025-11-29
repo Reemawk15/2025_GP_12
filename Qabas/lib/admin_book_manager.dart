@@ -183,7 +183,6 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
         'pdfUrl': pdfUrl,
         'coverUrl': coverUrl,
         'createdAt': FieldValue.serverTimestamp(),
-        'published': true,
       });
 
       _formKey.currentState!.reset();
