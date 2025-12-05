@@ -705,7 +705,7 @@ class _FriendReviewsTab extends StatelessWidget {
           borderRadius: BorderRadius.circular(18),
         ),
         child: const Text(
-          'لا توجد تقييمات بعد 📭',
+          'لا توجد تقييمات بعد',
           style: TextStyle(
             color: Colors.black54,
             fontSize: 15.5,
@@ -967,45 +967,96 @@ class _ClubsTab extends StatelessWidget {
         if (snap.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-        final clubs = snap.data?.docs ?? const [];
 
-        if (clubs.isEmpty) {
-          return const Center(
-            child: Text(
-              'لا توجد أندية',
-              style: TextStyle(color: Colors.black54),
+        if (snap.hasError) {
+          return Center(
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(16, 280, 16, 24),
+              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.08),
+                border: Border.all(color: Colors.red.withOpacity(0.25)),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: const Text(
+                'حدث خطأ أثناء جلب الأندية.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           );
         }
 
-        // Top padding is outside the scrollable area
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 280, 16, 24),
-          child: ListView.separated(
-            // Inside padding is zero so position stays exactly the same
-            padding: EdgeInsets.zero,
-            physics: const ClampingScrollPhysics(),
-            itemCount: clubs.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (context, i) {
-              final clubDoc = clubs[i];
-              final clubId  = clubDoc.id;
-              final data    = clubDoc.data();
-              final title   = (data['title'] ?? 'نادي بدون اسم') as String;
-              final desc    = (data['description'] ?? '') as String?;
-              final cat     = (data['category'] ?? '') as String?;
+        final clubs = snap.data?.docs ?? const [];
 
-              // Only show this club if the friend is a member
-              final friendMemberDoc = FirebaseFirestore.instance
-                  .collection('clubs').doc(clubId)
-                  .collection('members').doc(friendUid)
-                  .snapshots();
+        // ما فيه أندية أصلاً في التطبيق
+        if (clubs.isEmpty) {
+          return _clubsEmptyBox();
+        }
 
-              return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                stream: friendMemberDoc,
-                builder: (context, friendSnap) {
-                  final friendIsMember = friendSnap.data?.exists == true;
-                  if (!friendIsMember) return const SizedBox.shrink();
+        // هنا نسوي تشيك مرة وحدة: هل صديقك عضو في أي نادي من هذي؟
+        return FutureBuilder<List<bool>>(
+          future: _loadMembershipForClubs(clubs, friendUid),
+          builder: (context, memSnap) {
+            if (memSnap.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            if (memSnap.hasError) {
+              return Center(
+                child: Container(
+                  margin: const EdgeInsets.fromLTRB(16, 280, 16, 24),
+                  padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.08),
+                    border: Border.all(color: Colors.red.withOpacity(0.25)),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: const Text(
+                    'حدث خطأ أثناء التحقق من عضوية الأندية.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            final membership = memSnap.data ?? List<bool>.filled(clubs.length, false);
+
+            // نفلتر فقط الأندية اللي صديقك عضو فيها
+            final visibleClubs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+            for (int i = 0; i < clubs.length; i++) {
+              if (membership[i]) {
+                visibleClubs.add(clubs[i]);
+              }
+            }
+
+            // لو ما طلع ولا نادي صديقك عضو فيه → نفس فكرة "لا توجد تقييمات بعد"
+            if (visibleClubs.isEmpty) {
+              return _clubsEmptyBox();
+            }
+
+            // نفس كودك القديم تقريباً لكن على قائمة الأندية اللي هو عضو فيها فقط
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(16, 280, 16, 24),
+              child: ListView.separated(
+                padding: EdgeInsets.zero,
+                physics: const ClampingScrollPhysics(),
+                itemCount: visibleClubs.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                itemBuilder: (context, i) {
+                  final clubDoc = visibleClubs[i];
+                  final clubId  = clubDoc.id;
+                  final data    = clubDoc.data();
+                  final title   = (data['title'] ?? 'نادي بدون اسم') as String;
+                  final desc    = (data['description'] ?? '') as String?;
+                  final cat     = (data['category'] ?? '') as String?;
 
                   return Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -1059,12 +1110,54 @@ class _ClubsTab extends StatelessWidget {
                     ),
                   );
                 },
-              );
-            },
-          ),
+              ),
+            );
+          },
         );
       },
     );
+  }
+
+  // نفس فكرة كارد "لا توجد تقييمات بعد" لكن للنادي
+  static Widget _clubsEmptyBox() {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 280, 16, 24),
+        padding: const EdgeInsets.symmetric(vertical: 40),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: const Text(
+          'لم يشترك في نادي بعد',
+          style: TextStyle(
+            color: Colors.black54,
+            fontSize: 15.5,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // تشيك مره واحدة لكل الأندية: هل هذا الفرند عضو فيها ولا لا
+  static Future<List<bool>> _loadMembershipForClubs(
+      List<QueryDocumentSnapshot<Map<String, dynamic>>> clubs,
+      String friendUid,
+      ) async {
+    final fs = FirebaseFirestore.instance;
+
+    final futures = clubs.map((clubDoc) {
+      return fs
+          .collection('clubs')
+          .doc(clubDoc.id)
+          .collection('members')
+          .doc(friendUid)
+          .get();
+    }).toList();
+
+    final snapshots = await Future.wait(futures);
+    return snapshots.map((s) => s.exists).toList();
   }
 }
 

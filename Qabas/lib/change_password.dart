@@ -116,7 +116,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       return;
     }
 
-    // 🔥 هنا الشرط المهم: الجديدة نفس القديمة؟
+    // 🔥 الجديدة نفس القديمة؟
     if (_currentPass.text.trim() == _newPass.text.trim()) {
       _showSnack('يجب اختيار كلمة مرور جديدة مختلفة عن الحالية.', icon: Icons.error_outline);
       return;
@@ -165,7 +165,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
           Scaffold(
             backgroundColor: Colors.transparent,
-            resizeToAvoidBottomInset: false, // 👈 مهم
+            resizeToAvoidBottomInset: false, // 👈 نخليها زي ما هي
 
             appBar: AppBar(
               backgroundColor: Colors.transparent,
@@ -177,163 +177,173 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                   alignment: Alignment.centerRight,
                   child: IconButton(
                     tooltip: 'رجوع',
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded,size:19),
+                    icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 19),
                     color: _darkGreen,
                     onPressed: () => Navigator.pop(context),
                   ),
                 ),
               ),
             ),
+
             body: SafeArea(
-              child: Center(
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(20, 0, 20, 24 + MediaQuery.of(context).viewInsets.bottom,
-                  ),
-                  child: Container(
-                    width: double.infinity,
-                    constraints: const BoxConstraints(maxWidth: 480),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.94),
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.06),
-                          blurRadius: 14,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 22, 20, 24),
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            const Text(
-                              'تغيير كلمة المرور',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w700,
-                                color: _darkGreen,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'لأسباب أمنية، أدخل كلمة المرور الحالية ثم اختر كلمة مرور جديدة قوية.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 13.5,
-                                color: Colors.black87,
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-
-                            // كلمة المرور الحالية
-                            _field(
-                              label: 'كلمة المرور الحالية',
-                              controller: _currentPass,
-                              obscure: _obscureCurrent,
-                              validator: (v) =>
-                              (v == null || v.trim().isEmpty)
-                                  ? 'هذا الحقل مطلوب'
-                                  : null,
-                              suffix: IconButton(
-                                tooltip: _obscureCurrent ? 'إظهار' : 'إخفاء',
-                                onPressed: () => setState(
-                                      () => _obscureCurrent = !_obscureCurrent,
-                                ),
-                                icon: Icon(
-                                  _obscureCurrent
-                                      ? Icons.visibility_off
-                                      : Icons.visibility,
-                                  color: _midGreen,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-
-                            // كلمة المرور الجديدة
-                            _field(
-                              label: 'كلمة المرور الجديدة',
-                              controller: _newPass,
-                              obscure: _obscureNew,
-                              validator: _validatePassword,
-                              error: _livePassError != null,
-                              helper: _livePassError ??
-                                  'كلمة المرور يجب أن تكون ٨ أحرف على الأقل\n'
-                                      'وتضمّ حرفًا كبيرًا وحرفًا صغيرًا ورقمًا ورمزًا خاصًا.',
-                              suffix: IconButton(
-                                tooltip: _obscureNew ? 'إظهار' : 'إخفاء',
-                                onPressed: () => setState(
-                                      () => _obscureNew = !_obscureNew,
-                                ),
-                                icon: Icon(
-                                  _obscureNew
-                                      ? Icons.visibility_off
-                                      : Icons.visibility,
-                                  color: _midGreen,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-
-                            // تأكيد كلمة المرور الجديدة
-                            _field(
-                              label: 'تأكيد كلمة المرور الجديدة',
-                              controller: _confirmPass,
-                              obscure: _obscureNew2,
-                              validator: (v) {
-                                if (v == null || v.trim().isEmpty) {
-                                  return 'هذا الحقل مطلوب';
-                                }
-                                if (v.trim() != _newPass.text.trim()) {
-                                  return 'غير مطابقة لكلمة المرور الجديدة';
-                                }
-                                return null;
-                              },
-                              suffix: IconButton(
-                                tooltip: _obscureNew2 ? 'إظهار' : 'إخفاء',
-                                onPressed: () => setState(
-                                      () => _obscureNew2 = !_obscureNew2,
-                                ),
-                                icon: Icon(
-                                  _obscureNew2
-                                      ? Icons.visibility_off
-                                      : Icons.visibility,
-                                  color: _midGreen,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-
-                            SizedBox(
-                              height: 48,
-                              child: FilledButton(
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: _confirm,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(26),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  // constraints.maxHeight = ارتفاع مساحة الـ body
+                  return Center(
+                    child: Container(
+                      width: double.infinity,
+                      height: constraints.maxHeight,                // 👈 الكارد بطول الصفحة
+                      constraints: const BoxConstraints(maxWidth: 480),
+                      margin: const EdgeInsets.symmetric(horizontal: 20),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.94),
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.06),
+                            blurRadius: 14,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 22, 20, 24),
+                        child: SingleChildScrollView(
+                          // المسافة اللي تحت عشان الكيبورد ما يغطي آخر الحقول
+                          padding: EdgeInsets.only(
+                            bottom: 24 + MediaQuery.of(context).viewInsets.bottom,
+                          ),
+                          child: Form(
+                            key: _formKey,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                const Text(
+                                  'تغيير كلمة المرور',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w700,
+                                    color: _darkGreen,
                                   ),
                                 ),
-                                onPressed: _saving ? null : _changePassword,
-                                child: _saving
-                                    ? const CircularProgressIndicator(
-                                  color: Colors.white,
-                                )
-                                    : const Text(
-                                  'حفظ',
-                                  style: TextStyle(fontSize: 16),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'لأسباب أمنية، أدخل كلمة المرور الحالية ثم اختر كلمة مرور جديدة قوية.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 13.5,
+                                    color: Colors.black87,
+                                  ),
                                 ),
-                              ),
+                                const SizedBox(height: 20),
+
+                                // كلمة المرور الحالية
+                                _field(
+                                  label: 'كلمة المرور الحالية',
+                                  controller: _currentPass,
+                                  obscure: _obscureCurrent,
+                                  validator: (v) =>
+                                  (v == null || v.trim().isEmpty)
+                                      ? 'هذا الحقل مطلوب'
+                                      : null,
+                                  suffix: IconButton(
+                                    tooltip: _obscureCurrent ? 'إظهار' : 'إخفاء',
+                                    onPressed: () => setState(
+                                          () => _obscureCurrent = !_obscureCurrent,
+                                    ),
+                                    icon: Icon(
+                                      _obscureCurrent
+                                          ? Icons.visibility_off
+                                          : Icons.visibility,
+                                      color: _midGreen,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+
+                                // كلمة المرور الجديدة
+                                _field(
+                                  label: 'كلمة المرور الجديدة',
+                                  controller: _newPass,
+                                  obscure: _obscureNew,
+                                  validator: _validatePassword,
+                                  error: _livePassError != null,
+                                  helper: _livePassError ??
+                                      'كلمة المرور يجب أن تكون ٨ أحرف على الأقل\n'
+                                          'وتضمّ حرفًا كبيرًا وحرفًا صغيرًا ورقمًا ورمزًا خاصًا.',
+                                  suffix: IconButton(
+                                    tooltip: _obscureNew ? 'إظهار' : 'إخفاء',
+                                    onPressed: () => setState(
+                                          () => _obscureNew = !_obscureNew,
+                                    ),
+                                    icon: Icon(
+                                      _obscureNew
+                                          ? Icons.visibility_off
+                                          : Icons.visibility,
+                                      color: _midGreen,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+
+                                // تأكيد كلمة المرور الجديدة
+                                _field(
+                                  label: 'تأكيد كلمة المرور الجديدة',
+                                  controller: _confirmPass,
+                                  obscure: _obscureNew2,
+                                  validator: (v) {
+                                    if (v == null || v.trim().isEmpty) {
+                                      return 'هذا الحقل مطلوب';
+                                    }
+                                    if (v.trim() != _newPass.text.trim()) {
+                                      return 'غير مطابقة لكلمة المرور الجديدة';
+                                    }
+                                    return null;
+                                  },
+                                  suffix: IconButton(
+                                    tooltip: _obscureNew2 ? 'إظهار' : 'إخفاء',
+                                    onPressed: () => setState(
+                                          () => _obscureNew2 = !_obscureNew2,
+                                    ),
+                                    icon: Icon(
+                                      _obscureNew2
+                                          ? Icons.visibility_off
+                                          : Icons.visibility,
+                                      color: _midGreen,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 24),
+
+                                SizedBox(
+                                  height: 48,
+                                  child: FilledButton(
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: _confirm,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(26),
+                                      ),
+                                    ),
+                                    onPressed: _saving ? null : _changePassword,
+                                    child: _saving
+                                        ? const CircularProgressIndicator(
+                                      color: Colors.white,
+                                    )
+                                        : const Text(
+                                      'حفظ',
+                                      style: TextStyle(fontSize: 16),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
             ),
           ),
