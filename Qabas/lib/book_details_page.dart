@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'friend_details_page.dart';
-import 'chatbot_placeholder.dart';
+
+import 'Book_chatbot.dart';
 
 // Theme colors
 const _primary   = Color(0xFF0E3A2C); // Dark text/icons
@@ -238,13 +239,14 @@ class BookDetailsPage extends StatelessWidget {
               },
             ),
 
-            // Chatbot FAB inside Scaffold
             floatingActionButton: FloatingActionButton(
               backgroundColor: _accent,
               onPressed: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => const ChatBotPlaceholderPage(),
+                    builder: (_) => BookChatPage(
+                      bookId: bookId,
+                    ),
                   ),
                 );
               },
@@ -253,6 +255,8 @@ class BookDetailsPage extends StatelessWidget {
                 color: Colors.white,
               ),
             ),
+
+
           ),
         ],
       ),

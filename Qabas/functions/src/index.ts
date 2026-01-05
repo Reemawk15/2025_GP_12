@@ -1,9 +1,19 @@
+import * as admin from "firebase-admin";
+
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
+
+export * from "./book_chat";
+
 import { onObjectFinalized } from "firebase-functions/v2/storage";
 import { logger } from "firebase-functions";
 import { Storage } from "@google-cloud/storage";
 import { DocumentProcessorServiceClient } from "@google-cloud/documentai";
 import { v4 as uuidv4 } from "uuid";
-import { PDFDocument } from "pdf-lib"; // Used to split large PDFs
+import { PDFDocument } from "pdf-lib";
+
+
 
 // ================== CONFIGURATION ==================
 const APP_BUCKET = "qabas-95e06.firebasestorage.app";   // Firebase Storage bucket
