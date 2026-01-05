@@ -338,6 +338,7 @@ class _ChatRow extends StatelessWidget {
         String name = fallbackName ?? '';
         String? photoUrl = fallbackPhotoUrl;
 
+        // Retrieve live user data if available
         if (snap.hasData && snap.data!.exists) {
           final data = snap.data!.data()!;
           name = (data['name'] ??
@@ -350,8 +351,22 @@ class _ChatRow extends StatelessWidget {
               (data['photoUrl'] ?? data['avatarUrl'] ?? photoUrl)?.toString();
         }
 
-        if (name.isEmpty) name = 'مستخدم';
+        if (name.isEmpty) name = 'User';
 
+        // 🔵 Unified action for opening the user's profile
+        void _openProfile() {
+          // Prevent action if disabled or clicking on own message
+          if (!enableProfileTap) return;
+          if (uid.isEmpty || mine) return;
+
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => FriendDetailsPage(friendUid: uid),
+            ),
+          );
+        }
+
+        // User avatar (fallback to first letter if no photo)
         final avatar = CircleAvatar(
           radius: 16,
           backgroundColor: Colors.white,
@@ -360,28 +375,21 @@ class _ChatRow extends StatelessWidget {
               : null,
           child: (photoUrl == null || photoUrl!.isEmpty)
               ? Text(
-            name.isNotEmpty ? name.characters.first : 'ش',
+            name.isNotEmpty ? name.characters.first : '?',
             style: const TextStyle(color: Colors.black54),
           )
               : null,
         );
 
-        // لو enableProfileTap = false → مجرد صورة بدون onTap
+        // Make avatar tappable to open profile
         final tappableAvatar = enableProfileTap
             ? GestureDetector(
-          onTap: () {
-            // لو ما تبين الأدمن يدخل حساب أحد: لاحقًا نخليها false عنده
-            if (uid.isEmpty || mine) return;
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => FriendDetailsPage(friendUid: uid),
-              ),
-            );
-          },
+          onTap: _openProfile,
           child: avatar,
         )
             : avatar;
 
+        // Chat bubble with tappable username
         final bubble = Container(
           constraints: const BoxConstraints(maxWidth: 280),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -392,9 +400,17 @@ class _ChatRow extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                name,
-                style: const TextStyle(fontSize: 11, color: Colors.black54),
+              // 🔵 Username is also clickable and leads to profile
+              GestureDetector(
+                onTap: _openProfile,
+                child: Text(
+                  name,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Colors.black54,
+                    decoration: TextDecoration.underline, // Optional visual cue
+                  ),
+                ),
               ),
               const SizedBox(height: 2),
               Text(

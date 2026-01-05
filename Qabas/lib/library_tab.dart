@@ -88,14 +88,14 @@ class LibraryTab extends StatelessWidget {
                           labelColor: _midGreen,
                           unselectedLabelColor: Colors.black54,
                           labelStyle: TextStyle(
-                            fontSize: 13,
+                            fontSize: 12,
                             fontWeight: FontWeight.w700,
                           ),
                           unselectedLabelStyle: TextStyle(
-                            fontSize: 13,
+                            fontSize: 12,
                             fontWeight: FontWeight.w500,
                           ),
-                          labelPadding: EdgeInsets.symmetric(horizontal: 3),
+                          labelPadding: EdgeInsets.symmetric(horizontal: 1),
                           tabs: [
                             Tab(text: 'أرغب بالاستماع لها'),
                             Tab(text: 'استمع لها الآن'),
