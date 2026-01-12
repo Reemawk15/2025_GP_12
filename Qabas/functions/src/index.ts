@@ -122,8 +122,7 @@ async function preparePdfParts(
     sourceFilePath,
     totalPages,
   });
-
-  // No split needed: use original file
+// No split needed: use original file
   if (totalPages <= MAX_PAGES_PER_PART) {
     return {
       inputUris: [`gs://${sourceBucketName}/${sourceFilePath}`],
@@ -405,7 +404,6 @@ function isTocStructurePage(lines: string[], pageIndex: number): boolean {
 
   return false;
 }
-
 /**
  * Remove inline page numbers embedded between sentences:
  * - After punctuation like ". ۱۲ الكلمة"
@@ -429,7 +427,7 @@ function removeInlinePageNumbers(text: string): string {
  * Detect and remove a reference/footer block at the bottom of the page.
  *
  * Heuristics:
- *  0) Divider line (----- / _____ / ....) near the bottom => everything after is footer.
+ *  0) Divider line (----- / _ / ....) near the bottom => everything after is footer.
  *  1) Generic Arabic + Latin reference block with "المرجع/المراجع/المصادر/انظر".
  *  2) Hindawi-style Arabic-only footer starting with "انظر أيضًا ...".
  *
@@ -531,7 +529,6 @@ function cleanPages(rawPages: string[]): string[] {
 
   // 1) Detect repeated small header/footer lines across pages
   const freq = new Map<string, number>();
-
   for (const lines of pagesLines) {
     const top = lines.slice(0, 3);
     const bottom = lines.slice(-2);
@@ -661,7 +658,6 @@ function looksLikeReferencesPage(text: string): boolean {
   const t = text.trim();
   if (/^(المراجع|المصادر|المراجع\s*والمصادر)\b/.test(t)) return true;
   if (/^references\b/i.test(t)) return true;
-
   const lines = t.split(/\r?\n+/);
   let refLike = 0;
   for (const ln of lines.slice(0, 60)) {
@@ -797,7 +793,6 @@ async function collectPages(outPrefix: string): Promise<string[]> {
     });
 
     if (full) anyFullText = true;
-
     if (!pagesArr.length) {
       if (full?.trim()) pagesTexts.push(full.trim());
       else logger.warn("No pages and no document.text", { name: f.name });
@@ -945,7 +940,6 @@ export const ocrOnPdfUploadV2 = onObjectFinalized(
           partUri,
           outPrefix,
         });
-
         await runBatchOCR(partUri, outPrefix);
 
         const partPages = await collectPages(outPrefix);
