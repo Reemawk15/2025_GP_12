@@ -3,6 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import 'admin_book_manager.dart';
 import 'admin_community_tab.dart';
+import 'admin_statistics_page.dart';
+
 
 class _HomeColors {
   static const confirm    = Color(0xFF6F8E63);
@@ -167,7 +169,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       onPressed: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => const AdminStatsPage()),
+                          MaterialPageRoute(builder: (_) => const AdminStatisticsPage()),
                         );
                       },
                     ),

@@ -34,6 +34,9 @@ dependencies:
   flutter_localizations:
     sdk: flutter
 
+  # adminstat charts
+  fl_chart: ^0.66.0
+
   # Audio
   just_audio: ^0.9.38
   audio_session: ^0.1.19
@@ -75,6 +78,7 @@ flutter:
 
   assets:
     - assets/images/qabas_logo.png
+    - assets/images/adminstat.png
     - assets/images/new_bg.png   # الخلفية الجديدة (تأكدي إنها موجودة بنفس الاسم)
     - assets/images/signin_bg.png
     - assets/images/qabas_mark.png
