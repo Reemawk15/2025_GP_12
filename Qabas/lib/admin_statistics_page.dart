@@ -5,9 +5,8 @@ import 'package:fl_chart/fl_chart.dart';
 class AdminStatisticsPage extends StatelessWidget {
   const AdminStatisticsPage({super.key});
 
-  // =======================
-  // تحويل الأرقام لعربي
-  // =======================
+
+  // Converting numbers to english
   String toArabicNumber(num number) {
     const arabicDigits = ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'];
     return number
@@ -41,9 +40,8 @@ class AdminStatisticsPage extends StatelessWidget {
                 children: [
                   const SizedBox(height: 20),
 
-                  /// =======================
-                  /// الكاردات الثلاث
-                  /// =======================
+
+                  //The three cards
                   FutureBuilder(
                     future: _fetchTopCardsData(),
                     builder: (context, snapshot) {
@@ -82,9 +80,9 @@ class AdminStatisticsPage extends StatelessWidget {
 
                   const SizedBox(height: 30),
 
-                  /// =======================
-                  /// Bar Chart
-                  /// =======================
+
+                  // Bar Chart
+
                   _chartCard(
                     context: context,
                     title: 'أكثر ٣ تصنيفات للكتب المسموعة',
@@ -124,15 +122,12 @@ class AdminStatisticsPage extends StatelessWidget {
                                         Text(toArabicNumber(value.toInt())),
                                   ),
                                 ),
-
-                                /// ⭐ FIX HERE
                                 bottomTitles: AxisTitles(
                                   sideTitles: SideTitles(
                                     showTitles: true,
-                                    reservedSize: 42, // ⭐ مساحة إضافية للنص
+                                    reservedSize: 42,
                                     getTitlesWidget: (value, meta) => Padding(
-                                      padding:
-                                      const EdgeInsets.only(top: 12), // ⭐ نزول بسيط
+                                      padding: const EdgeInsets.only(top: 12),
                                       child: SizedBox(
                                         width: 60,
                                         child: Text(
@@ -175,9 +170,9 @@ class AdminStatisticsPage extends StatelessWidget {
 
                   const SizedBox(height: 30),
 
-                  /// =======================
-                  /// Pie Chart
-                  /// =======================
+
+                  /// Pie Chart (Animated)
+
                   _chartCard(
                     context: context,
                     title: 'الأندية',
@@ -189,55 +184,12 @@ class AdminStatisticsPage extends StatelessWidget {
                         }
 
                         final data = snapshot.data as Map<String, int>;
-                        final total =
-                        data.values.fold(0, (a, b) => a + b);
 
                         return Column(
                           children: [
                             SizedBox(
                               height: 200,
-                              child: PieChart(
-                                PieChartData(
-                                  centerSpaceRadius: 55,
-                                  sections: [
-                                    _pieSection(
-                                      context,
-                                      data['accepted']!,
-                                      total,
-                                      Theme.of(context)
-                                          .colorScheme
-                                          .primary,
-                                    ),
-                                    _pieSection(
-                                      context,
-                                      data['pending']!,
-                                      total,
-                                      Theme.of(context)
-                                          .colorScheme
-                                          .primary
-                                          .withOpacity(0.6),
-                                    ),
-                                    _pieSection(
-                                      context,
-                                      data['rejected']!,
-                                      total,
-                                      Theme.of(context)
-                                          .colorScheme
-                                          .primary
-                                          .withOpacity(0.3),
-                                    ),
-                                    _pieSection(
-                                      context,
-                                      data['canceled']!,
-                                      total,
-                                      Colors.grey.shade500,
-                                    ),
-                                  ],
-                                ),
-                                swapAnimationDuration:
-                                const Duration(milliseconds: 1000),
-                                swapAnimationCurve: Curves.easeOutQuart,
-                              ),
+                              child: AnimatedPieChart(data: data),
                             ),
                             const SizedBox(height: 24),
                             Wrap(
@@ -287,10 +239,8 @@ class AdminStatisticsPage extends StatelessWidget {
     );
   }
 
-  /// =======================
-  /// =======================
-  /// Widgets
-  /// =======================
+
+  // Widgets
 
   Widget _statCard({
     required BuildContext context,
@@ -369,29 +319,9 @@ class AdminStatisticsPage extends StatelessWidget {
     );
   }
 
-  PieChartSectionData _pieSection(
-      BuildContext context,
-      int value,
-      int total,
-      Color color,
-      ) {
-    final percentage = total == 0 ? 0 : (value / total * 100).round();
 
-    return PieChartSectionData(
-      value: value.toDouble(),
-      title: '${toArabicNumber(percentage)}٪',
-      radius: 65,
-      color: color,
-      titleStyle: const TextStyle(
-        color: Colors.white,
-        fontWeight: FontWeight.bold,
-      ),
-    );
-  }
+  // Firestore Logic
 
-  /// =======================
-  /// Firestore Logic
-  /// =======================
 
   Future<Map<String, int>> _fetchTopCardsData() async {
     final users =
@@ -449,6 +379,91 @@ class AdminStatisticsPage extends StatelessWidget {
     }
 
     return result;
+  }
+}
+
+
+// Animated Pie Chart
+
+class AnimatedPieChart extends StatefulWidget {
+  final Map<String, int> data;
+
+  const AnimatedPieChart({super.key, required this.data});
+
+  @override
+  State<AnimatedPieChart> createState() => _AnimatedPieChartState();
+}
+
+class _AnimatedPieChartState extends State<AnimatedPieChart> {
+  int touchedIndex = -1;
+
+  String toArabicNumber(num number) {
+    const arabicDigits = ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'];
+    return number
+        .toString()
+        .split('')
+        .map((e) => arabicDigits[int.parse(e)])
+        .join();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final total = widget.data.values.fold(0, (a, b) => a + b);
+
+    final values = [
+      widget.data['accepted']!,
+      widget.data['pending']!,
+      widget.data['rejected']!,
+      widget.data['canceled']!,
+    ];
+
+    final colors = [
+      Theme.of(context).colorScheme.primary,
+      Theme.of(context).colorScheme.primary.withOpacity(0.6),
+      Theme.of(context).colorScheme.primary.withOpacity(0.3),
+      Colors.grey.shade500,
+    ];
+
+    return PieChart(
+      PieChartData(
+        pieTouchData: PieTouchData(
+          touchCallback: (event, response) {
+            setState(() {
+              if (!event.isInterestedForInteractions ||
+                  response == null ||
+                  response.touchedSection == null) {
+                touchedIndex = -1;
+              } else {
+                touchedIndex =
+                    response.touchedSection!.touchedSectionIndex;
+              }
+            });
+          },
+        ),
+        centerSpaceRadius: 55,
+        sectionsSpace: 2,
+        sections: List.generate(4, (i) {
+          final isTouched = i == touchedIndex;
+          final value = values[i];
+          final percentage =
+          total == 0 ? 0 : (value / total * 100).round();
+
+          return PieChartSectionData(
+            value: value.toDouble(),
+            color: colors[i],
+            radius: isTouched ? 75 : 65,
+            title: '${toArabicNumber(percentage)}٪',
+            titleStyle: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: isTouched ? 18 : 14,
+            ),
+          );
+        }),
+      ),
+      swapAnimationDuration: const Duration(milliseconds: 900),
+      swapAnimationCurve: Curves.easeOutCubic,
+    );
   }
 }
 
