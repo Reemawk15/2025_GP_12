@@ -1,19 +1,9 @@
-import * as admin from "firebase-admin";
-
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
-
-export * from "./book_chat";
-
 import { onObjectFinalized } from "firebase-functions/v2/storage";
 import { logger } from "firebase-functions";
 import { Storage } from "@google-cloud/storage";
 import { DocumentProcessorServiceClient } from "@google-cloud/documentai";
 import { v4 as uuidv4 } from "uuid";
-import { PDFDocument } from "pdf-lib";
-
-
+import { PDFDocument } from "pdf-lib"; // Used to split large PDFs
 
 // ================== CONFIGURATION ==================
 const APP_BUCKET = "qabas-95e06.firebasestorage.app";   // Firebase Storage bucket
@@ -114,7 +104,11 @@ async function preparePdfParts(
   const bucket = storage.bucket(sourceBucketName);
   const [pdfBytes] = await bucket.file(sourceFilePath).download();
 
+  // IMPORTANT: some PDFs can be encrypted => pdf-lib might throw
+  // If you ever hit encryption errors, you can switch to:
+  // const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
   const pdfDoc = await PDFDocument.load(pdfBytes);
+
   const totalPages = pdfDoc.getPageCount();
 
   logger.info("PDF page count detected", {
@@ -122,7 +116,8 @@ async function preparePdfParts(
     sourceFilePath,
     totalPages,
   });
-// No split needed: use original file
+
+  // No split needed: use original file
   if (totalPages <= MAX_PAGES_PER_PART) {
     return {
       inputUris: [`gs://${sourceBucketName}/${sourceFilePath}`],
@@ -144,16 +139,10 @@ async function preparePdfParts(
 
   for (let partIndex = 0; partIndex < numParts; partIndex++) {
     const startPage = partIndex * MAX_PAGES_PER_PART; // inclusive (0-based)
-    const endPage = Math.min(
-      totalPages,
-      (partIndex + 1) * MAX_PAGES_PER_PART
-    ); // exclusive
+    const endPage = Math.min(totalPages, (partIndex + 1) * MAX_PAGES_PER_PART); // exclusive
 
     const partDoc = await PDFDocument.create();
-    const pageIndices = Array.from(
-      { length: endPage - startPage },
-      (_, i) => startPage + i
-    );
+    const pageIndices = Array.from({ length: endPage - startPage }, (_, i) => startPage + i);
 
     const copiedPages = await partDoc.copyPages(pdfDoc, pageIndices);
     copiedPages.forEach((p) => partDoc.addPage(p));
@@ -234,28 +223,19 @@ function extractOnePageText(page: any, fullText: string): string {
 
   if (!pageText.trim() && Array.isArray(page?.paragraphs)) {
     for (const p of page.paragraphs) {
-      pageText = concatIf(
-        pageText,
-        sliceFromAnyAnchor(pickLayoutAnchor(p), fullText)
-      );
+      pageText = concatIf(pageText, sliceFromAnyAnchor(pickLayoutAnchor(p), fullText));
     }
   }
 
   if (!pageText.trim() && Array.isArray(page?.lines)) {
     for (const l of page.lines) {
-      pageText = concatIf(
-        pageText,
-        sliceFromAnyAnchor(pickLayoutAnchor(l), fullText)
-      );
+      pageText = concatIf(pageText, sliceFromAnyAnchor(pickLayoutAnchor(l), fullText));
     }
   }
 
   if (!pageText.trim() && Array.isArray(page?.blocks)) {
     for (const b of page.blocks) {
-      pageText = concatIf(
-        pageText,
-        sliceFromAnyAnchor(pickLayoutAnchor(b), fullText)
-      );
+      pageText = concatIf(pageText, sliceFromAnyAnchor(pickLayoutAnchor(b), fullText));
     }
   }
 
@@ -272,24 +252,15 @@ function extractOnePageText(page: any, fullText: string): string {
   if (!pageText.trim()) {
     if (Array.isArray(page?.paragraphs)) {
       for (const p of page.paragraphs) {
-        pageText = concatIf(
-          pageText,
-          (p.layout?.textAnchor?.content as string) || ""
-        );
+        pageText = concatIf(pageText, (p.layout?.textAnchor?.content as string) || "");
       }
     } else if (Array.isArray(page?.lines)) {
       for (const l of page.lines) {
-        pageText = concatIf(
-          pageText,
-          (l.layout?.textAnchor?.content as string) || ""
-        );
+        pageText = concatIf(pageText, (l.layout?.textAnchor?.content as string) || "");
       }
     } else if (Array.isArray(page?.blocks)) {
       for (const b of page.blocks) {
-        pageText = concatIf(
-          pageText,
-          (b.layout?.textAnchor?.content as string) || ""
-        );
+        pageText = concatIf(pageText, (b.layout?.textAnchor?.content as string) || "");
       }
     }
   }
@@ -302,10 +273,6 @@ function extractOnePageText(page: any, fullText: string): string {
 /**
  * Detect whether a line is just a page number (ASCII or Arabic-Indic digits),
  * or forms like "Page 3" / "صفحة ٣".
- * Supports:
- * - 0-9
- * - ٠-٩ (Arabic-Indic)
- * - ۰-۹ (Extended Arabic-Indic)
  */
 function isPageNumberLine(line: string): boolean {
   const trimmed = line.trim();
@@ -326,10 +293,7 @@ function isPageNumberLine(line: string): boolean {
 }
 
 /**
- * Detect if a single line looks like a table-of-contents entry:
- * - "61 السابع"
- * - "الضمير أصوات 61"
- * - "Chapter 3 ..... 15" (with dotted leaders)
+ * Detect if a single line looks like a table-of-contents entry.
  */
 function isTocLikeLine(line: string): boolean {
   const trimmed = line.trim();
@@ -340,12 +304,12 @@ function isTocLikeLine(line: string): boolean {
     return true;
   }
 
-  // "61 السابع" : page number at the beginning
+  // "61 السابع"
   if (/^[0-9\u0660-\u0669\u06F0-\u06F9]{1,4}\s+.+$/.test(trimmed)) {
     return true;
   }
 
-  // "السابع 61" : page number at the end
+  // "السابع 61"
   if (/^.+\s[0-9\u0660-\u0669\u06F0-\u06F9]{1,4}\s*$/.test(trimmed)) {
     return true;
   }
@@ -361,13 +325,8 @@ function isShortTitleLine(line: string): boolean {
   const trimmed = line.trim();
   if (!trimmed) return false;
 
-  // Must have Arabic letters
   if (!/[\u0600-\u06FF]{3,}/.test(trimmed)) return false;
-
-  // Too long = likely a full sentence, not a pure title line
   if (trimmed.length > 40) return false;
-
-  // If it contains sentence-level punctuation, treat as normal content
   if (/[\.؟!؛،]/.test(trimmed)) return false;
 
   return true;
@@ -388,26 +347,19 @@ function isTocStructurePage(lines: string[], pageIndex: number): boolean {
   let shortTitleLike = 0;
 
   for (const ln of nonEmpty) {
-    if (isTocLikeLine(ln)) {
-      tocLike++;
-    } else if (isShortTitleLine(ln)) {
-      shortTitleLike++;
-    }
+    if (isTocLikeLine(ln)) tocLike++;
+    else if (isShortTitleLine(ln)) shortTitleLike++;
   }
 
   const candidateCount = tocLike + shortTitleLike;
   if (candidateCount < 5) return false;
 
-  if (candidateCount >= nonEmpty.length * 0.6) {
-    return true;
-  }
-
+  if (candidateCount >= nonEmpty.length * 0.6) return true;
   return false;
 }
+
 /**
- * Remove inline page numbers embedded between sentences:
- * - After punctuation like ". ۱۲ الكلمة"
- * - Trailing small number at end of line, but ONLY if no other digits in that line.
+ * Remove inline page numbers embedded between sentences.
  */
 function removeInlinePageNumbers(text: string): string {
   text = text.replace(
@@ -425,22 +377,12 @@ function removeInlinePageNumbers(text: string): string {
 
 /**
  * Detect and remove a reference/footer block at the bottom of the page.
- *
- * Heuristics:
- *  0) Divider line (----- / _ / ....) near the bottom => everything after is footer.
- *  1) Generic Arabic + Latin reference block with "المرجع/المراجع/المصادر/انظر".
- *  2) Hindawi-style Arabic-only footer starting with "انظر أيضًا ...".
- *
- * These rules are conservative and only trigger near the bottom of the page
- * so we do not accidentally cut normal content in the middle.
  */
 function stripReferenceFooterFromLines(lines: string[]): string[] {
   const n = lines.length;
   if (n < 4) return lines;
 
-  // ---------- (0) Divider line near the bottom ----------
-  // If there is a horizontal divider in the last few lines, treat everything
-  // after it as footer. We keep content above the divider.
+  // (0) Divider line near the bottom
   for (let i = Math.max(0, n - 6); i < n; i++) {
     const l = lines[i].trim();
     if (/^[\.\-\_]{5,}$/.test(l)) {
@@ -448,7 +390,7 @@ function stripReferenceFooterFromLines(lines: string[]): string[] {
     }
   }
 
-  // ---------- (1) Generic mixed Arabic/Latin reference footer ----------
+  // (1) Generic mixed Arabic/Latin reference footer
   const lookback = Math.min(10, n);
   const candidateIdxs: number[] = [];
   let hasRefKeyword = false;
@@ -470,16 +412,14 @@ function stripReferenceFooterFromLines(lines: string[]): string[] {
 
   if (hasRefKeyword && candidateIdxs.length >= 2) {
     const start = Math.min(...candidateIdxs);
-    // Ensure footer really starts near the bottom
     if (start >= n - 6) {
       return lines.slice(0, start);
     }
   }
 
-  // ---------- (2) Hindawi-style Arabic-only footer ("انظر أيضًا ...") ----------
+  // (2) Hindawi-style Arabic-only footer
   const hindawiStartRegex = /انظر\s+أيضًا|انظر\s+ايضاً|انظر\s+ايضا/i;
-  const metaRegex =
-    /(الكتاب|سلسلة|المؤلف|تأليف|ترجمة|دار النشر|من سلسلة|الطبعة)/;
+  const metaRegex = /(الكتاب|سلسلة|المؤلف|تأليف|ترجمة|دار النشر|من سلسلة|الطبعة)/;
 
   const searchFrom = Math.max(0, n - 5);
   for (let i = searchFrom; i < n; i++) {
@@ -487,7 +427,6 @@ function stripReferenceFooterFromLines(lines: string[]): string[] {
     if (!line) continue;
 
     if (!hindawiStartRegex.test(line)) continue;
-    // Must be very close to the bottom (last 4 lines)
     if (i < n - 4) continue;
 
     let hasMeta = false;
@@ -509,18 +448,137 @@ function stripReferenceFooterFromLines(lines: string[]): string[] {
     }
   }
 
-  // No footer detected, keep all lines
   return lines;
 }
+
+// ================== NEW: front-matter / publisher / contact filtering ==================
+
+/** Arabic/Latin digits for phone detection */
+function looksLikePhoneOrWhatsapp(line: string): boolean {
+  const t = line.trim();
+  if (!t) return false;
+
+  // contains "واتس/واتساب" OR starts with international prefix OR has long digit run
+  if (/واتس|واتساب|whats\s*app/i.test(t)) return true;
+
+  // +966..., 00966..., 0020..., etc.
+  if (/^(\+|00)\d{6,}/.test(t.replace(/\s+/g, ""))) return true;
+
+  // long digits (Arabic-Indic or ASCII) -> phone-ish
+  const digits = t.match(/[0-9\u0660-\u0669\u06F0-\u06F9]/g) || [];
+  if (digits.length >= 9) return true;
+
+  return false;
+}
+
+function looksLikeHandleOrContactLine(line: string): boolean {
+  const t = line.trim();
+  if (!t) return false;
+
+  // social handles
+  if (/@[A-Za-z0-9_\.]{2,}/.test(t)) return true;
+
+  // emails
+  if (/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/.test(t)) return true;
+
+  // URLs even without scheme
+  if (/(https?:\/\/|www\.)/i.test(t)) return true;
+  if (/\b[A-Za-z0-9-]+\.(com|net|org|io|sa|me|app|edu|gov)\b/i.test(t)) return true;
+
+  // contact keywords
+  if (/للتواصل|للتواصل:|للتواصل\s*$|الموقع\s*الإلكتروني|الموقع الالكتروني|موقع\s*الكتروني|حساب|حسابات|تويتر|سناب|انستقرام/i.test(t)) {
+    return true;
+  }
+
+  // phone/whatsapp
+  if (looksLikePhoneOrWhatsapp(t)) return true;
+
+  return false;
+}
+
+/**
+ * Lines that are bibliographic/publisher metadata:
+ * - "فهرسة مكتبة الملك فهد الوطنية..."
+ * - "ردمك / ISBN"
+ * - "رقم الإيداع / ديوي / التصنيف"
+ * - "دار النشر / مركز ... للنشر والتوزيع / التجهيز الفني..."
+ */
+function looksLikeBibliographicMetaLine(line: string): boolean {
+  const t = line.trim();
+  if (!t) return false;
+
+  const metaRe =
+    /فهرسة\s+مكتبة|مكتبة\s+الملك\s+فهد|أثناء\s+النشر|ردمك|isbn|رقم\s+الإيداع|التصنيف|ديوي|رقم\s+التسجيل|الترقيم\s+الدولي|حقوق\s+النشر|جميع\s+الحقوق|الناشر|دار\s+النشر|الطبعة|التجهيز\s+الفني|تصميم|مصمم|الغلاف|لجنة\s+النشر|النشر\s+و\s*التوزيع|مركز\s+خدمة\s+المؤلفين|خدمة\s+المؤلفين|طباعة|تسويق|توزيع/i;
+
+  if (metaRe.test(t)) return true;
+
+  // ".... ١٥×٢٢ سم" size line / physical description
+  if (/[0-9\u0660-\u0669\u06F0-\u06F9]+\s*×\s*[0-9\u0660-\u0669\u06F0-\u06F9]+\s*سم/.test(t)) return true;
+
+  // ".... ص ؛" pages/format line often appears in CIP
+  if (/\bص\b\s*[؛;]/.test(t)) return true;
+
+  return false;
+}
+
+/**
+ * Decide if the whole page is front-matter metadata (CIP/publisher/contact).
+ * We keep it conservative + protect real content like "مقدمة" / "الفصل".
+ */
+function isFrontMatterMetaPage(rawText: string, pageIndex: number): boolean {
+  // Most of these pages appear early; but sometimes repeat later. We'll allow early bias.
+  const earlyBias = pageIndex <= 12;
+
+  const text = rawText.trim();
+  if (!text) return false;
+
+  // protect real narrative beginnings
+  if (/(^|\n)\s*مقدمة\s*($|\n)/.test(text)) return false;
+  if (/(^|\n)\s*(الفصل|الباب)\s+/.test(text)) return false;
+
+  const lines = text.split(/\r?\n+/).map((l) => l.trim()).filter(Boolean);
+  if (!lines.length) return false;
+
+  let metaHits = 0;
+  let contactHits = 0;
+
+  for (const ln of lines.slice(0, 80)) {
+    if (looksLikeBibliographicMetaLine(ln)) metaHits++;
+    if (looksLikeHandleOrContactLine(ln)) contactHits++;
+  }
+
+  // If it screams metadata/contact
+  const strong =
+    metaHits >= 4 ||
+    (metaHits >= 2 && contactHits >= 2) ||
+    contactHits >= 5;
+
+  // Also if many short label-like lines and very little punctuation, typical CIP blocks
+  const punctCount = (text.match(/[\.؟!؛،:]/g) || []).length;
+  const arabicLetters = (text.match(/[\u0600-\u06FF]/g) || []).length;
+
+  const cipStyle =
+    (metaHits + contactHits) >= Math.max(6, Math.floor(lines.length * 0.35)) &&
+    punctCount <= 6 &&
+    arabicLetters < 1800;
+
+  if (earlyBias && (strong || cipStyle)) return true;
+  if (!earlyBias && strong && (metaHits + contactHits) >= 8) return true;
+
+  return false;
+}
+
+// ================== Cleaning pages ==================
 
 /**
  * Clean book pages:
  * - Remove table of contents / publisher / rights pages entirely
- * - Remove page-number lines ("7", "١١", "۱۱", "Page ٥")
+ * - Remove page-number lines
  * - Remove repeating small headers/footers
  * - Remove TOC-like dotted lines
  * - Remove decorative-only lines
  * - Strip reference-style footer blocks at the bottom (per page)
+ * - NEW: remove bibliographic/publisher/contact front-matter pages + lines
  */
 function cleanPages(rawPages: string[]): string[] {
   if (!rawPages.length) return [];
@@ -529,6 +587,7 @@ function cleanPages(rawPages: string[]): string[] {
 
   // 1) Detect repeated small header/footer lines across pages
   const freq = new Map<string, number>();
+
   for (const lines of pagesLines) {
     const top = lines.slice(0, 3);
     const bottom = lines.slice(-2);
@@ -544,18 +603,20 @@ function cleanPages(rawPages: string[]): string[] {
 
   const headerFooterCandidates = new Set<string>();
   for (const [line, count] of freq.entries()) {
-    if (count >= 2) {
-      headerFooterCandidates.add(line);
-    }
+    if (count >= 2) headerFooterCandidates.add(line);
   }
 
   const cleaned: string[] = [];
 
-  // Use pageIndex in the loop to help TOC detection
   for (let pageIndex = 0; pageIndex < pagesLines.length; pageIndex++) {
     const lines = pagesLines[pageIndex];
     const rawPageText = lines.join("\n");
     const lower = rawPageText.toLowerCase();
+
+    // NEW: skip full front-matter meta pages (CIP/publisher/contact)
+    if (isFrontMatterMetaPage(rawPageText, pageIndex)) {
+      continue;
+    }
 
     const isTocByStructure = isTocStructurePage(lines, pageIndex);
 
@@ -583,8 +644,6 @@ function cleanPages(rawPages: string[]): string[] {
     }
 
     // 3) Line-by-line cleaning before footer detection
-    //    We keep decorative lines for now so the footer logic can see them
-    //    (e.g., "-----" used as a divider before the footer).
     const candidateLines: string[] = [];
 
     for (const rawLine of lines) {
@@ -598,13 +657,22 @@ function cleanPages(rawPages: string[]): string[] {
         continue;
       }
 
+      // NEW: drop contact/handle/phone lines anywhere
+      if (looksLikeHandleOrContactLine(line)) continue;
+
+      // NEW: drop bibliographic/publisher meta lines anywhere
+      // (BUT do not delete "مقدمة" or "الفصل..." lines)
+      if (!/^\s*مقدمة\s*$/i.test(line) && !/^\s*(الفصل|الباب)\s+/i.test(line)) {
+        if (looksLikeBibliographicMetaLine(line)) continue;
+      }
+
       candidateLines.push(line);
     }
 
     // 3.5) Strip reference-style footer block from the bottom of this page
     const footerStrippedLines = stripReferenceFooterFromLines(candidateLines);
 
-    // Now remove dotted leaders and decorative-only lines
+    // Remove dotted leaders and decorative-only lines
     const finalLines: string[] = [];
     for (const l of footerStrippedLines) {
       if (/\.{5,}/.test(l)) continue;            // dotted leaders
@@ -628,14 +696,24 @@ function cleanPages(rawPages: string[]): string[] {
 
 /** Strip inline English from text: words, URLs, emails, DOIs; keep Arabic. */
 function stripInlineEnglish(text: string): string {
-  // Remove URLs and DOIs first
-  let t = text.replace(/https?:\/\/\S+|www\.\S+|doi\.org\/\S+/gi, " ");
+  let t = text;
+
+  // Remove URLs + domains even without scheme
+  t = t.replace(/https?:\/\/\S+|www\.\S+|doi\.org\/\S+/gi, " ");
+  t = t.replace(/\b[A-Za-z0-9-]+\.(com|net|org|io|sa|me|app|edu|gov)\S*/gi, " ");
 
   // Remove emails
   t = t.replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, " ");
 
+  // Remove @handles
+  t = t.replace(/@[A-Za-z0-9_\.]{2,}/g, " ");
+
   // Remove standalone Latin words/tokens
   t = t.replace(/\b[A-Za-z][A-Za-z\-']*\b/g, " ");
+
+  // Remove phone-ish sequences (to reduce noise)
+  t = t.replace(/(\+|00)\d{6,}/g, " ");
+  t = t.replace(/[0-9\u0660-\u0669\u06F0-\u06F9]{9,}/g, " ");
 
   // Collapse extra spaces and tidy lines
   t = t
@@ -658,6 +736,7 @@ function looksLikeReferencesPage(text: string): boolean {
   const t = text.trim();
   if (/^(المراجع|المصادر|المراجع\s*والمصادر)\b/.test(t)) return true;
   if (/^references\b/i.test(t)) return true;
+
   const lines = t.split(/\r?\n+/);
   let refLike = 0;
   for (const ln of lines.slice(0, 60)) {
@@ -709,6 +788,12 @@ function processOnePageForSpeech(rawText: string) {
   const base = rawText.trim();
   if (!base) return { type: "empty" as const, spokenText: "" };
 
+  // NEW: final safety net — if somehow meta page passed earlier, drop it here too
+  // (we don't have pageIndex here, but still useful)
+  if (isFrontMatterMetaPage(base, 0)) {
+    return { type: "front_matter" as const, spokenText: "" };
+  }
+
   if (looksLikeReferencesPage(base)) {
     return { type: "references" as const, spokenText: "" };
   }
@@ -729,8 +814,7 @@ async function collectPages(outPrefix: string): Promise<string[]> {
 
   const maxAttempts = 12;
   const delayMs = 5000;
-  const sleep = (ms: number) =>
-    new Promise((r) => setTimeout(r, ms));
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
   let jsonFiles: any[] = [];
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -793,6 +877,7 @@ async function collectPages(outPrefix: string): Promise<string[]> {
     });
 
     if (full) anyFullText = true;
+
     if (!pagesArr.length) {
       if (full?.trim()) pagesTexts.push(full.trim());
       else logger.warn("No pages and no document.text", { name: f.name });
@@ -824,9 +909,7 @@ async function collectPages(outPrefix: string): Promise<string[]> {
     }
   }
 
-  const nonEmpty = pagesTexts.filter(
-    (p) => p && p.trim().length > 0
-  );
+  const nonEmpty = pagesTexts.filter((p) => p && p.trim().length > 0);
   logger.info("Pages collected (raw)", {
     pages: nonEmpty.length,
   });
@@ -940,6 +1023,7 @@ export const ocrOnPdfUploadV2 = onObjectFinalized(
           partUri,
           outPrefix,
         });
+
         await runBatchOCR(partUri, outPrefix);
 
         const partPages = await collectPages(outPrefix);
@@ -961,7 +1045,6 @@ export const ocrOnPdfUploadV2 = onObjectFinalized(
         kind: ctx.kind,
         basePrefix: ctx.basePrefix,
       });
-      // حتى لو فشل نوقف هنا بدون محاولة حذف (ما فيه temp-split مهم للمستخدم)
       return;
     }
 
@@ -993,14 +1076,11 @@ export const ocrOnPdfUploadV2 = onObjectFinalized(
       const pPath = `${pagesFolder}/page-${n}.txt`;
       const p = processed[i];
       const payload = p.type === "text" ? p.spokenText : "";
-      await storage
-        .bucket(APP_BUCKET)
-        .file(pPath)
-        .save(payload ? payload + "\n" : "", {
-          resumable: false,
-          contentType: "text/plain; charset=utf-8",
-          metadata: { cacheControl: "no-cache" },
-        });
+      await storage.bucket(APP_BUCKET).file(pPath).save(payload ? payload + "\n" : "", {
+        resumable: false,
+        contentType: "text/plain; charset=utf-8",
+        metadata: { cacheControl: "no-cache" },
+      });
     }
 
     const publicUrl =
