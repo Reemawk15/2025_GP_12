@@ -5,6 +5,8 @@ import { DocumentProcessorServiceClient } from "@google-cloud/documentai";
 import { v4 as uuidv4 } from "uuid";
 import { PDFDocument } from "pdf-lib"; // Used to split large PDFs
 
+export { generateBookAudio } from "./generate_audio";
+
 // ================== CONFIGURATION ==================
 const APP_BUCKET = "qabas-95e06.firebasestorage.app";   // Firebase Storage bucket
 const DOC_OUTPUT_BUCKET = "qabas-95e06-docai-us-1";     // Document AI output bucket
