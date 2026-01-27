@@ -47,81 +47,122 @@ class BookDetailsPage extends StatelessWidget {
   final String bookId;
   const BookDetailsPage({super.key, required this.bookId});
 
-  /// ✅✅✅ الصوت فقط: توحيد الحالات مع Cloud Function (processing / completed)
-  /// ✅✅✅ الصوت فقط: لا نرسل idToken للفنكشن (يعتمد على request.auth)
+  // ✅ تعديل ضروري: تحويل القيم القادمة من Firestore بشكل آمن إلى int
+  int _asInt(dynamic v, {int fallback = 0}) {
+    if (v == null) return fallback;
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    if (v is String) return int.tryParse(v) ?? fallback;
+    return fallback;
+  }
+
   Future<void> _startOrGenerateAudio(
       BuildContext context, {
         required Map<String, dynamic> data,
+        required String title,
+        required String author,
+        required String cover,
       }) async {
-
-    final status = (data['audioStatus'] ?? 'idle') as String;
+    final status = (data['audioStatus'] ?? 'idle').toString();
     final partsRaw = data['audioParts'];
 
-    // 1) إذا الصوت جاهز → افتح المشغل
-    if (status == 'completed' && partsRaw is List && partsRaw.isNotEmpty) {
+    final bool hasParts = partsRaw is List && partsRaw.isNotEmpty;
+
+    // ✅ لو فيه أجزاء موجودة (حتى لو processing) افتحي المشغل بكل الموجود
+    if (hasParts) {
       final urls = partsRaw.map((e) => e.toString()).toList();
 
-      final lastPartIndex = (data['lastPartIndex'] ?? 0) as int;
-      final lastPositionMs = (data['lastPositionMs'] ?? 0) as int;
+      // ✅ التعديل هنا فقط: كان (as int) ويسبب كراش أحياناً
+      final lastPartIndex = _asInt(data['lastPartIndex'], fallback: 0);
+      final lastPositionMs = _asInt(data['lastPositionMs'], fallback: 0);
 
+      if (!context.mounted) return;
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => BookAudioPlayerPage(
             bookId: bookId,
+            bookTitle: title,
+            bookAuthor: author,
+            coverUrl: cover,
             audioUrls: urls,
-            initialPartIndex: lastPartIndex,
+            initialPartIndex: (lastPartIndex < urls.length) ? lastPartIndex : 0,
             initialPositionMs: lastPositionMs,
           ),
         ),
       );
+
+      // ✅ (اختياري) إذا تبين عند الضغط وهو processing يحاول يكمل جزء واحد بالخلفية
+      if (status == 'processing') {
+        try {
+          final user = FirebaseAuth.instance.currentUser;
+          if (user != null) {
+            final functions = FirebaseFunctions.instanceFor(region: 'us-central1');
+            final callable = functions.httpsCallable(
+              'generateBookAudio',
+              options: HttpsCallableOptions(timeout: const Duration(minutes: 9)),
+            );
+            await callable.call({'bookId': bookId, 'maxParts': 30});
+          }
+        } catch (_) {}
+      }
       return;
     }
 
-    // 2) إذا جاري التوليد
-    if (status == 'processing') {
-      _showSnack(
-        context,
-        'جاري توليد الصوت... انتظري قليلاً',
-        icon: Icons.hourglass_top_rounded,
-      );
-      return;
-    }
-
-    // 3) غير ذلك → ابدأ التوليد
+    // ✅ ما فيه أجزاء -> نبدأ توليد
     try {
-      _showSnack(
-        context,
-        'بدأنا توليد الصوت... قد يستغرق وقتاً بسيطاً',
-        icon: Icons.settings_rounded,
-      );
-
-      // تأكدي أن اليوزر موجود (عشان request.auth بالفنكشن)
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
         _showSnack(context, 'لازم تسجلين دخول أولاً', icon: Icons.info_outline);
         return;
       }
 
-      // ✅ (2) اجبري تحديث التوكن قبل استدعاء الفنكشن
-      await user.getIdToken(true);
+      _showSnack(context, 'جاري توليد الصوت…', icon: Icons.settings_rounded);
 
-      // ✅ (1) استخدمي FirebaseFunctions.instance + Timeout
-      final callable = FirebaseFunctions.instance.httpsCallable(
+      final functions = FirebaseFunctions.instanceFor(region: 'us-central1');
+      final callable = functions.httpsCallable(
         'generateBookAudio',
-        options: HttpsCallableOptions(
-          timeout: const Duration(minutes: 9),
-        ),
+        options: HttpsCallableOptions(timeout: const Duration(minutes: 9)),
       );
 
-      await callable.call({
-        'bookId': bookId,
-      });
-
+      await callable.call({'bookId': bookId, 'maxParts': 30});
+      _pollUntilHasAnyPart(context);
     } on FirebaseFunctionsException catch (e) {
-      _showSnack(context, 'تعذّر: ${e.code} - ${e.message ?? ""}', icon: Icons.error_outline);
-    } catch (e) {
-      _showSnack(context, 'تعذّر بدء توليد الصوت', icon: Icons.error_outline);
+      _showSnack(context, 'تعذّر: ${e.code}', icon: Icons.error_outline);
+      _pollUntilHasAnyPart(context);
+    } catch (_) {
+      _showSnack(context, 'تعذّر توليد الصوت', icon: Icons.error_outline);
     }
+  }
+
+  /// ✅ ينتظر لين يصير فيه أول جزء جاهز ثم يترك الـ StreamBuilder يحدث UI
+  void _pollUntilHasAnyPart(BuildContext context) {
+    int tries = 0;
+    Future.doWhile(() async {
+      if (!context.mounted) return false;
+      await Future.delayed(const Duration(seconds: 4));
+      tries++;
+
+      final snap = await FirebaseFirestore.instance
+          .collection('audiobooks')
+          .doc(bookId)
+          .get();
+
+      if (!snap.exists) return false;
+      final d = snap.data() as Map<String, dynamic>? ?? {};
+      final parts = d['audioParts'];
+      final count = (parts is List) ? parts.length : 0;
+
+      if (count > 0) {
+        _showSnack(context, 'تم تجهيز أول جزء ✅', icon: Icons.check_circle);
+        return false;
+      }
+
+      if (tries >= 45) {
+        _showSnack(context, 'التوليد يأخذ وقت… جربي بعد شوي', icon: Icons.info_outline);
+        return false;
+      }
+      return true;
+    });
   }
 
   @override
@@ -130,15 +171,9 @@ class BookDetailsPage extends StatelessWidget {
       textDirection: TextDirection.rtl,
       child: Stack(
         children: [
-          // Shared background
           Positioned.fill(
-            child: Image.asset(
-              'assets/images/back_private.png',
-              fit: BoxFit.cover,
-            ),
+            child: Image.asset('assets/images/back_private.png', fit: BoxFit.cover),
           ),
-
-          // Content above the background
           Scaffold(
             backgroundColor: Colors.transparent,
             appBar: AppBar(
@@ -149,23 +184,13 @@ class BookDetailsPage extends StatelessWidget {
               toolbarHeight: 150,
               leading: IconButton(
                 tooltip: 'رجوع',
-                icon: const Icon(
-                  Icons.arrow_back_ios_new_rounded,
-                  color: _primary,
-                  size: 22,
-                ),
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _primary, size: 22),
                 onPressed: () => Navigator.of(context).maybePop(),
               ),
-              title: const Text(
-                'تفاصيل الكتاب',
-                style: TextStyle(color: _primary),
-              ),
+              title: const Text('تفاصيل الكتاب', style: TextStyle(color: _primary)),
             ),
             body: StreamBuilder<DocumentSnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('audiobooks')
-                  .doc(bookId)
-                  .snapshots(),
+              stream: FirebaseFirestore.instance.collection('audiobooks').doc(bookId).snapshots(),
               builder: (context, snap) {
                 if (snap.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
@@ -182,17 +207,15 @@ class BookDetailsPage extends StatelessWidget {
                 final desc = (data['description'] ?? '') as String;
 
                 final audioStatus = (data['audioStatus'] ?? 'idle') as String;
-                final audioPartsRaw = data['audioParts'];
-                final bool hasAudioParts = audioPartsRaw is List && audioPartsRaw.isNotEmpty;
+                final partsRaw = data['audioParts'];
+                final bool hasAudioParts = partsRaw is List && partsRaw.isNotEmpty;
 
-                // ✅✅✅ الصوت فقط: نفس حالات الفنكشن
-                final bool isGenerating = audioStatus == 'processing';
-                final bool isReady = audioStatus == 'completed' && hasAudioParts;
-
-                final listenLabel = isGenerating
+                // ✅ هنا: لو فيه أجزاء نسمح بالاستماع حتى لو processing
+                final bool isGenerating = (audioStatus == 'processing') && !hasAudioParts;
+                final listenLabel = hasAudioParts
+                    ? 'استمع'
+                    : isGenerating
                     ? 'جاري توليد الصوت...'
-                    : isReady
-                    ? 'متابعة الاستماع'
                     : 'بدء الاستماع';
 
                 return SingleChildScrollView(
@@ -200,7 +223,6 @@ class BookDetailsPage extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Cover
                       Center(
                         child: Container(
                           width: 220,
@@ -211,20 +233,12 @@ class BookDetailsPage extends StatelessWidget {
                           ),
                           clipBehavior: Clip.antiAlias,
                           child: cover.isNotEmpty
-                              ? Image.network(
-                            cover,
-                            fit: BoxFit.contain,
-                          )
-                              : const Icon(
-                            Icons.menu_book,
-                            size: 80,
-                            color: _primary,
-                          ),
+                              ? Image.network(cover, fit: BoxFit.contain)
+                              : const Icon(Icons.menu_book, size: 80, color: _primary),
                         ),
                       ),
                       const SizedBox(height: 16),
 
-                      // Category pill
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -240,7 +254,6 @@ class BookDetailsPage extends StatelessWidget {
                       ),
                       const SizedBox(height: 10),
 
-                      // Title
                       Center(
                         child: Text(
                           title,
@@ -257,36 +270,61 @@ class BookDetailsPage extends StatelessWidget {
                       _AverageRatingRow(bookId: bookId),
                       const SizedBox(height: 4),
 
-                      // Author
                       Center(
-                        child: Text(
-                          'الكاتب: $author',
-                          style: const TextStyle(color: Colors.black54),
-                        ),
+                        child: Text('الكاتب: $author', style: const TextStyle(color: Colors.black54)),
                       ),
 
                       const SizedBox(height: 18),
 
-                      // Description
                       _PillCard(
                         title: 'نبذة عن الكتاب :',
                         child: Text(desc.isEmpty ? 'لا توجد نبذة متاحة حالياً.' : desc),
                       ),
                       const SizedBox(height: 12),
 
-                      // Audio action buttons (UI only for now)
+                      // (UI only)
                       const _AudioPillButton(
                         icon: Icons.record_voice_over,
                         label: 'ملخص عن الكتاب',
                       ),
                       const SizedBox(height: 10),
 
-                      // Start Listening
-                      _AudioPillButton(
-                        icon: Icons.play_arrow,
-                        label: listenLabel,
-                        enabled: !isGenerating,
-                        onPressed: () => _startOrGenerateAudio(context, data: data),
+                      SizedBox(
+                        height: 56,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _pillGreen,
+                            foregroundColor: _darkGreen,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                          ),
+                          onPressed: isGenerating
+                              ? null
+                              : () => _startOrGenerateAudio(
+                            context,
+                            data: data,
+                            title: title,
+                            author: author,
+                            cover: cover,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.headphones_rounded, size: 24),
+                              const SizedBox(width: 12),
+                              Text(
+                                listenLabel == 'بدء الاستماع' ? 'استمع' : listenLabel,
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
 
                       const SizedBox(height: 18),
@@ -300,9 +338,8 @@ class BookDetailsPage extends StatelessWidget {
 
                       const SizedBox(height: 12),
                       const Divider(height: 1),
-
-                      // Inline actions row just under reviews
                       const SizedBox(height: 8),
+
                       _InlineActionsRow(
                         onAddToList: () => _showAddToListSheet(
                           context,
@@ -311,13 +348,8 @@ class BookDetailsPage extends StatelessWidget {
                           author: author,
                           cover: cover,
                         ),
-                        onDownload: null, // UI only for now
-                        onReview: () => _showAddReviewSheet(
-                          context,
-                          bookId,
-                          title,
-                          cover,
-                        ),
+                        onDownload: null,
+                        onReview: () => _showAddReviewSheet(context, bookId, title, cover),
                       ),
 
                       const SizedBox(height: 90),
@@ -326,14 +358,11 @@ class BookDetailsPage extends StatelessWidget {
                 );
               },
             ),
-
             floatingActionButton: FloatingActionButton(
               backgroundColor: _accent,
               onPressed: () {
                 Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => BookChatPage(bookId: bookId),
-                  ),
+                  MaterialPageRoute(builder: (_) => BookChatPage(bookId: bookId)),
                 );
               },
               child: const Icon(Icons.chat_bubble_outline, color: Colors.white),
@@ -344,7 +373,6 @@ class BookDetailsPage extends StatelessWidget {
     );
   }
 
-  // === Bottom sheet: "Add to list" ===
   void _showAddToListSheet(
       BuildContext context, {
         required String bookId,
@@ -366,13 +394,7 @@ class BookDetailsPage extends StatelessWidget {
     );
   }
 
-  // Bottom sheet: add review
-  void _showAddReviewSheet(
-      BuildContext context,
-      String bookId,
-      String title,
-      String cover,
-      ) {
+  void _showAddReviewSheet(BuildContext context, String bookId, String title, String cover) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -388,7 +410,7 @@ class BookDetailsPage extends StatelessWidget {
   }
 }
 
-/// Row of inline actions under reviews (colors from theme)
+/// Row of inline actions under reviews
 class _InlineActionsRow extends StatelessWidget {
   final VoidCallback? onAddToList;
   final VoidCallback? onDownload;
@@ -450,7 +472,6 @@ class _InlineActionsRow extends StatelessWidget {
   }
 }
 
-/// Thin vertical divider
 class _DividerV extends StatelessWidget {
   const _DividerV();
   @override
@@ -465,7 +486,6 @@ class _DividerV extends StatelessWidget {
   }
 }
 
-/// Green pill card (for description section)
 class _PillCard extends StatelessWidget {
   final String title;
   final Widget child;
@@ -491,7 +511,7 @@ class _PillCard extends StatelessWidget {
   }
 }
 
-/// Audio-style button (UI only)
+/// (UI only)
 class _AudioPillButton extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -513,9 +533,7 @@ class _AudioPillButton extends StatelessWidget {
         style: ElevatedButton.styleFrom(
           backgroundColor: _pillGreen,
           foregroundColor: _primary,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
           elevation: 0,
         ),
         onPressed: canPress ? onPressed : null,
@@ -526,15 +544,13 @@ class _AudioPillButton extends StatelessWidget {
   }
 }
 
-/// Stars widget with half-star support (rounded to nearest 0.5)
 class _Stars extends StatelessWidget {
-  final double rating; // 0..5 (supports fractions)
+  final double rating;
   const _Stars({required this.rating});
 
   @override
   Widget build(BuildContext context) {
     final int halfSteps = (rating * 2).round();
-
     return Row(
       children: List.generate(5, (index) {
         final int starThreshold = (index + 1) * 2;
@@ -548,17 +564,12 @@ class _Stars extends StatelessWidget {
           icon = Icons.star_border;
         }
 
-        return Icon(
-          icon,
-          size: 16,
-          color: Colors.amber[700],
-        );
+        return Icon(icon, size: 16, color: Colors.amber[700]);
       }),
     );
   }
 }
 
-/// Overall rating row (average stars + number of reviewers)
 class _AverageRatingRow extends StatelessWidget {
   final String bookId;
   const _AverageRatingRow({required this.bookId});
@@ -575,22 +586,15 @@ class _AverageRatingRow extends StatelessWidget {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Row(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
-              SizedBox(width: 6),
-              _Stars(rating: 0.0),
-            ],
+            children: const [SizedBox(width: 6), _Stars(rating: 0.0)],
           );
         }
 
         final docs = snapshot.data?.docs ?? [];
-
         if (docs.isEmpty) {
           return Row(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
-              SizedBox(width: 6),
-              _Stars(rating: 0.0),
-            ],
+            children: const [SizedBox(width: 6), _Stars(rating: 0.0)],
           );
         }
 
@@ -598,13 +602,9 @@ class _AverageRatingRow extends StatelessWidget {
         for (final d in docs) {
           final data = d.data() as Map<String, dynamic>? ?? {};
           final r = data['rating'];
-          if (r is int) {
-            sum += r.toDouble();
-          } else if (r is double) {
-            sum += r;
-          }
+          if (r is int) sum += r.toDouble();
+          else if (r is double) sum += r;
         }
-
         final avg = sum / docs.length;
 
         return Row(
@@ -624,10 +624,7 @@ class _AverageRatingRow extends StatelessWidget {
             const SizedBox(width: 2),
             Text(
               '(${docs.length})',
-              style: const TextStyle(
-                fontSize: 12,
-                color: Colors.black54,
-              ),
+              style: const TextStyle(fontSize: 12, color: Colors.black54),
             ),
           ],
         );
@@ -636,7 +633,6 @@ class _AverageRatingRow extends StatelessWidget {
   }
 }
 
-/// Reviews list (for a specific book)
 class _ReviewsList extends StatelessWidget {
   final String bookId;
   const _ReviewsList({required this.bookId});
@@ -663,15 +659,14 @@ class _ReviewsList extends StatelessWidget {
             child: Text('لا توجد تعليقات بعد. كن أول من يقيّم هذا الكتاب!'),
           );
         }
+
         return Column(
           children: items.map((d) {
             final m = d.data() as Map<String, dynamic>? ?? {};
             final userName = (m['userName'] ?? 'قارئ') as String;
             final userImageUrl = (m['userImageUrl'] ?? '') as String;
             final rating = (m['rating'] ?? 0);
-            final ratingDouble = rating is int
-                ? rating.toDouble()
-                : (rating as double? ?? 0.0);
+            final ratingDouble = rating is int ? rating.toDouble() : (rating as double? ?? 0.0);
             final text = (m['text'] ?? '') as String;
             final userId = (m['userId'] ?? '') as String;
 
@@ -684,10 +679,7 @@ class _ReviewsList extends StatelessWidget {
               child: !hasImage
                   ? Text(
                 userName.isNotEmpty ? userName.characters.first : 'ق',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: _darkGreen,
-                ),
+                style: const TextStyle(fontWeight: FontWeight.bold, color: _darkGreen),
               )
                   : null,
             );
@@ -695,11 +687,8 @@ class _ReviewsList extends StatelessWidget {
             final tappableAvatar = GestureDetector(
               onTap: () {
                 if (userId.isEmpty || userId == currentUid) return;
-
                 Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => FriendDetailsPage(friendUid: userId),
-                  ),
+                  MaterialPageRoute(builder: (_) => FriendDetailsPage(friendUid: userId)),
                 );
               },
               child: avatar,
@@ -708,10 +697,7 @@ class _ReviewsList extends StatelessWidget {
             return Container(
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: _chipRose,
-                borderRadius: BorderRadius.circular(16),
-              ),
+              decoration: BoxDecoration(color: _chipRose, borderRadius: BorderRadius.circular(16)),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -724,12 +710,7 @@ class _ReviewsList extends StatelessWidget {
                         Row(
                           children: [
                             Expanded(
-                              child: Text(
-                                userName,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
+                              child: Text(userName, style: const TextStyle(fontWeight: FontWeight.w700)),
                             ),
                             _Stars(rating: ratingDouble),
                           ],
@@ -750,7 +731,6 @@ class _ReviewsList extends StatelessWidget {
 }
 
 /// Bottom sheet: Add book to user's list
-/// Saves in users/{uid}/library/{bookId}
 class _AddToListSheet extends StatelessWidget {
   final String bookId, title, author, cover;
   const _AddToListSheet({
@@ -766,6 +746,7 @@ class _AddToListSheet extends StatelessWidget {
       _showSnack(context, 'الرجاء تسجيل الدخول أولاً', icon: Icons.info_outline);
       return;
     }
+
     final ref = FirebaseFirestore.instance
         .collection('users')
         .doc(user.uid)
@@ -775,7 +756,7 @@ class _AddToListSheet extends StatelessWidget {
     await ref.set(
       {
         'bookId': bookId,
-        'status': status, // listen_now | want
+        'status': status,
         'title': title,
         'author': author,
         'coverUrl': cover,
@@ -802,19 +783,10 @@ class _AddToListSheet extends StatelessWidget {
             Container(
               height: 4,
               width: 40,
-              decoration: BoxDecoration(
-                color: Colors.black26,
-                borderRadius: BorderRadius.circular(2),
-              ),
+              decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(2)),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'إضافة إلى أي قائمة؟',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
+            const Text('إضافة إلى أي قائمة؟', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
             const SizedBox(height: 12),
             ListTile(
               leading: const Icon(Icons.play_circle_fill, color: _primary),
@@ -833,7 +805,7 @@ class _AddToListSheet extends StatelessWidget {
   }
 }
 
-/// ======= Bottom sheet: Add review =======
+/// Bottom sheet: Add review
 class _AddReviewSheet extends StatefulWidget {
   final String bookId;
   final String bookTitle;
@@ -872,19 +844,11 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
       final u = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
       if (u.exists) {
         final data = u.data() ?? {};
-
-        final candidateName = (data['name'] ??
-            data['fullName'] ??
-            data['displayName'] ??
-            '') as String;
-        if (candidateName.trim().isNotEmpty) {
-          userName = candidateName;
-        }
+        final candidateName = (data['name'] ?? data['fullName'] ?? data['displayName'] ?? '') as String;
+        if (candidateName.trim().isNotEmpty) userName = candidateName;
 
         final candidateImage = (data['photoUrl'] ?? '') as String;
-        if (candidateImage.trim().isNotEmpty) {
-          userImageUrl = candidateImage;
-        }
+        if (candidateImage.trim().isNotEmpty) userImageUrl = candidateImage;
       }
     } catch (_) {}
 
@@ -938,19 +902,10 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
               Container(
                 height: 4,
                 width: 40,
-                decoration: BoxDecoration(
-                  color: Colors.black26,
-                  borderRadius: BorderRadius.circular(2),
-                ),
+                decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(2)),
               ),
               const SizedBox(height: 12),
-              const Text(
-                'إضافة تعليق',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 16,
-                ),
-              ),
+              const Text('إضافة تعليق', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
               const SizedBox(height: 10),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -958,10 +913,7 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
                   final filled = i < _rating;
                   return IconButton(
                     onPressed: () => setState(() => _rating = i + 1),
-                    icon: Icon(
-                      filled ? Icons.star : Icons.star_border,
-                      color: Colors.amber[700],
-                    ),
+                    icon: Icon(filled ? Icons.star : Icons.star_border, color: Colors.amber[700]),
                   );
                 }),
               ),
@@ -989,18 +941,24 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
   }
 }
 
-/// ===============================
-/// SIMPLE AUDIO PLAYER PAGE
-/// ===============================
+/// AUDIO PLAYER PAGE
 class BookAudioPlayerPage extends StatefulWidget {
   final String bookId;
+  final String bookTitle;
+  final String bookAuthor;
+  final String coverUrl;
+
   final List<String> audioUrls;
+
   final int initialPartIndex;
   final int initialPositionMs;
 
   const BookAudioPlayerPage({
     super.key,
     required this.bookId,
+    required this.bookTitle,
+    required this.bookAuthor,
+    required this.coverUrl,
     required this.audioUrls,
     required this.initialPartIndex,
     required this.initialPositionMs,
@@ -1012,8 +970,17 @@ class BookAudioPlayerPage extends StatefulWidget {
 
 class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
   late final AudioPlayer _player;
-  ConcatenatingAudioSource? _playlist;
+
   bool _loading = true;
+
+  double _speed = 1.0;
+  final List<double> _speeds = const [0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
+  List<Duration?> _durations = [];
+
+  bool _durationsReady = false;
+
+  // ✅ حالة البوك مارك (معبّى/حدود)
+  bool _isBookmarked = false;
 
   @override
   void initState() {
@@ -1024,23 +991,112 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
 
   Future<void> _init() async {
     try {
-      _playlist = ConcatenatingAudioSource(
-        children: widget.audioUrls.map((u) => AudioSource.uri(Uri.parse(u))).toList(),
-      );
+      final sources = widget.audioUrls.map((u) => AudioSource.uri(Uri.parse(u))).toList();
+      final playlist = ConcatenatingAudioSource(children: sources);
 
       await _player.setAudioSource(
-        _playlist!,
-        initialIndex: (widget.initialPartIndex < widget.audioUrls.length)
-            ? widget.initialPartIndex
-            : 0,
+        playlist,
+        initialIndex: widget.initialPartIndex.clamp(0, widget.audioUrls.length - 1),
         initialPosition: Duration(milliseconds: widget.initialPositionMs),
       );
 
+      await _player.setSpeed(_speed);
+
+      // ✅ إذا فيه موضع محفوظ من قبل نبي الزر يكون "معبّى"
+      _isBookmarked = widget.initialPositionMs > 0;
+
+      // ✅ أول مرة: durations قد تكون null، نسمع sequenceStream للتحديث
+      _durations = _player.sequence?.map((s) => s.duration).toList() ?? [];
+
+      _player.sequenceStream.listen((seq) {
+        if (!mounted) return;
+        setState(() {
+          _durations = seq?.map((s) => s.duration).toList() ?? _durations;
+        });
+      });
+
       setState(() => _loading = false);
+
+      // ✅ احسب مدة كل جزء من الروابط عشان مجموع الكتاب يطلع صح
+      await _loadAllDurationsFromUrls();
     } catch (_) {
       setState(() => _loading = false);
       if (mounted) _showSnack(context, 'تعذّر تشغيل الصوت', icon: Icons.error_outline);
     }
+  }
+
+  Future<void> _loadAllDurationsFromUrls() async {
+    try {
+      if (_durations.isNotEmpty &&
+          _durations.length == widget.audioUrls.length &&
+          _durations.every((d) => d != null && d!.inMilliseconds > 0)) {
+        if (mounted) setState(() => _durationsReady = true);
+        return;
+      }
+
+      final tmp = AudioPlayer();
+      final List<Duration?> result = [];
+
+      for (final url in widget.audioUrls) {
+        try {
+          final d = await tmp.setUrl(url);
+          result.add(d);
+        } catch (_) {
+          result.add(null);
+        }
+      }
+
+      await tmp.dispose();
+
+      if (!mounted) return;
+      setState(() {
+        _durations = result;
+        _durationsReady = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _durationsReady = true);
+    }
+  }
+
+  int _totalMs() {
+    if (_durations.isEmpty) return 0;
+    return _durations.fold<int>(0, (sum, d) => sum + (d?.inMilliseconds ?? 0));
+  }
+
+  int _prefixMsBefore(int index) {
+    if (_durations.isEmpty) return 0;
+    int sum = 0;
+    for (int i = 0; i < index; i++) {
+      sum += (_durations[i]?.inMilliseconds ?? 0);
+    }
+    return sum;
+  }
+
+  int _globalPosMs() {
+    final idx = _player.currentIndex ?? 0;
+    final local = _player.position.inMilliseconds;
+    return _prefixMsBefore(idx) + local;
+  }
+
+  Future<void> _seekGlobalMs(int targetMs) async {
+    if (_durations.isEmpty) return;
+
+    int acc = 0;
+    for (int i = 0; i < _durations.length; i++) {
+      final d = _durations[i]?.inMilliseconds ?? 0;
+      if (d <= 0) continue;
+      if (targetMs < acc + d) {
+        final inside = targetMs - acc;
+        await _player.seek(Duration(milliseconds: inside), index: i);
+        return;
+      }
+      acc += d;
+    }
+
+    final lastIndex = (_durations.length - 1).clamp(0, _durations.length - 1);
+    final lastDur = _durations[lastIndex]?.inMilliseconds ?? 0;
+    await _player.seek(Duration(milliseconds: lastDur > 0 ? lastDur : 0), index: lastIndex);
   }
 
   Future<void> _saveProgress() async {
@@ -1048,10 +1104,7 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
       final idx = _player.currentIndex ?? 0;
       final pos = _player.position.inMilliseconds;
 
-      await FirebaseFirestore.instance
-          .collection('audiobooks')
-          .doc(widget.bookId)
-          .set(
+      await FirebaseFirestore.instance.collection('audiobooks').doc(widget.bookId).set(
         {
           'lastPartIndex': idx,
           'lastPositionMs': pos,
@@ -1061,24 +1114,64 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
     } catch (_) {}
   }
 
+  // ✅ Toggle للبوكمارك (هو اللي يحفظ/يلغي الحفظ)
+  Future<void> _toggleBookmark() async {
+    if (_isBookmarked) {
+      // إلغاء الحفظ (يرجع من البداية لاحقاً)
+      try {
+        await FirebaseFirestore.instance.collection('audiobooks').doc(widget.bookId).set(
+          {
+            'lastPartIndex': FieldValue.delete(),
+            'lastPositionMs': FieldValue.delete(),
+          },
+          SetOptions(merge: true),
+        );
+      } catch (_) {}
+
+      if (!mounted) return;
+      setState(() => _isBookmarked = false);
+    } else {
+      // حفظ الموضع
+      await _saveProgress();
+      if (!mounted) return;
+      setState(() => _isBookmarked = true);
+    }
+  }
+
+  Future<void> _seekBy(int seconds) async {
+    final total = _totalMs();
+    if (total <= 0) return;
+
+    int target = _globalPosMs() + (seconds * 1000);
+    if (target < 0) target = 0;
+    if (target > total) target = total;
+
+    await _seekGlobalMs(target);
+  }
+
+  Future<void> _toggleSpeed() async {
+    final idx = _speeds.indexOf(_speed);
+    final next = _speeds[(idx + 1) % _speeds.length];
+    setState(() => _speed = next);
+    await _player.setSpeed(next);
+  }
+
   @override
   void dispose() {
-    _saveProgress();
     _player.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final whiteCard = Colors.white.withOpacity(0.70);
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Stack(
         children: [
           Positioned.fill(
-            child: Image.asset(
-              'assets/images/back_private.png',
-              fit: BoxFit.cover,
-            ),
+            child: Image.asset('assets/images/back_private.png', fit: BoxFit.cover),
           ),
           Scaffold(
             backgroundColor: Colors.transparent,
@@ -1087,116 +1180,135 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
               surfaceTintColor: Colors.transparent,
               shadowColor: Colors.transparent,
               elevation: 0,
+              toolbarHeight: 150,
               leading: IconButton(
                 tooltip: 'رجوع',
-                icon: const Icon(
-                  Icons.arrow_back_ios_new_rounded,
-                  color: _primary,
-                  size: 22,
-                ),
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _primary, size: 22),
                 onPressed: () => Navigator.of(context).maybePop(),
               ),
-              title: const Text(
-                'تشغيل الكتاب',
-                style: TextStyle(color: _primary),
-              ),
+              title: const Text('تشغيل الكتاب', style: TextStyle(color: _primary)),
             ),
             body: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 18),
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
                   : Column(
                 children: [
+                  const SizedBox(height: 45),
+
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: _pillGreen,
-                      borderRadius: BorderRadius.circular(16),
+                      color: whiteCard,
+                      borderRadius: BorderRadius.circular(18),
                     ),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        StreamBuilder<int?>(
-                          stream: _player.currentIndexStream,
-                          builder: (context, snap) {
-                            final idx = (snap.data ?? 0) + 1;
-                            final total = widget.audioUrls.length;
-                            return Text(
-                              'الجزء $idx من $total',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w800,
-                                color: _primary,
-                              ),
-                            );
-                          },
+                        Container(
+                          width: 190,
+                          height: 235,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: widget.coverUrl.isNotEmpty
+                              ? Image.network(widget.coverUrl, fit: BoxFit.contain)
+                              : const Icon(Icons.menu_book, size: 70, color: _primary),
                         ),
                         const SizedBox(height: 10),
-                        StreamBuilder<Duration>(
-                          stream: _player.positionStream,
-                          builder: (context, ps) {
-                            final pos = ps.data ?? Duration.zero;
-                            final dur = _player.duration ?? Duration.zero;
-
-                            double value = 0;
-                            if (dur.inMilliseconds > 0) {
-                              value = pos.inMilliseconds / dur.inMilliseconds;
-                            }
-
-                            return Column(
-                              children: [
-                                Slider(
-                                  value: value.clamp(0, 1),
-                                  onChanged: (v) async {
-                                    final seekMs = (dur.inMilliseconds * v).round();
-                                    await _player.seek(Duration(milliseconds: seekMs));
-                                  },
-                                ),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(_fmt(pos), style: const TextStyle(color: Colors.black54)),
-                                    Text(_fmt(dur), style: const TextStyle(color: Colors.black54)),
-                                  ],
-                                ),
-                              ],
-                            );
-                          },
+                        Text(
+                          widget.bookTitle,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            color: _primary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          widget.bookAuthor,
+                          style: const TextStyle(
+                            color: Colors.black54,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 14),
 
-                  // Controls
+                  const SizedBox(height: 2),
+
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: whiteCard,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: StreamBuilder<Duration>(
+                      stream: _player.positionStream,
+                      builder: (context, snap) {
+                        final total = _totalMs();
+                        final gpos = _globalPosMs();
+
+                        final leftMs = gpos < 0 ? 0 : gpos;
+                        final rightMs = total > 0 ? total : 0;
+
+                        final value = (total > 0) ? (leftMs / total) : 0.0;
+
+                        return Column(
+                          children: [
+                            Slider(
+                              value: value.clamp(0, 1),
+                              onChanged: total <= 0
+                                  ? null
+                                  : (v) async {
+                                final target = (total * v).round();
+                                await _seekGlobalMs(target);
+                              },
+                            ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(_fmtMs(leftMs), style: const TextStyle(color: Colors.black54)),
+                                Text(_fmtMs(rightMs), style: const TextStyle(color: Colors.black54)),
+                              ],
+                            ),
+                            if (!_durationsReady)
+                              const Padding(
+                                padding: EdgeInsets.only(top: 6),
+                                child: Text('جاري حساب مدة الكتاب...', style: TextStyle(color: Colors.black54)),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       IconButton(
-                        iconSize: 34,
-                        onPressed: () async {
-                          final idx = _player.currentIndex ?? 0;
-                          if (idx > 0) {
-                            await _player.seek(Duration.zero, index: idx - 1);
-                            await _player.play();
-                          }
-                        },
-                        icon: const Icon(Icons.skip_previous_rounded, color: _primary),
+                        iconSize: 42,
+                        onPressed: () => _seekBy(-10),
+                        icon: const Icon(Icons.replay_10_rounded, color: _primary),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 16),
                       StreamBuilder<PlayerState>(
                         stream: _player.playerStateStream,
                         builder: (context, s) {
-                          final state = s.data;
-                          final playing = state?.playing ?? false;
-
+                          final playing = s.data?.playing ?? false;
                           return CircleAvatar(
-                            radius: 32,
+                            radius: 34,
                             backgroundColor: _accent,
                             child: IconButton(
-                              iconSize: 34,
+                              iconSize: 40,
                               onPressed: () async {
                                 if (playing) {
-                                  await _saveProgress();
+                                  // ❌ لا نحفظ عند الإيقاف
                                   await _player.pause();
                                 } else {
                                   await _player.play();
@@ -1210,45 +1322,73 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
                           );
                         },
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 16),
                       IconButton(
-                        iconSize: 34,
-                        onPressed: () async {
-                          final idx = _player.currentIndex ?? 0;
-                          if (idx < widget.audioUrls.length - 1) {
-                            await _player.seek(Duration.zero, index: idx + 1);
-                            await _player.play();
-                          }
-                        },
-                        icon: const Icon(Icons.skip_next_rounded, color: _primary),
+                        iconSize: 42,
+                        onPressed: () => _seekBy(10),
+                        icon: const Icon(Icons.forward_10_rounded, color: _primary),
                       ),
                     ],
                   ),
 
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 24),
 
-                  // Save progress manually (optional)
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _pillGreen,
-                        foregroundColor: _primary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        height: 64,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: whiteCard,
+                            foregroundColor: _primary,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(24),
+                            ),
+                            elevation: 0,
+                          ),
+                          onPressed: _toggleBookmark,
+                          icon: Icon(
+                            _isBookmarked ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+                            color: _primary,
+                            size: 26,
+                          ),
+                          label: const Text(
+                            'حفظ',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
-                        elevation: 0,
                       ),
-                      onPressed: () async {
-                        await _saveProgress();
-                        if (mounted) {
-                          _showSnack(context, 'تم حفظ موضع الاستماع', icon: Icons.check_circle);
-                        }
-                      },
-                      icon: const Icon(Icons.bookmark_rounded),
-                      label: const Text('حفظ موضع الاستماع'),
-                    ),
+                      const SizedBox(width: 12),
+                      SizedBox(
+                        height: 64,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: whiteCard,
+                            foregroundColor: _primary,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(24),
+                            ),
+                            elevation: 0,
+                          ),
+                          onPressed: _toggleSpeed,
+                          icon: const Icon(
+                            Icons.speed_rounded,
+                            size: 26,
+                          ),
+                          label: Text(
+                            '${_speed.toStringAsFixed(2)}x',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -1259,11 +1399,15 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
     );
   }
 
-  String _fmt(Duration d) {
-    final m = d.inMinutes;
+  String _fmtMs(int ms) {
+    final d = Duration(milliseconds: ms);
+    final h = d.inHours;
+    final m = d.inMinutes % 60;
     final s = d.inSeconds % 60;
-    final mm = m.toString().padLeft(2, '0');
-    final ss = s.toString().padLeft(2, '0');
-    return '$mm:$ss';
+
+    if (h > 0) {
+      return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+    }
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 }
