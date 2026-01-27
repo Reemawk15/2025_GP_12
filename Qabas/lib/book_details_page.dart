@@ -47,7 +47,7 @@ class BookDetailsPage extends StatelessWidget {
   final String bookId;
   const BookDetailsPage({super.key, required this.bookId});
 
-  // ✅ تعديل ضروري: تحويل القيم القادمة من Firestore بشكل آمن إلى int
+  // ✅ تحويل القيم القادمة من Firestore بشكل آمن إلى int
   int _asInt(dynamic v, {int fallback = 0}) {
     if (v == null) return fallback;
     if (v is int) return v;
@@ -68,13 +68,29 @@ class BookDetailsPage extends StatelessWidget {
 
     final bool hasParts = partsRaw is List && partsRaw.isNotEmpty;
 
-    // ✅ لو فيه أجزاء موجودة (حتى لو processing) افتحي المشغل بكل الموجود
+    // ✅ لو فيه أجزاء موجودة افتحي المشغل بكل الموجود
     if (hasParts) {
       final urls = partsRaw.map((e) => e.toString()).toList();
 
-      // ✅ التعديل هنا فقط: كان (as int) ويسبب كراش أحياناً
-      final lastPartIndex = _asInt(data['lastPartIndex'], fallback: 0);
-      final lastPositionMs = _asInt(data['lastPositionMs'], fallback: 0);
+      // ✅ التعديل: التقدم/البوكمارك لازم يكون لكل يوزر (users/{uid}/library/{bookId})
+      int lastPartIndex = 0;
+      int lastPositionMs = 0;
+
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        try {
+          final progSnap = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .collection('library')
+              .doc(bookId)
+              .get();
+
+          final p = progSnap.data() ?? {};
+          lastPartIndex = _asInt(p['lastPartIndex'], fallback: 0);
+          lastPositionMs = _asInt(p['lastPositionMs'], fallback: 0);
+        } catch (_) {}
+      }
 
       if (!context.mounted) return;
       Navigator.of(context).push(
@@ -94,7 +110,6 @@ class BookDetailsPage extends StatelessWidget {
       // ✅ (اختياري) إذا تبين عند الضغط وهو processing يحاول يكمل جزء واحد بالخلفية
       if (status == 'processing') {
         try {
-          final user = FirebaseAuth.instance.currentUser;
           if (user != null) {
             final functions = FirebaseFunctions.instanceFor(region: 'us-central1');
             final callable = functions.httpsCallable(
@@ -1099,30 +1114,50 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
     await _player.seek(Duration(milliseconds: lastDur > 0 ? lastDur : 0), index: lastIndex);
   }
 
+  // ✅ التعديل: حفظ التقدم لكل يوزر (users/{uid}/library/{bookId})
   Future<void> _saveProgress() async {
     try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
       final idx = _player.currentIndex ?? 0;
       final pos = _player.position.inMilliseconds;
 
-      await FirebaseFirestore.instance.collection('audiobooks').doc(widget.bookId).set(
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('library')
+          .doc(widget.bookId)
+          .set(
         {
           'lastPartIndex': idx,
           'lastPositionMs': pos,
+          'updatedAt': FieldValue.serverTimestamp(),
         },
         SetOptions(merge: true),
       );
     } catch (_) {}
   }
 
-  // ✅ Toggle للبوكمارك (هو اللي يحفظ/يلغي الحفظ)
+  // ✅ Toggle للبوكمارك (يحفظ/يلغي الحفظ) لكل يوزر
   Future<void> _toggleBookmark() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final ref = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('library')
+        .doc(widget.bookId);
+
     if (_isBookmarked) {
-      // إلغاء الحفظ (يرجع من البداية لاحقاً)
+      // إلغاء الحفظ
       try {
-        await FirebaseFirestore.instance.collection('audiobooks').doc(widget.bookId).set(
+        await ref.set(
           {
             'lastPartIndex': FieldValue.delete(),
             'lastPositionMs': FieldValue.delete(),
+            'updatedAt': FieldValue.serverTimestamp(),
           },
           SetOptions(merge: true),
         );
