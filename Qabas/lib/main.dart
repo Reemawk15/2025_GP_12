@@ -10,15 +10,16 @@ import 'firebase_options.dart';
 import 'sign_up_page.dart';
 import 'sign_in_page.dart';
 import 'splash_logo_page.dart';
+import 'goal_notifications.dart';
 
 /// Qabas color palette
 class QabasColors {
-  static const primary    = Color(0xFF0E3A2C);
+  static const primary = Color(0xFF0E3A2C);
   static const background = Color(0xFFC6DABA);
 
-  static const btnSolid   = Color(0xFFDDE9C6);
-  static const btnLight   = Color(0xFFF0F7DF);
-  static const btnText    = primary;
+  static const btnSolid = Color(0xFFDDE9C6);
+  static const btnLight = Color(0xFFF0F7DF);
+  static const btnText = primary;
 }
 
 Future<void> main() async {
@@ -36,10 +37,12 @@ Future<void> main() async {
   );
 
   // Firebase init
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
+  await GoalNotifications.instance.init();
+  await GoalNotifications.instance.scheduleWeeklyStartMotivation();
+
+  runApp(const QabasApp());
   // ✅ اطبع projectId (مهم جداً عشان نتأكد انه نفس مشروع الفنكشن)
   debugPrint('APP projectId = ${Firebase.app().options.projectId}');
   debugPrint('APP appId     = ${Firebase.app().options.appId}');
@@ -73,13 +76,14 @@ class QabasApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = ThemeData(
       useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: QabasColors.primary,
-        brightness: Brightness.light,
-      ).copyWith(
-        primary: QabasColors.primary,
-        background: QabasColors.background,
-      ),
+      colorScheme:
+          ColorScheme.fromSeed(
+            seedColor: QabasColors.primary,
+            brightness: Brightness.light,
+          ).copyWith(
+            primary: QabasColors.primary,
+            background: QabasColors.background,
+          ),
       scaffoldBackgroundColor: QabasColors.background,
       appBarTheme: const AppBarTheme(
         centerTitle: true,
@@ -114,10 +118,7 @@ class QabasApp extends StatelessWidget {
       title: 'قَبَس',
       debugShowCheckedModeBanner: false,
       locale: const Locale('ar'),
-      supportedLocales: const [
-        Locale('ar'),
-        Locale('en'),
-      ],
+      supportedLocales: const [Locale('ar'), Locale('en')],
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
@@ -146,10 +147,7 @@ class HomePage extends StatelessWidget {
         body: Stack(
           fit: StackFit.expand,
           children: [
-            Image.asset(
-              'assets/images/First.png',
-              fit: BoxFit.cover,
-            ),
+            Image.asset('assets/images/First.png', fit: BoxFit.cover),
             SafeArea(
               child: Align(
                 alignment: Alignment.bottomCenter,

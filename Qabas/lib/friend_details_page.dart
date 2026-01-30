@@ -7,14 +7,18 @@ import 'club_chat_page.dart';
 /// =====================
 /// Brand colors
 /// =====================
-const Color _darkGreen   = Color(0xFF0E3A2C);
-const Color _midGreen    = Color(0xFF2F5145);
-const Color _lightGreen  = Color(0xFFC9DABF);
-const Color _confirm     = Color(0xFF6F8E63);
-const Color _danger      = Color(0xFFB64B4B);
+const Color _darkGreen = Color(0xFF0E3A2C);
+const Color _midGreen = Color(0xFF2F5145);
+const Color _lightGreen = Color(0xFFC9DABF);
+const Color _confirm = Color(0xFF6F8E63);
+const Color _danger = Color(0xFFB64B4B);
 
 /// Unified snack bar helper
-void _showAppSnack(BuildContext context, String message, {IconData icon = Icons.check_circle}) {
+void _showAppSnack(
+  BuildContext context,
+  String message, {
+  IconData icon = Icons.check_circle,
+}) {
   final messenger = ScaffoldMessenger.of(context);
   messenger.hideCurrentSnackBar();
   messenger.showSnackBar(
@@ -30,7 +34,11 @@ void _showAppSnack(BuildContext context, String message, {IconData icon = Icons.
           const SizedBox(width: 8),
           Text(
             message,
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
           ),
         ],
       ),
@@ -45,7 +53,9 @@ class FriendDetailsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final userDoc = FirebaseFirestore.instance.collection('users').doc(friendUid);
+    final userDoc = FirebaseFirestore.instance
+        .collection('users')
+        .doc(friendUid);
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -64,7 +74,11 @@ class FriendDetailsPage extends StatelessWidget {
               child: IconButton(
                 tooltip: 'رجوع',
                 onPressed: () => Navigator.of(context).maybePop(),
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _midGreen, size: 20),
+                icon: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: _midGreen,
+                  size: 20,
+                ),
               ),
             ),
             flexibleSpace: SafeArea(child: _FriendHeader(userDoc: userDoc)),
@@ -110,14 +124,16 @@ class _FriendHeader extends StatelessWidget {
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: userDoc.snapshots(),
       builder: (context, snap) {
-        final data     = snap.data?.data() ?? {};
-        final name     = (data['name'] ?? '') as String;
+        final data = snap.data?.data() ?? {};
+        final name = (data['name'] ?? '') as String;
         final username = (data['username'] ?? '') as String;
         final photoUrl = (data['photoUrl'] ?? '') as String;
 
         final userAsTail = username.isEmpty
             ? ''
-            : (username.startsWith('@') ? '${username.substring(1)}@' : '$username@');
+            : (username.startsWith('@')
+                  ? '${username.substring(1)}@'
+                  : '$username@');
 
         return Align(
           alignment: Alignment.topCenter,
@@ -134,7 +150,9 @@ class _FriendHeader extends StatelessWidget {
                   CircleAvatar(
                     radius: 26,
                     backgroundColor: Colors.white,
-                    backgroundImage: photoUrl.isEmpty ? null : NetworkImage(photoUrl),
+                    backgroundImage: photoUrl.isEmpty
+                        ? null
+                        : NetworkImage(photoUrl),
                     child: photoUrl.isEmpty
                         ? const Icon(Icons.person, color: Colors.black38)
                         : null,
@@ -194,7 +212,10 @@ class _FriendHeader extends StatelessWidget {
 class _DynamicFriendAction extends StatelessWidget {
   final String friendUid;
   final String friendName;
-  const _DynamicFriendAction({required this.friendUid, required this.friendName});
+  const _DynamicFriendAction({
+    required this.friendUid,
+    required this.friendName,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -202,12 +223,16 @@ class _DynamicFriendAction extends StatelessWidget {
     if (me == null) return const SizedBox.shrink();
 
     final myFriendDoc = FirebaseFirestore.instance
-        .collection('users').doc(me.uid)
-        .collection('friends').doc(friendUid);
+        .collection('users')
+        .doc(me.uid)
+        .collection('friends')
+        .doc(friendUid);
 
     final pendingReqDoc = FirebaseFirestore.instance
-        .collection('users').doc(friendUid)
-        .collection('friendRequests').doc(me.uid);
+        .collection('users')
+        .doc(friendUid)
+        .collection('friendRequests')
+        .doc(me.uid);
 
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: myFriendDoc.snapshots(),
@@ -216,7 +241,8 @@ class _DynamicFriendAction extends StatelessWidget {
         if (isFriend) {
           return _FriendBadge(
             isFollowing: true,
-            onTap: () => _HeaderAndTabs._confirmUnfollow(context, friendName, friendUid),
+            onTap: () =>
+                _HeaderAndTabs._confirmUnfollow(context, friendName, friendUid),
           );
         }
         return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
@@ -226,17 +252,26 @@ class _DynamicFriendAction extends StatelessWidget {
             if (waiting) {
               // Pending state: tapping shows the same cancel-request dialog as in Friends search tab
               return InkWell(
-                onTap: () => _HeaderAndTabs.confirmCancelPendingRequest(context, friendUid),
+                onTap: () => _HeaderAndTabs.confirmCancelPendingRequest(
+                  context,
+                  friendUid,
+                ),
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: _confirm.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Text(
                     'بانتظار القبول ⏳',
-                    style: TextStyle(fontWeight: FontWeight.w700, color: _confirm),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: _confirm,
+                    ),
                   ),
                 ),
               );
@@ -246,14 +281,20 @@ class _DynamicFriendAction extends StatelessWidget {
               onTap: () => _HeaderAndTabs.sendFriendRequest(context, friendUid),
               behavior: HitTestBehavior.opaque,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: _confirm,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Text(
                   'إضافة',
-                  style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             );
@@ -280,7 +321,11 @@ class _TabbarContainer extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
           boxShadow: const [
-            BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 3)),
+            BoxShadow(
+              color: Colors.black12,
+              blurRadius: 8,
+              offset: Offset(0, 3),
+            ),
           ],
         ),
         child: const _TabsOnly(),
@@ -302,7 +347,10 @@ class _TabsOnly extends StatelessWidget {
         insets: EdgeInsets.symmetric(horizontal: 24),
       ),
       labelStyle: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
-      unselectedLabelStyle: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+      unselectedLabelStyle: TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+      ),
       tabs: [
         Tab(text: 'الإحصائيات'),
         Tab(text: 'التقييمات'),
@@ -317,19 +365,24 @@ class _TabsOnly extends StatelessWidget {
 /// ===============================
 class _HeaderAndTabs {
   /// Send new friend request from FriendDetails header
-  static Future<void> sendFriendRequest(BuildContext context, String friendUid) async {
+  static Future<void> sendFriendRequest(
+    BuildContext context,
+    String friendUid,
+  ) async {
     final me = FirebaseAuth.instance.currentUser;
     if (me == null) return;
 
     final reqRef = FirebaseFirestore.instance
-        .collection('users').doc(friendUid)
-        .collection('friendRequests').doc(me.uid);
+        .collection('users')
+        .doc(friendUid)
+        .collection('friendRequests')
+        .doc(me.uid);
 
     try {
-      await reqRef.set(
-        {'fromUid': me.uid, 'createdAt': FieldValue.serverTimestamp()},
-        SetOptions(merge: true),
-      );
+      await reqRef.set({
+        'fromUid': me.uid,
+        'createdAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
       _showAppSnack(context, 'تم إرسال الطلب');
     } catch (e) {
       _showAppSnack(context, 'تعذّر الإرسال: $e', icon: Icons.error_outline);
@@ -338,10 +391,10 @@ class _HeaderAndTabs {
 
   /// Confirmation dialog to unfriend (same style as club leave dialog)
   static Future<void> _confirmUnfollow(
-      BuildContext context,
-      String friendName,
-      String friendUid,
-      ) async {
+    BuildContext context,
+    String friendName,
+    String friendUid,
+  ) async {
     final me = FirebaseAuth.instance.currentUser;
     if (me == null) return;
 
@@ -349,9 +402,7 @@ class _HeaderAndTabs {
       context: context,
       builder: (ctx) => Dialog(
         backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
           child: Directionality(
@@ -372,10 +423,7 @@ class _HeaderAndTabs {
                 Text(
                   'هل أنت متأكد أنك تريد إزالة $friendName من قائمة أصدقائك؟',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    color: Colors.black87,
-                  ),
+                  style: const TextStyle(fontSize: 15, color: Colors.black87),
                 ),
                 const SizedBox(height: 24),
                 SizedBox(
@@ -433,11 +481,27 @@ class _HeaderAndTabs {
     final fs = FirebaseFirestore.instance;
     final batch = fs.batch();
 
-    final myFriend   = fs.collection('users').doc(myUid).collection('friends').doc(friendUid);
-    final hisFriend  = fs.collection('users').doc(friendUid).collection('friends').doc(myUid);
+    final myFriend = fs
+        .collection('users')
+        .doc(myUid)
+        .collection('friends')
+        .doc(friendUid);
+    final hisFriend = fs
+        .collection('users')
+        .doc(friendUid)
+        .collection('friends')
+        .doc(myUid);
 
-    final reqHimHasFromMe = fs.collection('users').doc(friendUid).collection('friendRequests').doc(myUid);
-    final reqMeHasFromHim = fs.collection('users').doc(myUid).collection('friendRequests').doc(friendUid);
+    final reqHimHasFromMe = fs
+        .collection('users')
+        .doc(friendUid)
+        .collection('friendRequests')
+        .doc(myUid);
+    final reqMeHasFromHim = fs
+        .collection('users')
+        .doc(myUid)
+        .collection('friendRequests')
+        .doc(friendUid);
 
     batch.delete(myFriend);
     batch.delete(hisFriend);
@@ -450,9 +514,9 @@ class _HeaderAndTabs {
   /// Public helper used from the pending badge in header.
   /// Shows "Cancel friend request" confirmation dialog (same style as search tab).
   static Future<void> confirmCancelPendingRequest(
-      BuildContext context,
-      String friendUid,
-      ) async {
+    BuildContext context,
+    String friendUid,
+  ) async {
     final me = FirebaseAuth.instance.currentUser;
     if (me == null) return;
 
@@ -460,9 +524,7 @@ class _HeaderAndTabs {
       context: context,
       builder: (ctx) => Dialog(
         backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
           child: Directionality(
@@ -483,10 +545,7 @@ class _HeaderAndTabs {
                 const Text(
                   'هل أنت متأكد أنك تريد إلغاء طلب الإضافة؟',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: Colors.black87,
-                  ),
+                  style: TextStyle(fontSize: 15, color: Colors.black87),
                 ),
                 const SizedBox(height: 24),
                 SizedBox(
@@ -540,7 +599,10 @@ class _HeaderAndTabs {
   }
 
   /// Delete outgoing friend request document from Firestore.
-  static Future<void> _cancelPendingRequest(String myUid, String friendUid) async {
+  static Future<void> _cancelPendingRequest(
+    String myUid,
+    String friendUid,
+  ) async {
     final fs = FirebaseFirestore.instance;
     final reqRef = fs
         .collection('users')
@@ -574,23 +636,39 @@ class _StatsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final statsRef = FirebaseFirestore.instance
-        .collection('users').doc(friendUid)
-        .collection('stats').doc('main');
+        .collection('users')
+        .doc(friendUid)
+        .collection('stats')
+        .doc('main');
 
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: statsRef.snapshots(),
       builder: (context, snap) {
         final data = snap.data?.data();
-        final best     = data?['bestStreak']    ?? 0;
-        final current  = data?['currentStreak'] ?? 0;
+        final best = data?['bestStreak'] ?? 0;
+        final current = data?['currentStreak'] ?? 0;
         final listened = data?['listenedCount'] ?? 0;
 
-        final items = [
-          _StatRow(icon: '🏅', text: 'أفضل مداومة: $best يوم'),
-          _StatRow(icon: '🔥', text: 'المداومة الحالية: $current يوم'),
-          _StatRow(icon: '📚', text: 'الكتب المسموعة: $listened كتاب'),
+        final items = <Widget>[
+          _StatCard(icon: '🏅', text: 'أفضل مداومة: $best يوم'),
+          _StatCard(icon: '🔥', text: 'المداومة الحالية: $current يوم'),
+          FutureBuilder<int>(
+            future: _getCompletedBooksCount(friendUid),
+            builder: (context, s) {
+              final count = s.data ?? 0;
+              return _StatCard(icon: '📚', text: 'الكتب المنجزة: $count كتاب');
+            },
+          ),
         ];
 
+        return ListView.separated(
+          padding: const EdgeInsets.fromLTRB(16, 300, 16, 24),
+          itemBuilder: (_, i) => items[i],
+          separatorBuilder: (_, __) => const SizedBox(height: 32),
+          itemCount: items.length,
+        );
+
+        /*
         return ListView.separated(
           padding: const EdgeInsets.fromLTRB(16, 300, 16, 24),
           itemBuilder: (_, i) => Container(
@@ -599,7 +677,11 @@ class _StatsTab extends StatelessWidget {
               color: _card,
               borderRadius: BorderRadius.circular(16),
               boxShadow: const [
-                BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4)),
+                BoxShadow(
+                  color: Colors.black12,
+                  blurRadius: 8,
+                  offset: Offset(0, 4),
+                ),
               ],
             ),
             child: Row(
@@ -622,8 +704,58 @@ class _StatsTab extends StatelessWidget {
           ),
           separatorBuilder: (_, __) => const SizedBox(height: 32),
           itemCount: items.length,
-        );
+        );*/
       },
+    );
+  }
+}
+
+Future<int> _getCompletedBooksCount(String friendUid) async {
+  final snap = await FirebaseFirestore.instance
+      .collection('users')
+      .doc(friendUid)
+      .collection('library')
+      .where('isCompleted', isEqualTo: true)
+      .get();
+
+  return snap.docs.length;
+}
+
+class _StatCard extends StatelessWidget {
+  final String icon;
+  final String text;
+  const _StatCard({required this.icon, required this.text});
+
+  static const Color _card = Color(0xFFE6F0E0);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+      decoration: BoxDecoration(
+        color: _card,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4)),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(icon, style: const TextStyle(fontSize: 22)),
+          Expanded(
+            child: Text(
+              text,
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                fontSize: 14.5,
+                fontWeight: FontWeight.w700,
+                color: _darkGreen,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -670,7 +802,9 @@ class _FriendReviewsTab extends StatelessWidget {
         }
 
         final docs = snap.data?.docs ?? const [];
-        final reviews = docs.map((d) => _FriendReview.fromDoc(d.id, d.data())).toList();
+        final reviews = docs
+            .map((d) => _FriendReview.fromDoc(d.id, d.data()))
+            .toList();
 
         if (reviews.isEmpty) {
           return _friendEmptyBox();
@@ -795,8 +929,8 @@ class _FriendReview {
       } catch (_) {}
     }
 
-    final title   = (data['bookTitle'] ?? data['title']) as String?;
-    final cover   = (data['bookCover'] ?? data['coverUrl']) as String?;
+    final title = (data['bookTitle'] ?? data['title']) as String?;
+    final cover = (data['bookCover'] ?? data['coverUrl']) as String?;
     final content = (data['text'] ?? data['snippet']) as String?;
 
     final ratingVal = (() {
@@ -857,17 +991,17 @@ class _FriendReviewTile extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
             child: (coverUrl != null && coverUrl!.isNotEmpty)
                 ? Image.network(
-              coverUrl!,
-              width: 56,
-              height: 72,
-              fit: BoxFit.cover,
-            )
+                    coverUrl!,
+                    width: 56,
+                    height: 72,
+                    fit: BoxFit.cover,
+                  )
                 : Container(
-              width: 56,
-              height: 72,
-              color: Colors.white.withOpacity(0.6),
-              child: const Icon(Icons.menu_book, color: _darkGreen),
-            ),
+                    width: 56,
+                    height: 72,
+                    color: Colors.white.withOpacity(0.6),
+                    child: const Icon(Icons.menu_book, color: _darkGreen),
+                  ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -892,10 +1026,7 @@ class _FriendReviewTile extends StatelessWidget {
                     const SizedBox(width: 8),
                     Text(
                       date,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: _darkGreen,
-                      ),
+                      style: const TextStyle(fontSize: 12, color: _darkGreen),
                     ),
                   ],
                 ),
@@ -1009,7 +1140,10 @@ class _ClubsTab extends StatelessWidget {
               return Center(
                 child: Container(
                   margin: const EdgeInsets.fromLTRB(16, 280, 16, 24),
-                  padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 24,
+                    horizontal: 16,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.red.withOpacity(0.08),
                     border: Border.all(color: Colors.red.withOpacity(0.25)),
@@ -1027,10 +1161,12 @@ class _ClubsTab extends StatelessWidget {
               );
             }
 
-            final membership = memSnap.data ?? List<bool>.filled(clubs.length, false);
+            final membership =
+                memSnap.data ?? List<bool>.filled(clubs.length, false);
 
             // نفلتر فقط الأندية اللي صديقك عضو فيها
-            final visibleClubs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+            final visibleClubs =
+                <QueryDocumentSnapshot<Map<String, dynamic>>>[];
             for (int i = 0; i < clubs.length; i++) {
               if (membership[i]) {
                 visibleClubs.add(clubs[i]);
@@ -1052,19 +1188,26 @@ class _ClubsTab extends StatelessWidget {
                 separatorBuilder: (_, __) => const SizedBox(height: 12),
                 itemBuilder: (context, i) {
                   final clubDoc = visibleClubs[i];
-                  final clubId  = clubDoc.id;
-                  final data    = clubDoc.data();
-                  final title   = (data['title'] ?? 'نادي بدون اسم') as String;
-                  final desc    = (data['description'] ?? '') as String?;
-                  final cat     = (data['category'] ?? '') as String?;
+                  final clubId = clubDoc.id;
+                  final data = clubDoc.data();
+                  final title = (data['title'] ?? 'نادي بدون اسم') as String;
+                  final desc = (data['description'] ?? '') as String?;
+                  final cat = (data['category'] ?? '') as String?;
 
                   return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
                     decoration: BoxDecoration(
                       color: _card,
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: const [
-                        BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4)),
+                        BoxShadow(
+                          color: Colors.black12,
+                          blurRadius: 8,
+                          offset: Offset(0, 4),
+                        ),
                       ],
                     ),
                     child: Column(
@@ -1142,9 +1285,9 @@ class _ClubsTab extends StatelessWidget {
 
   // تشيك مره واحدة لكل الأندية: هل هذا الفرند عضو فيها ولا لا
   static Future<List<bool>> _loadMembershipForClubs(
-      List<QueryDocumentSnapshot<Map<String, dynamic>>> clubs,
-      String friendUid,
-      ) async {
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> clubs,
+    String friendUid,
+  ) async {
     final fs = FirebaseFirestore.instance;
 
     final futures = clubs.map((clubDoc) {
@@ -1182,8 +1325,10 @@ class _JoinOrOpenButtonFDState extends State<_JoinOrOpenButtonFD> {
     if (me == null) return const SizedBox.shrink();
 
     final myMemberDocStream = FirebaseFirestore.instance
-        .collection('clubs').doc(widget.clubId)
-        .collection('members').doc(me.uid)
+        .collection('clubs')
+        .doc(widget.clubId)
+        .collection('members')
+        .doc(me.uid)
         .snapshots();
 
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
@@ -1192,9 +1337,10 @@ class _JoinOrOpenButtonFDState extends State<_JoinOrOpenButtonFD> {
         final isMember = snap.data?.exists == true;
 
         final String label = isMember ? 'أنت جزء من النادي' : 'انضم';
-        final Color bg     = isMember ? Colors.white : _confirm;
-        final BorderSide side =
-        isMember ? const BorderSide(color: _darkGreen, width: 1.2) : BorderSide.none;
+        final Color bg = isMember ? Colors.white : _confirm;
+        final BorderSide side = isMember
+            ? const BorderSide(color: _darkGreen, width: 1.2)
+            : BorderSide.none;
 
         return SizedBox(
           height: 36,
@@ -1202,28 +1348,30 @@ class _JoinOrOpenButtonFDState extends State<_JoinOrOpenButtonFD> {
             onPressed: _busy
                 ? null
                 : () async {
-              setState(() => _busy = true);
-              try {
-                if (!isMember) {
-                  await FirebaseFirestore.instance
-                      .collection('clubs').doc(widget.clubId)
-                      .collection('members').doc(me.uid)
-                      .set({'joinedAt': FieldValue.serverTimestamp()});
-                }
-                if (context.mounted) {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => ClubChatPage(
-                        clubId: widget.clubId,
-                        clubTitle: widget.clubTitle,
-                      ),
-                    ),
-                  );
-                }
-              } finally {
-                if (mounted) setState(() => _busy = false);
-              }
-            },
+                    setState(() => _busy = true);
+                    try {
+                      if (!isMember) {
+                        await FirebaseFirestore.instance
+                            .collection('clubs')
+                            .doc(widget.clubId)
+                            .collection('members')
+                            .doc(me.uid)
+                            .set({'joinedAt': FieldValue.serverTimestamp()});
+                      }
+                      if (context.mounted) {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => ClubChatPage(
+                              clubId: widget.clubId,
+                              clubTitle: widget.clubTitle,
+                            ),
+                          ),
+                        );
+                      }
+                    } finally {
+                      if (mounted) setState(() => _busy = false);
+                    }
+                  },
             style: TextButton.styleFrom(
               backgroundColor: bg,
               foregroundColor: _darkGreen,
@@ -1235,17 +1383,17 @@ class _JoinOrOpenButtonFDState extends State<_JoinOrOpenButtonFD> {
             ),
             child: _busy
                 ? const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation(_darkGreen),
-              ),
-            )
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation(_darkGreen),
+                    ),
+                  )
                 : Text(
-              label,
-              style: const TextStyle(fontWeight: FontWeight.w800),
-            ),
+                    label,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
           ),
         );
       },
@@ -1275,10 +1423,7 @@ class _FriendBadge extends StatelessWidget {
             SizedBox(width: 6),
             Text(
               'صديق',
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                color: _confirm,
-              ),
+              style: TextStyle(fontWeight: FontWeight.w700, color: _confirm),
             ),
           ],
         ),

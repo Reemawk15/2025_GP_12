@@ -10,10 +10,10 @@ import 'package:image_picker/image_picker.dart';
 import 'book_details_page.dart';
 import 'my_book_details_page.dart';
 
-const Color _darkGreen  = Color(0xFF0E3A2C);
-const Color _midGreen   = Color(0xFF2F5145);
-const Color _fillGreen  = Color(0xFFC9DABF);
-const Color _confirm    = Color(0xFF6F8E63);
+const Color _darkGreen = Color(0xFF0E3A2C);
+const Color _midGreen = Color(0xFF2F5145);
+const Color _fillGreen = Color(0xFFC9DABF);
+const Color _confirm = Color(0xFF6F8E63);
 
 /// Main tab that shows private shelves + "My Books"
 class LibraryTab extends StatelessWidget {
@@ -23,13 +23,12 @@ class LibraryTab extends StatelessWidget {
     if (Navigator.of(context).canPop()) {
       Navigator.of(context).pop();
     }
-    // If inside bottom navigation root, nothing happens
+    // If inside bottom navigation root, nothing happensy
   }
 
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
-
     return Directionality(
       textDirection: TextDirection.rtl,
       child: DefaultTabController(
@@ -45,35 +44,37 @@ class LibraryTab extends StatelessWidget {
             ),
             Scaffold(
               backgroundColor: Colors.transparent,
-              floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+              floatingActionButtonLocation:
+                  FloatingActionButtonLocation.endFloat,
               floatingActionButton: user == null
                   ? null
                   : Padding(
-                // Adjust this value to move the FAB up/down
-                padding: const EdgeInsets.only(bottom: 100),
-                child: FloatingActionButton(
-                  mini: true, // Smaller FAB
-                  backgroundColor: _confirm,
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const AddMyBookPage(),
+                      // Adjust this value to move the FAB up/down
+                      padding: const EdgeInsets.only(bottom: 100),
+                      child: FloatingActionButton(
+                        mini: true, // Smaller FAB
+                        backgroundColor: _confirm,
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const AddMyBookPage(),
+                            ),
+                          );
+                        },
+                        child: const Icon(Icons.add, color: Colors.white),
                       ),
-                    );
-                  },
-                  child: const Icon(Icons.add, color: Colors.white),
-                ),
-              ),
+                    ),
               body: SafeArea(
                 child: Column(
                   children: [
-                    const SizedBox(height: 60),
+                    const SizedBox(height: 42),
 
                     // Tab bar to switch between shelves
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                      //padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Container(
-                        height: 38,
+                        height: 52,
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(.9),
                           borderRadius: BorderRadius.circular(24),
@@ -83,8 +84,9 @@ class LibraryTab extends StatelessWidget {
                             borderSide: BorderSide(width: 2),
                           ),
                           dividerColor: Colors.transparent,
-                          overlayColor:
-                          MaterialStatePropertyAll(Colors.transparent),
+                          overlayColor: MaterialStatePropertyAll(
+                            Colors.transparent,
+                          ),
                           labelColor: _midGreen,
                           unselectedLabelColor: Colors.black54,
                           labelStyle: TextStyle(
@@ -95,7 +97,16 @@ class LibraryTab extends StatelessWidget {
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
                           ),
-                          labelPadding: EdgeInsets.symmetric(horizontal: 1),
+
+                          // 👈 هذا السطر المهم
+                          indicatorPadding: const EdgeInsets.only(bottom: 6),
+
+                          labelPadding: const EdgeInsets.only(
+                            left: 1,
+                            right: 1,
+                            bottom: 10, // 👈 هذا يرفع الكلمات
+                          ),
+
                           tabs: [
                             Tab(text: 'أرغب بالاستماع لها'),
                             Tab(text: 'استمع لها الآن'),
@@ -105,25 +116,29 @@ class LibraryTab extends StatelessWidget {
                         ),
                       ),
                     ),
-
+                    _weeklyGoalBar(),
                     const SizedBox(height: 8),
 
                     Expanded(
                       child: user == null
                           ? const Center(
-                        child: Text('الرجاء تسجيل الدخول لعرض مكتبتك'),
-                      )
+                              child: Text('الرجاء تسجيل الدخول لعرض مكتبتك'),
+                            )
                           : TabBarView(
-                        physics: const BouncingScrollPhysics(),
-                        children: [
-                          _LibraryShelf(status: 'want', uid: user.uid),
-                          _LibraryShelf(
-                              status: 'listen_now', uid: user.uid),
-                          _LibraryShelf(
-                              status: 'listened', uid: user.uid),
-                          _MyBooksShelfTab(uid: user.uid),
-                        ],
-                      ),
+                              physics: const BouncingScrollPhysics(),
+                              children: [
+                                _LibraryShelf(status: 'want', uid: user.uid),
+                                _LibraryShelf(
+                                  status: 'listen_now',
+                                  uid: user.uid,
+                                ),
+                                _LibraryShelf(
+                                  status: 'listened',
+                                  uid: user.uid,
+                                ),
+                                _MyBooksShelfTab(uid: user.uid),
+                              ],
+                            ),
                     ),
                   ],
                 ),
@@ -142,11 +157,22 @@ class Book {
   final String title;
   final ImageProvider? cover;
   final String status;
+  final int listenedSeconds;
+  final int estimatedTotalSeconds;
+  final bool isCompleted;
+  final int contentMs;
+  final int totalMs;
+
   const Book({
     required this.id,
     required this.title,
     this.cover,
     required this.status,
+    this.listenedSeconds = 0,
+    this.estimatedTotalSeconds = 0,
+    this.isCompleted = false,
+    this.contentMs = 0,
+    this.totalMs = 0,
   });
 }
 
@@ -210,19 +236,33 @@ class _LibraryShelfState extends State<_LibraryShelf> {
         final docs = snap.data?.docs ?? [];
         final all = docs.map((d) {
           final m = d.data() as Map<String, dynamic>? ?? {};
+
           final title = (m['title'] ?? '') as String;
           final cover = (m['coverUrl'] ?? '') as String;
           final status = (m['status'] ?? 'want') as String;
+          final listenedSeconds = (m['listenedSeconds'] as num?)?.toInt() ?? 0;
+          final estimatedTotalSeconds =
+              (m['estimatedTotalSeconds'] as num?)?.toInt() ?? 0;
+          final isCompleted = (m['isCompleted'] as bool?) ?? false;
+          final contentMs = (m['contentMs'] as num?)?.toInt() ?? 0;
+          final totalMs = (m['totalMs'] as num?)?.toInt() ?? 0;
+
           return Book(
             id: d.id,
             title: title.isEmpty ? 'كتاب' : title,
             cover: cover.isNotEmpty ? NetworkImage(cover) : null,
             status: status,
+            listenedSeconds: listenedSeconds,
+            estimatedTotalSeconds: estimatedTotalSeconds,
+            isCompleted: isCompleted,
+            contentMs: contentMs,
+            totalMs: totalMs,
           );
         }).toList();
 
-        final current =
-        all.where((b) => !_locallyHidden.contains(b.id)).toList();
+        final current = all
+            .where((b) => !_locallyHidden.contains(b.id))
+            .toList();
 
         if (current.isNotEmpty) {
           _lastNonEmpty = current;
@@ -349,8 +389,9 @@ class _ShelfViewState extends State<_ShelfView> {
                 return Stack(
                   children: List.generate(_shelfRects.length, (i) {
                     final rect = _shelfRects[i];
-                    final shelfBooks =
-                    i < groups.length ? groups[i] : const <Book>[];
+                    final shelfBooks = i < groups.length
+                        ? groups[i]
+                        : const <Book>[];
 
                     final left = rect.leftFrac * W;
                     final right = rect.rightFrac * W;
@@ -360,10 +401,9 @@ class _ShelfViewState extends State<_ShelfView> {
 
                     final slots = _perShelf;
                     final totalSpacing = _spacing * (slots - 1);
-                    final bookWidth =
-                    ((width - totalSpacing) / slots * 0.9).clamp(40.0, 140.0);
-                    final bookHeight =
-                    (bookWidth / _bookAspect * _bookStretch);
+                    final bookWidth = ((width - totalSpacing) / slots * 0.9)
+                        .clamp(40.0, 140.0);
+                    final bookHeight = (bookWidth / _bookAspect * _bookStretch);
 
                     return Positioned(
                       left: left,
@@ -375,20 +415,24 @@ class _ShelfViewState extends State<_ShelfView> {
                         height: height,
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: List.generate(slots, (slot) {
-                            final book =
-                            slot < shelfBooks.length ? shelfBooks[slot] : null;
+                            final book = slot < shelfBooks.length
+                                ? shelfBooks[slot]
+                                : null;
                             return SizedBox(
                               width: bookWidth,
                               height: bookHeight,
                               child: book == null
                                   ? const SizedBox.shrink()
-                                  : _BookCard(
-                                book: book,
-                                uid: widget.uid,
-                                onMoved: widget.onMoved,
-                              ),
+                                  : Align(
+                                      alignment: Alignment.topCenter,
+                                      child: _BookCard(
+                                        book: book,
+                                        uid: widget.uid,
+                                        onMoved: widget.onMoved,
+                                      ),
+                                    ),
                             );
                           }),
                         ),
@@ -440,6 +484,114 @@ class _ShelfViewState extends State<_ShelfView> {
   }
 }
 
+// retuer the weeklyGoal from database
+Future<int> _getWeeklyGoalMinutesForMe() async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return 60;
+
+  final doc = await FirebaseFirestore.instance
+      .collection('users')
+      .doc(user.uid)
+      .get();
+  final data = doc.data() ?? {};
+
+  final weeklyGoal = data['weeklyGoal'];
+  if (weeklyGoal is Map) {
+    final v = weeklyGoal['minutes'];
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    if (v is String) return int.tryParse(v) ?? 60;
+  }
+  return 60;
+}
+
+Future<int> _getWeeklyListenedSecondsForMe() async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return 0;
+
+  final doc = await FirebaseFirestore.instance
+      .collection('users')
+      .doc(user.uid)
+      .collection('stats')
+      .doc('main')
+      .get();
+
+  final data = doc.data() ?? {};
+  final v = data['weeklyListenedSeconds'] ?? data['weeklyListenedSeconds'];
+
+  if (v is int) return v;
+  if (v is num) return v.toInt();
+  if (v is String) return int.tryParse(v) ?? 0;
+  return 0;
+}
+
+Widget _weeklyGoalBar() {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return const SizedBox.shrink();
+
+  final statsRef = FirebaseFirestore.instance
+      .collection('users')
+      .doc(user.uid)
+      .collection('stats')
+      .doc('main');
+
+  return StreamBuilder<DocumentSnapshot>(
+    stream: statsRef.snapshots(),
+    builder: (context, snap) {
+      final data = snap.data?.data() as Map<String, dynamic>? ?? {};
+      final weeklySec =
+          (data['weeklyListenedSeconds'] as num?)?.toInt() ??
+          (data['weeklyListenedSeconds'] as num?)?.toInt() ??
+          0;
+
+      return FutureBuilder<int>(
+        future: _getWeeklyGoalMinutesForMe(),
+        builder: (context, g) {
+          final goalMinutes = g.data ?? 60;
+          final minutes = (weeklySec / 60).floor();
+          final progress = (goalMinutes <= 0)
+              ? 0.0
+              : (minutes / goalMinutes).clamp(0.0, 1.0);
+
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(40, 0, 40, 6),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Bar
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 12,
+                    backgroundColor: const Color(0xFFDCE7D6), // أخضر فاتح
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      Color(0xFF88A07D), // أخضر أغمق (التعبئة)
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 6),
+
+                // num under bar
+                Text(
+                  '$minutes / $goalMinutes د',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0E3A2C),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    },
+  );
+}
+
 /// Single book card used inside library shelves
 class _BookCard extends StatelessWidget {
   final Book book;
@@ -457,8 +609,11 @@ class _BookCard extends StatelessWidget {
     'listened': 'استمعت لها',
   };
 
-  void _showSnack(BuildContext context, String message,
-      {IconData icon = Icons.check_circle}) {
+  void _showSnack(
+    BuildContext context,
+    String message, {
+    IconData icon = Icons.check_circle,
+  }) {
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
     messenger.showSnackBar(
@@ -466,8 +621,7 @@ class _BookCard extends StatelessWidget {
         backgroundColor: _confirm,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
-        shape:
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         content: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -494,10 +648,16 @@ class _BookCard extends StatelessWidget {
         .doc(uid)
         .collection('library')
         .doc(book.id);
+
     try {
-      await ref.delete();
+      await ref.set({
+        'inLibrary': false, // ✅ نخفيه فقط
+        'removedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
       onMoved(book.id);
-      _showSnack(context, 'تم الحذف من قائمتك', icon: Icons.check_circle);
+      _showSnack(context, 'تمت الحذف من قائمتك', icon: Icons.check_circle);
     } catch (e) {
       _showSnack(
         context,
@@ -508,20 +668,20 @@ class _BookCard extends StatelessWidget {
   }
 
   Future<void> _moveToStatus(
-      BuildContext sheetContext, String newStatus) async {
+    BuildContext sheetContext,
+    String newStatus,
+  ) async {
     final ref = FirebaseFirestore.instance
         .collection('users')
         .doc(uid)
         .collection('library')
         .doc(book.id);
     try {
-      await ref.set(
-        {
-          'status': newStatus,
-          'addedAt': FieldValue.serverTimestamp(),
-        },
-        SetOptions(merge: true),
-      );
+      await ref.set({
+        'inLibrary': true,
+        'status': newStatus,
+        'addedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
       onMoved(book.id);
       Navigator.pop(sheetContext);
       _showSnack(
@@ -538,6 +698,37 @@ class _BookCard extends StatelessWidget {
     }
   }
 
+  // restart bar
+  Future<void> _resetProgress(BuildContext context) async {
+    final ref = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('library')
+        .doc(book.id);
+
+    try {
+      await ref.set({
+        'contentMs': 0,
+        'isCompleted': false,
+        'completedAt': FieldValue.delete(),
+        'lastPositionMs': 0,
+        'lastPartIndex': 0,
+        // Back the book after reset the bar to listen now tab
+        'status': 'listen_now',
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      Navigator.pop(context);
+      _showSnack(context, 'تمت إعادة التتبع من البداية', icon: Icons.refresh);
+    } catch (e) {
+      _showSnack(
+        context,
+        'تعذّرت إعادة التتبع. حاول مجددًا',
+        icon: Icons.error_outline,
+      );
+    }
+  }
+
   void _showOptionsMenu(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -546,6 +737,18 @@ class _BookCard extends StatelessWidget {
       ),
       builder: (sheetContext) {
         final List<Widget> tiles = [];
+
+        // choose to reset the bar appear only if the book complate + it in listened tab
+        if (book.status == 'listened' && book.isCompleted == true) {
+          tiles.add(
+            ListTile(
+              leading: const Icon(Icons.refresh, color: Colors.teal),
+              title: const Text('إعادة التتبع من البداية'),
+              onTap: () => _resetProgress(sheetContext),
+            ),
+          );
+          tiles.add(const Divider(height: 0));
+        }
 
         tiles.add(
           ListTile(
@@ -562,8 +765,10 @@ class _BookCard extends StatelessWidget {
         if (book.status == 'want') {
           tiles.add(
             ListTile(
-              leading:
-              const Icon(Icons.play_arrow_outlined, color: Colors.teal),
+              leading: const Icon(
+                Icons.play_arrow_outlined,
+                color: Colors.teal,
+              ),
               title: const Text('نقل إلى: استمع لها الآن'),
               onTap: () => _moveToStatus(sheetContext, 'listen_now'),
             ),
@@ -571,16 +776,17 @@ class _BookCard extends StatelessWidget {
         } else if (book.status == 'listened') {
           tiles.add(
             ListTile(
-              leading:
-              const Icon(Icons.bookmark_border, color: Colors.teal),
+              leading: const Icon(Icons.bookmark_border, color: Colors.teal),
               title: const Text('نقل إلى: أرغب بالاستماع لها'),
               onTap: () => _moveToStatus(sheetContext, 'want'),
             ),
           );
           tiles.add(
             ListTile(
-              leading:
-              const Icon(Icons.play_arrow_outlined, color: Colors.teal),
+              leading: const Icon(
+                Icons.play_arrow_outlined,
+                color: Colors.teal,
+              ),
               title: const Text('نقل إلى: استمع لها الآن'),
               onTap: () => _moveToStatus(sheetContext, 'listen_now'),
             ),
@@ -588,16 +794,17 @@ class _BookCard extends StatelessWidget {
         } else if (book.status == 'listen_now') {
           tiles.add(
             ListTile(
-              leading:
-              const Icon(Icons.bookmark_border, color: Colors.teal),
+              leading: const Icon(Icons.bookmark_border, color: Colors.teal),
               title: const Text('نقل إلى: أرغب بالاستماع لها'),
               onTap: () => _moveToStatus(sheetContext, 'want'),
             ),
           );
           tiles.add(
             ListTile(
-              leading: const Icon(Icons.check_circle_outline,
-                  color: Colors.teal),
+              leading: const Icon(
+                Icons.check_circle_outline,
+                color: Colors.teal,
+              ),
               title: const Text('نقل إلى: استمعت لها'),
               onTap: () => _moveToStatus(sheetContext, 'listened'),
             ),
@@ -636,15 +843,14 @@ class _BookCard extends StatelessWidget {
     return InkWell(
       onTap: () {
         Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => BookDetailsPage(bookId: book.id),
-          ),
+          MaterialPageRoute(builder: (_) => BookDetailsPage(bookId: book.id)),
         );
       },
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           Container(
+            margin: const EdgeInsets.only(top: 2),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: radius,
@@ -656,23 +862,43 @@ class _BookCard extends StatelessWidget {
                 ),
               ],
             ),
+
             child: ClipRRect(
               borderRadius: radius,
-              child: book.cover != null
-                  ? Image(image: book.cover!, fit: BoxFit.cover)
-                  : Container(
-                color: const Color(0xFFF6F2F7),
-                padding: const EdgeInsets.all(8),
-                alignment: Alignment.center,
-                child: Text(
-                  book.title,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 12, height: 1.2),
-                ),
+              child: Column(
+                children: [
+                  Expanded(
+                    child: book.cover != null
+                        ? Image(
+                            image: book.cover!,
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                          )
+                        : Container(
+                            width: double.infinity,
+                            color: const Color(0xFFF6F2F7),
+                            padding: const EdgeInsets.all(8),
+                            alignment: Alignment.center,
+                            child: Text(
+                              book.title,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontSize: 12, height: 1.2),
+                            ),
+                          ),
+                  ),
+
+                  _MiniBarOnly(
+                    contentMs: book.contentMs,
+                    totalMs: book.totalMs,
+                    isCompleted: book.isCompleted,
+                  ),
+                ],
               ),
             ),
+
+            // end change reema
           ),
           Positioned(
             top: -2,
@@ -690,15 +916,47 @@ class _BookCard extends StatelessWidget {
                   ),
                 ),
                 child: const Center(
-                  child: Icon(
-                    Icons.more_vert,
-                    size: 14,
-                    color: Colors.white,
-                  ),
+                  child: Icon(Icons.more_vert, size: 14, color: Colors.white),
                 ),
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniProgressBar extends StatelessWidget {
+  final int contentMs;
+  final int totalMs;
+
+  const _MiniProgressBar({required this.contentMs, required this.totalMs});
+
+  @override
+  Widget build(BuildContext context) {
+    if (totalMs <= 0) {
+      return const SizedBox(height: 6);
+    }
+
+    final p = (contentMs / totalMs).clamp(0.0, 1.0);
+    final remainingMs = (totalMs - contentMs).clamp(0, totalMs);
+
+    final remainingMin = (remainingMs / 60000).ceil();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      color: Colors.white,
+      child: Column(
+        children: [
+          LinearProgressIndicator(
+            value: p,
+            minHeight: 4,
+            backgroundColor: const Color(0xFFEAEAEA),
+            valueColor: const AlwaysStoppedAnimation<Color>(_confirm),
+          ),
+          const SizedBox(height: 2),
         ],
       ),
     );
@@ -710,11 +968,7 @@ class MyBook {
   final String id;
   final String title;
   final String coverUrl;
-  MyBook({
-    required this.id,
-    required this.title,
-    required this.coverUrl,
-  });
+  MyBook({required this.id, required this.title, required this.coverUrl});
 }
 
 /// Tab that shows "My Books" grid from users/{uid}/mybooks
@@ -743,9 +997,7 @@ class _MyBooksShelfTab extends StatelessWidget {
               );
             }
             if (!snap.hasData || snap.data!.docs.isEmpty) {
-              return const Center(
-                child: Text('لا توجد كتب مضافة حتى الآن'),
-              );
+              return const Center(child: Text('لا توجد كتب مضافة حتى الآن'));
             }
 
             final docs = snap.data!.docs;
@@ -760,10 +1012,7 @@ class _MyBooksShelfTab extends StatelessWidget {
               );
             }).toList();
 
-            return _MyShelfView(
-              books: books,
-              uid: uid,
-            );
+            return _MyShelfView(books: books, uid: uid);
           },
         ),
       ),
@@ -786,10 +1035,7 @@ class _ShelfRect {
 class _MyShelfView extends StatefulWidget {
   final List<MyBook> books;
   final String uid;
-  const _MyShelfView({
-    required this.books,
-    required this.uid,
-  });
+  const _MyShelfView({required this.books, required this.uid});
 
   @override
   State<_MyShelfView> createState() => _MyShelfViewState();
@@ -798,10 +1044,30 @@ class _MyShelfView extends StatefulWidget {
 class _MyShelfViewState extends State<_MyShelfView> {
   // Physical positions of the 4 shelves on the "My Books" background
   static const List<_ShelfRect> _shelfRects = [
-    _ShelfRect(leftFrac: 0.18, rightFrac: 0.18, topFrac: 0.09, heightFrac: 0.11),
-    _ShelfRect(leftFrac: 0.18, rightFrac: 0.18, topFrac: 0.29, heightFrac: 0.11),
-    _ShelfRect(leftFrac: 0.18, rightFrac: 0.18, topFrac: 0.49, heightFrac: 0.11),
-    _ShelfRect(leftFrac: 0.18, rightFrac: 0.18, topFrac: 0.69, heightFrac: 0.11),
+    _ShelfRect(
+      leftFrac: 0.18,
+      rightFrac: 0.18,
+      topFrac: 0.09,
+      heightFrac: 0.14,
+    ),
+    _ShelfRect(
+      leftFrac: 0.18,
+      rightFrac: 0.18,
+      topFrac: 0.29,
+      heightFrac: 0.14,
+    ),
+    _ShelfRect(
+      leftFrac: 0.18,
+      rightFrac: 0.18,
+      topFrac: 0.49,
+      heightFrac: 0.14,
+    ),
+    _ShelfRect(
+      leftFrac: 0.18,
+      rightFrac: 0.18,
+      topFrac: 0.69,
+      heightFrac: 0.14,
+    ),
   ];
 
   static const int _perShelf = 4;
@@ -871,8 +1137,9 @@ class _MyShelfViewState extends State<_MyShelfView> {
                 return Stack(
                   children: List.generate(_shelfRects.length, (i) {
                     final rect = _shelfRects[i];
-                    final shelfBooks =
-                    i < groups.length ? groups[i] : const <MyBook>[];
+                    final shelfBooks = i < groups.length
+                        ? groups[i]
+                        : const <MyBook>[];
 
                     final left = rect.leftFrac * W;
                     final right = rect.rightFrac * W;
@@ -882,10 +1149,9 @@ class _MyShelfViewState extends State<_MyShelfView> {
 
                     final slots = _perShelf;
                     final totalSpacing = _spacing * (slots - 1);
-                    final bookWidth =
-                    ((width - totalSpacing) / slots * 0.9).clamp(40.0, 140.0);
-                    final bookHeight =
-                    (bookWidth / _bookAspect * _bookStretch);
+                    final bookWidth = ((width - totalSpacing) / slots * 0.95)
+                        .clamp(40.0, 160.0);
+                    final bookHeight = (bookWidth / _bookAspect * _bookStretch);
 
                     return Positioned(
                       left: left,
@@ -899,17 +1165,15 @@ class _MyShelfViewState extends State<_MyShelfView> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: List.generate(slots, (slot) {
-                            final book =
-                            slot < shelfBooks.length ? shelfBooks[slot] : null;
+                            final book = slot < shelfBooks.length
+                                ? shelfBooks[slot]
+                                : null;
                             return SizedBox(
                               width: bookWidth,
                               height: bookHeight,
                               child: book == null
                                   ? const SizedBox.shrink()
-                                  : _MyBookCard(
-                                book: book,
-                                uid: widget.uid,
-                              ),
+                                  : _MyBookCard(book: book, uid: widget.uid),
                             );
                           }),
                         ),
@@ -965,13 +1229,13 @@ class _MyShelfViewState extends State<_MyShelfView> {
 class _MyBookCard extends StatelessWidget {
   final MyBook book;
   final String uid;
-  const _MyBookCard({
-    required this.book,
-    required this.uid,
-  });
+  const _MyBookCard({required this.book, required this.uid});
 
-  void _showSnack(BuildContext context, String message,
-      {IconData icon = Icons.check_circle}) {
+  void _showSnack(
+    BuildContext context,
+    String message, {
+    IconData icon = Icons.check_circle,
+  }) {
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
     messenger.showSnackBar(
@@ -979,8 +1243,7 @@ class _MyBookCard extends StatelessWidget {
         backgroundColor: _confirm,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
-        shape:
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         content: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -1006,9 +1269,7 @@ class _MyBookCard extends StatelessWidget {
       context: context,
       builder: (ctx) => Dialog(
         backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
           child: Directionality(
@@ -1029,10 +1290,7 @@ class _MyBookCard extends StatelessWidget {
                 const Text(
                   'هل أنت متأكد أنك تريد حذف هذا الكتاب من مكتبتك؟',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: Colors.black87,
-                  ),
+                  style: TextStyle(fontSize: 15, color: Colors.black87),
                 ),
                 const SizedBox(height: 24),
                 SizedBox(
@@ -1066,10 +1324,7 @@ class _MyBookCard extends StatelessWidget {
                     onPressed: () => Navigator.pop(ctx, false),
                     child: const Text(
                       'إلغاء',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: _darkGreen,
-                      ),
+                      style: TextStyle(fontSize: 16, color: _darkGreen),
                     ),
                   ),
                 ),
@@ -1100,11 +1355,7 @@ class _MyBookCard extends StatelessWidget {
 
       _showSnack(context, 'تم حذف الكتاب', icon: Icons.check_circle);
     } catch (e) {
-      _showSnack(
-        context,
-        'تعذّر الحذف: $e',
-        icon: Icons.error_outline,
-      );
+      _showSnack(context, 'تعذّر الحذف: $e', icon: Icons.error_outline);
     }
   }
 
@@ -1132,8 +1383,7 @@ class _MyBookCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 ListTile(
-                  leading:
-                  const Icon(Icons.delete_outline, color: Colors.red),
+                  leading: const Icon(Icons.delete_outline, color: Colors.red),
                   title: const Text('حذف الكتاب'),
                   onTap: () async {
                     Navigator.pop(sheetContext);
@@ -1155,9 +1405,7 @@ class _MyBookCard extends StatelessWidget {
     return InkWell(
       onTap: () {
         Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => MyBookDetailsPage(bookId: book.id),
-          ),
+          MaterialPageRoute(builder: (_) => MyBookDetailsPage(bookId: book.id)),
         );
       },
       child: Stack(
@@ -1179,36 +1427,35 @@ class _MyBookCard extends StatelessWidget {
               borderRadius: radius,
               child: book.coverUrl.isNotEmpty
                   ? Image.network(
-                book.coverUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) {
-                  return Container(
-                    color: const Color(0xFFF6F2F7),
-                    padding: const EdgeInsets.all(8),
-                    alignment: Alignment.center,
-                    child: Text(
-                      book.title,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                      style:
-                      const TextStyle(fontSize: 12, height: 1.2),
-                    ),
-                  );
-                },
-              )
+                      book.coverUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) {
+                        return Container(
+                          color: const Color(0xFFF6F2F7),
+                          padding: const EdgeInsets.all(8),
+                          alignment: Alignment.center,
+                          child: Text(
+                            book.title,
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 12, height: 1.2),
+                          ),
+                        );
+                      },
+                    )
                   : Container(
-                color: const Color(0xFFF6F2F7),
-                padding: const EdgeInsets.all(8),
-                alignment: Alignment.center,
-                child: Text(
-                  book.title,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 12, height: 1.2),
-                ),
-              ),
+                      color: const Color(0xFFF6F2F7),
+                      padding: const EdgeInsets.all(8),
+                      alignment: Alignment.center,
+                      child: Text(
+                        book.title,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 12, height: 1.2),
+                      ),
+                    ),
             ),
           ),
           Positioned(
@@ -1227,16 +1474,45 @@ class _MyBookCard extends StatelessWidget {
                   ),
                 ),
                 child: const Center(
-                  child: Icon(
-                    Icons.more_vert,
-                    size: 14,
-                    color: Colors.white,
-                  ),
+                  child: Icon(Icons.more_vert, size: 14, color: Colors.white),
                 ),
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _MiniBarOnly extends StatelessWidget {
+  final int contentMs;
+  final int totalMs;
+  final bool isCompleted;
+
+  const _MiniBarOnly({
+    required this.contentMs,
+    required this.totalMs,
+    required this.isCompleted,
+  });
+  // Bar under book style
+  @override
+  Widget build(BuildContext context) {
+    final safeTotal = totalMs <= 0 ? 1 : totalMs;
+    final p = isCompleted ? 1.0 : (contentMs / safeTotal).clamp(0.0, 1.0);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(6, 6, 6, 6),
+      color: Colors.white,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: LinearProgressIndicator(
+          value: p,
+          minHeight: 6,
+          backgroundColor: const Color(0xFFC9DABF), // أخضر فاتح
+          valueColor: const AlwaysStoppedAnimation<Color>(_confirm),
+        ),
       ),
     );
   }
@@ -1276,8 +1552,7 @@ class _AddMyBookPageState extends State<AddMyBookPage> {
         backgroundColor: _confirm,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
-        shape:
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         content: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -1315,8 +1590,10 @@ class _AddMyBookPageState extends State<AddMyBookPage> {
 
   Future<void> _pickCover() async {
     final picker = ImagePicker();
-    final x =
-    await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+    final x = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+    );
     if (!mounted) return;
     if (x != null) {
       setState(() => _coverFile = File(x.path));
@@ -1326,20 +1603,27 @@ class _AddMyBookPageState extends State<AddMyBookPage> {
   Future<void> _saveBook() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      _showSnack('الرجاء تسجيل الدخول لإضافة كتاب',
-          icon: Icons.login_rounded);
-      return; }
+      _showSnack('الرجاء تسجيل الدخول لإضافة كتاب', icon: Icons.login_rounded);
+      return;
+    }
     if (_titleCtrl.text.trim().isEmpty || _pdfFile == null) {
-      setState(() => _forceValidate = true); }
+      setState(() => _forceValidate = true);
+    }
     if (_titleCtrl.text.trim().isEmpty || _pdfFile == null) {
       _showSnack(_missingFriendlyMessage(), icon: Icons.info_outline);
-      return; }
+      return;
+    }
     if (!_formKey.currentState!.validate()) {
       _showSnack('فضلاً أكمل الحقول المطلوبة', icon: Icons.info_outline);
-      return; }
+      return;
+    }
     try {
       setState(() => _saving = true);
-      final docRef = FirebaseFirestore.instance.collection('users').doc(user.uid).collection('mybooks').doc();
+      final docRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('mybooks')
+          .doc();
       final storage = FirebaseStorage.instance;
       final baseRef = storage.ref('users/${user.uid}/mybooks/${docRef.id}');
       final pdfRef = baseRef.child('book.pdf');
@@ -1350,21 +1634,26 @@ class _AddMyBookPageState extends State<AddMyBookPage> {
       if (_coverFile != null) {
         final coverRef = baseRef.child('cover.jpg');
         final coverTask = await coverRef.putFile(_coverFile!);
-        coverUrl = await coverTask.ref.getDownloadURL(); }
+        coverUrl = await coverTask.ref.getDownloadURL();
+      }
       await docRef.set({
         'title': _titleCtrl.text.trim(),
         'pdfUrl': pdfUrl,
         'coverUrl': coverUrl,
         'ownerUid': user.uid,
-        'createdAt': FieldValue.serverTimestamp(), });
+        'createdAt': FieldValue.serverTimestamp(),
+      });
       if (!mounted) return;
       // Return back to library after adding the book
       Navigator.pop(context);
     } catch (e) {
       if (mounted) {
-        _showSnack('حدث خطأ أثناء الحفظ: $e', icon: Icons.error_outline); }
+        _showSnack('حدث خطأ أثناء الحفظ: $e', icon: Icons.error_outline);
+      }
     } finally {
-      if (mounted) setState(() => _saving = false); }}
+      if (mounted) setState(() => _saving = false);
+    }
+  }
 
   String _missingFriendlyMessage() {
     final nameMissing = _titleCtrl.text.trim().isEmpty;
@@ -1390,10 +1679,7 @@ class _AddMyBookPageState extends State<AddMyBookPage> {
       child: Stack(
         children: [
           Positioned.fill(
-            child: Image.asset(
-              'assets/images/back.png',
-              fit: BoxFit.cover,
-            ),
+            child: Image.asset('assets/images/back.png', fit: BoxFit.cover),
           ),
           Scaffold(
             backgroundColor: Colors.transparent,
@@ -1411,10 +1697,7 @@ class _AddMyBookPageState extends State<AddMyBookPage> {
                 onPressed: () => Navigator.pop(context),
               ),
               centerTitle: true,
-              title: const Text(
-                '',
-                style: TextStyle(color: _darkGreen),
-              ),
+              title: const Text('', style: TextStyle(color: _darkGreen)),
             ),
             body: SafeArea(
               child: SingleChildScrollView(
@@ -1497,11 +1780,13 @@ class _AddMyBookPageState extends State<AddMyBookPage> {
                               onPressed: _isReadyToSave ? _saveBook : null,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: _confirm,
-                                disabledBackgroundColor:
-                                _confirm.withOpacity(0.45),
+                                disabledBackgroundColor: _confirm.withOpacity(
+                                  0.45,
+                                ),
                                 disabledForegroundColor: Colors.white70,
-                                padding:
-                                const EdgeInsets.symmetric(vertical: 14),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),

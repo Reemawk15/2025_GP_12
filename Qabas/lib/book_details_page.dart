@@ -5,18 +5,23 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:just_audio/just_audio.dart';
 import 'friend_details_page.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'goal_notifications.dart';
 
 import 'Book_chatbot.dart';
 
 // Theme colors
-const _primary   = Color(0xFF0E3A2C); // Dark text/icons
-const _accent    = Color(0xFF6F8E63); // Chat button + SnackBar
+const _primary = Color(0xFF0E3A2C); // Dark text/icons
+const _accent = Color(0xFF6F8E63); // Chat button + SnackBar
 const _pillGreen = Color(0xFFE6F0E0); // Soft light backgrounds
-const _chipRose  = Color(0xFFFFEFF0); // Review bubbles background
-const Color _darkGreen  = Color(0xFF0E3A2C);
+const _chipRose = Color(0xFFFFEFF0); // Review bubbles background
+const Color _darkGreen = Color(0xFF0E3A2C);
 
 /// Unified SnackBar with app style
-void _showSnack(BuildContext context, String message, {IconData icon = Icons.check_circle}) {
+void _showSnack(
+  BuildContext context,
+  String message, {
+  IconData icon = Icons.check_circle,
+}) {
   final messenger = ScaffoldMessenger.of(context);
   messenger.hideCurrentSnackBar();
   messenger.showSnackBar(
@@ -33,7 +38,9 @@ void _showSnack(BuildContext context, String message, {IconData icon = Icons.che
           Text(
             message,
             style: const TextStyle(
-              color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16,
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
             ),
           ),
         ],
@@ -57,12 +64,12 @@ class BookDetailsPage extends StatelessWidget {
   }
 
   Future<void> _startOrGenerateAudio(
-      BuildContext context, {
-        required Map<String, dynamic> data,
-        required String title,
-        required String author,
-        required String cover,
-      }) async {
+    BuildContext context, {
+    required Map<String, dynamic> data,
+    required String title,
+    required String author,
+    required String cover,
+  }) async {
     final status = (data['audioStatus'] ?? 'idle').toString();
     final partsRaw = data['audioParts'];
 
@@ -111,10 +118,14 @@ class BookDetailsPage extends StatelessWidget {
       if (status == 'processing') {
         try {
           if (user != null) {
-            final functions = FirebaseFunctions.instanceFor(region: 'us-central1');
+            final functions = FirebaseFunctions.instanceFor(
+              region: 'us-central1',
+            );
             final callable = functions.httpsCallable(
               'generateBookAudio',
-              options: HttpsCallableOptions(timeout: const Duration(minutes: 9)),
+              options: HttpsCallableOptions(
+                timeout: const Duration(minutes: 9),
+              ),
             );
             await callable.call({'bookId': bookId, 'maxParts': 30});
           }
@@ -173,7 +184,11 @@ class BookDetailsPage extends StatelessWidget {
       }
 
       if (tries >= 45) {
-        _showSnack(context, 'التوليد يأخذ وقت… جربي بعد شوي', icon: Icons.info_outline);
+        _showSnack(
+          context,
+          'التوليد يأخذ وقت… جربي بعد شوي',
+          icon: Icons.info_outline,
+        );
         return false;
       }
       return true;
@@ -187,7 +202,10 @@ class BookDetailsPage extends StatelessWidget {
       child: Stack(
         children: [
           Positioned.fill(
-            child: Image.asset('assets/images/back_private.png', fit: BoxFit.cover),
+            child: Image.asset(
+              'assets/images/back_private.png',
+              fit: BoxFit.cover,
+            ),
           ),
           Scaffold(
             backgroundColor: Colors.transparent,
@@ -199,13 +217,23 @@ class BookDetailsPage extends StatelessWidget {
               toolbarHeight: 150,
               leading: IconButton(
                 tooltip: 'رجوع',
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _primary, size: 22),
+                icon: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: _primary,
+                  size: 22,
+                ),
                 onPressed: () => Navigator.of(context).maybePop(),
               ),
-              title: const Text('تفاصيل الكتاب', style: TextStyle(color: _primary)),
+              title: const Text(
+                'تفاصيل الكتاب',
+                style: TextStyle(color: _primary),
+              ),
             ),
             body: StreamBuilder<DocumentSnapshot>(
-              stream: FirebaseFirestore.instance.collection('audiobooks').doc(bookId).snapshots(),
+              stream: FirebaseFirestore.instance
+                  .collection('audiobooks')
+                  .doc(bookId)
+                  .snapshots(),
               builder: (context, snap) {
                 if (snap.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
@@ -223,10 +251,12 @@ class BookDetailsPage extends StatelessWidget {
 
                 final audioStatus = (data['audioStatus'] ?? 'idle') as String;
                 final partsRaw = data['audioParts'];
-                final bool hasAudioParts = partsRaw is List && partsRaw.isNotEmpty;
+                final bool hasAudioParts =
+                    partsRaw is List && partsRaw.isNotEmpty;
 
                 // ✅ هنا: لو فيه أجزاء نسمح بالاستماع حتى لو processing
-                final bool isGenerating = (audioStatus == 'processing') && !hasAudioParts;
+                final bool isGenerating =
+                    (audioStatus == 'processing') && !hasAudioParts;
                 final listenLabel = hasAudioParts
                     ? 'استمع'
                     : isGenerating
@@ -249,7 +279,11 @@ class BookDetailsPage extends StatelessWidget {
                           clipBehavior: Clip.antiAlias,
                           child: cover.isNotEmpty
                               ? Image.network(cover, fit: BoxFit.contain)
-                              : const Icon(Icons.menu_book, size: 80, color: _primary),
+                              : const Icon(
+                                  Icons.menu_book,
+                                  size: 80,
+                                  color: _primary,
+                                ),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -258,12 +292,17 @@ class BookDetailsPage extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
                             decoration: BoxDecoration(
                               color: _pillGreen,
                               borderRadius: BorderRadius.circular(16),
                             ),
-                            child: Text(category.isEmpty ? 'غير مصنّف' : category),
+                            child: Text(
+                              category.isEmpty ? 'غير مصنّف' : category,
+                            ),
                           ),
                         ],
                       ),
@@ -286,14 +325,19 @@ class BookDetailsPage extends StatelessWidget {
                       const SizedBox(height: 4),
 
                       Center(
-                        child: Text('الكاتب: $author', style: const TextStyle(color: Colors.black54)),
+                        child: Text(
+                          'الكاتب: $author',
+                          style: const TextStyle(color: Colors.black54),
+                        ),
                       ),
 
                       const SizedBox(height: 18),
 
                       _PillCard(
                         title: 'نبذة عن الكتاب :',
-                        child: Text(desc.isEmpty ? 'لا توجد نبذة متاحة حالياً.' : desc),
+                        child: Text(
+                          desc.isEmpty ? 'لا توجد نبذة متاحة حالياً.' : desc,
+                        ),
                       ),
                       const SizedBox(height: 12),
 
@@ -318,12 +362,12 @@ class BookDetailsPage extends StatelessWidget {
                           onPressed: isGenerating
                               ? null
                               : () => _startOrGenerateAudio(
-                            context,
-                            data: data,
-                            title: title,
-                            author: author,
-                            cover: cover,
-                          ),
+                                  context,
+                                  data: data,
+                                  title: title,
+                                  author: author,
+                                  cover: cover,
+                                ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -331,7 +375,9 @@ class BookDetailsPage extends StatelessWidget {
                               const Icon(Icons.headphones_rounded, size: 24),
                               const SizedBox(width: 12),
                               Text(
-                                listenLabel == 'بدء الاستماع' ? 'استمع' : listenLabel,
+                                listenLabel == 'بدء الاستماع'
+                                    ? 'استمع'
+                                    : listenLabel,
                                 style: const TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.w800,
@@ -346,7 +392,10 @@ class BookDetailsPage extends StatelessWidget {
 
                       const Text(
                         'التعليقات حول الكتاب:',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       _ReviewsList(bookId: bookId),
@@ -364,7 +413,8 @@ class BookDetailsPage extends StatelessWidget {
                           cover: cover,
                         ),
                         onDownload: null,
-                        onReview: () => _showAddReviewSheet(context, bookId, title, cover),
+                        onReview: () =>
+                            _showAddReviewSheet(context, bookId, title, cover),
                       ),
 
                       const SizedBox(height: 90),
@@ -377,7 +427,9 @@ class BookDetailsPage extends StatelessWidget {
               backgroundColor: _accent,
               onPressed: () {
                 Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => BookChatPage(bookId: bookId)),
+                  MaterialPageRoute(
+                    builder: (_) => BookChatPage(bookId: bookId),
+                  ),
                 );
               },
               child: const Icon(Icons.chat_bubble_outline, color: Colors.white),
@@ -389,12 +441,12 @@ class BookDetailsPage extends StatelessWidget {
   }
 
   void _showAddToListSheet(
-      BuildContext context, {
-        required String bookId,
-        required String title,
-        required String author,
-        required String cover,
-      }) {
+    BuildContext context, {
+    required String bookId,
+    required String title,
+    required String author,
+    required String cover,
+  }) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -409,18 +461,20 @@ class BookDetailsPage extends StatelessWidget {
     );
   }
 
-  void _showAddReviewSheet(BuildContext context, String bookId, String title, String cover) {
+  void _showAddReviewSheet(
+    BuildContext context,
+    String bookId,
+    String title,
+    String cover,
+  ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => _AddReviewSheet(
-        bookId: bookId,
-        bookTitle: title,
-        bookCover: cover,
-      ),
+      builder: (ctx) =>
+          _AddReviewSheet(bookId: bookId, bookTitle: title, bookCover: cover),
     );
   }
 }
@@ -430,11 +484,7 @@ class _InlineActionsRow extends StatelessWidget {
   final VoidCallback? onAddToList;
   final VoidCallback? onDownload;
   final VoidCallback? onReview;
-  const _InlineActionsRow({
-    this.onAddToList,
-    this.onDownload,
-    this.onReview,
-  });
+  const _InlineActionsRow({this.onAddToList, this.onDownload, this.onReview});
 
   @override
   Widget build(BuildContext context) {
@@ -494,9 +544,7 @@ class _DividerV extends StatelessWidget {
     return const SizedBox(
       width: 1,
       height: 44,
-      child: DecoratedBox(
-        decoration: BoxDecoration(color: Color(0xFFEEEEEE)),
-      ),
+      child: DecoratedBox(decoration: BoxDecoration(color: Color(0xFFEEEEEE))),
     );
   }
 }
@@ -548,7 +596,9 @@ class _AudioPillButton extends StatelessWidget {
         style: ElevatedButton.styleFrom(
           backgroundColor: _pillGreen,
           foregroundColor: _primary,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
           elevation: 0,
         ),
         onPressed: canPress ? onPressed : null,
@@ -617,8 +667,10 @@ class _AverageRatingRow extends StatelessWidget {
         for (final d in docs) {
           final data = d.data() as Map<String, dynamic>? ?? {};
           final r = data['rating'];
-          if (r is int) sum += r.toDouble();
-          else if (r is double) sum += r;
+          if (r is int)
+            sum += r.toDouble();
+          else if (r is double)
+            sum += r;
         }
         final avg = sum / docs.length;
 
@@ -681,7 +733,9 @@ class _ReviewsList extends StatelessWidget {
             final userName = (m['userName'] ?? 'قارئ') as String;
             final userImageUrl = (m['userImageUrl'] ?? '') as String;
             final rating = (m['rating'] ?? 0);
-            final ratingDouble = rating is int ? rating.toDouble() : (rating as double? ?? 0.0);
+            final ratingDouble = rating is int
+                ? rating.toDouble()
+                : (rating as double? ?? 0.0);
             final text = (m['text'] ?? '') as String;
             final userId = (m['userId'] ?? '') as String;
 
@@ -693,9 +747,12 @@ class _ReviewsList extends StatelessWidget {
               backgroundImage: hasImage ? NetworkImage(userImageUrl) : null,
               child: !hasImage
                   ? Text(
-                userName.isNotEmpty ? userName.characters.first : 'ق',
-                style: const TextStyle(fontWeight: FontWeight.bold, color: _darkGreen),
-              )
+                      userName.isNotEmpty ? userName.characters.first : 'ق',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: _darkGreen,
+                      ),
+                    )
                   : null,
             );
 
@@ -703,7 +760,9 @@ class _ReviewsList extends StatelessWidget {
               onTap: () {
                 if (userId.isEmpty || userId == currentUid) return;
                 Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => FriendDetailsPage(friendUid: userId)),
+                  MaterialPageRoute(
+                    builder: (_) => FriendDetailsPage(friendUid: userId),
+                  ),
                 );
               },
               child: avatar,
@@ -712,7 +771,10 @@ class _ReviewsList extends StatelessWidget {
             return Container(
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: _chipRose, borderRadius: BorderRadius.circular(16)),
+              decoration: BoxDecoration(
+                color: _chipRose,
+                borderRadius: BorderRadius.circular(16),
+              ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -725,7 +787,12 @@ class _ReviewsList extends StatelessWidget {
                         Row(
                           children: [
                             Expanded(
-                              child: Text(userName, style: const TextStyle(fontWeight: FontWeight.w700)),
+                              child: Text(
+                                userName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                             ),
                             _Stars(rating: ratingDouble),
                           ],
@@ -734,7 +801,7 @@ class _ReviewsList extends StatelessWidget {
                         Text(text),
                       ],
                     ),
-                  )
+                  ),
                 ],
               ),
             );
@@ -758,7 +825,11 @@ class _AddToListSheet extends StatelessWidget {
   Future<void> _setStatus(BuildContext context, String status) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      _showSnack(context, 'الرجاء تسجيل الدخول أولاً', icon: Icons.info_outline);
+      _showSnack(
+        context,
+        'الرجاء تسجيل الدخول أولاً',
+        icon: Icons.info_outline,
+      );
       return;
     }
 
@@ -768,17 +839,14 @@ class _AddToListSheet extends StatelessWidget {
         .collection('library')
         .doc(bookId);
 
-    await ref.set(
-      {
-        'bookId': bookId,
-        'status': status,
-        'title': title,
-        'author': author,
-        'coverUrl': cover,
-        'addedAt': FieldValue.serverTimestamp(),
-      },
-      SetOptions(merge: true),
-    );
+    await ref.set({
+      'bookId': bookId,
+      'status': status,
+      'title': title,
+      'author': author,
+      'coverUrl': cover,
+      'addedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
 
     if (context.mounted) {
       Navigator.pop(context);
@@ -798,10 +866,16 @@ class _AddToListSheet extends StatelessWidget {
             Container(
               height: 4,
               width: 40,
-              decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(2)),
+              decoration: BoxDecoration(
+                color: Colors.black26,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
             const SizedBox(height: 16),
-            const Text('إضافة إلى أي قائمة؟', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+            const Text(
+              'إضافة إلى أي قائمة؟',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+            ),
             const SizedBox(height: 12),
             ListTile(
               leading: const Icon(Icons.play_circle_fill, color: _primary),
@@ -843,11 +917,19 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
   Future<void> _save() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      _showSnack(context, 'الرجاء تسجيل الدخول أولاً', icon: Icons.info_outline);
+      _showSnack(
+        context,
+        'الرجاء تسجيل الدخول أولاً',
+        icon: Icons.info_outline,
+      );
       return;
     }
     if (_ctrl.text.trim().isEmpty) {
-      _showSnack(context, 'فضلاً اكتب تعليقاً مختصراً', icon: Icons.info_outline);
+      _showSnack(
+        context,
+        'فضلاً اكتب تعليقاً مختصراً',
+        icon: Icons.info_outline,
+      );
       return;
     }
     setState(() => _saving = true);
@@ -856,10 +938,15 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
     String userImageUrl = user.photoURL ?? '';
 
     try {
-      final u = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      final u = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
       if (u.exists) {
         final data = u.data() ?? {};
-        final candidateName = (data['name'] ?? data['fullName'] ?? data['displayName'] ?? '') as String;
+        final candidateName =
+            (data['name'] ?? data['fullName'] ?? data['displayName'] ?? '')
+                as String;
         if (candidateName.trim().isNotEmpty) userName = candidateName;
 
         final candidateImage = (data['photoUrl'] ?? '') as String;
@@ -917,10 +1004,16 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
               Container(
                 height: 4,
                 width: 40,
-                decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(2)),
+                decoration: BoxDecoration(
+                  color: Colors.black26,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
               const SizedBox(height: 12),
-              const Text('إضافة تعليق', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+              const Text(
+                'إضافة تعليق',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+              ),
               const SizedBox(height: 10),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -928,7 +1021,10 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
                   final filled = i < _rating;
                   return IconButton(
                     onPressed: () => setState(() => _rating = i + 1),
-                    icon: Icon(filled ? Icons.star : Icons.star_border, color: Colors.amber[700]),
+                    icon: Icon(
+                      filled ? Icons.star : Icons.star_border,
+                      color: Colors.amber[700],
+                    ),
                   );
                 }),
               ),
@@ -985,6 +1081,9 @@ class BookAudioPlayerPage extends StatefulWidget {
 
 class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
   late final AudioPlayer _player;
+  DateTime _lastWrite = DateTime.fromMillisecondsSinceEpoch(0);
+  final Stopwatch _listenWatch = Stopwatch();
+  int _sessionListenedSeconds = 0;
 
   bool _loading = true;
 
@@ -994,24 +1093,43 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
 
   bool _durationsReady = false;
 
-  // ✅ حالة البوك مارك (معبّى/حدود)
   bool _isBookmarked = false;
-
   @override
   void initState() {
     super.initState();
     _player = AudioPlayer();
+
+    _player.playingStream.listen((isPlaying) {
+      if (isPlaying) {
+        if (!_listenWatch.isRunning) {
+          _listenWatch.start();
+        }
+      } else {
+        if (_listenWatch.isRunning) {
+          _listenWatch.stop();
+          _sessionListenedSeconds += _listenWatch.elapsed.inSeconds;
+          _listenWatch.reset();
+          _saveListeningStats();
+        }
+      }
+    });
+
     _init();
   }
 
   Future<void> _init() async {
     try {
-      final sources = widget.audioUrls.map((u) => AudioSource.uri(Uri.parse(u))).toList();
+      final sources = widget.audioUrls
+          .map((u) => AudioSource.uri(Uri.parse(u)))
+          .toList();
       final playlist = ConcatenatingAudioSource(children: sources);
 
       await _player.setAudioSource(
         playlist,
-        initialIndex: widget.initialPartIndex.clamp(0, widget.audioUrls.length - 1),
+        initialIndex: widget.initialPartIndex.clamp(
+          0,
+          widget.audioUrls.length - 1,
+        ),
         initialPosition: Duration(milliseconds: widget.initialPositionMs),
       );
 
@@ -1032,11 +1150,59 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
 
       setState(() => _loading = false);
 
-      // ✅ احسب مدة كل جزء من الروابط عشان مجموع الكتاب يطلع صح
+      // ✅ راقب حالة التشغيل: إذا شغّل → ابدأ عدّ، إذا وقف → وقف العد واجمع الوقت واحفظ
+      _player.processingStateStream.listen((state) async {
+        if (state == ProcessingState.completed) {
+          final user = FirebaseAuth.instance.currentUser;
+          if (user == null) return;
+
+          final total = _totalMs();
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .collection('library')
+              .doc(widget.bookId)
+              .set({
+                'isCompleted': true,
+                'totalMs': total,
+                'contentMs': total,
+                'updatedAt': FieldValue.serverTimestamp(),
+              }, SetOptions(merge: true));
+        }
+      });
+
+      Future<void> _markCompleted() async {
+        try {
+          final user = FirebaseAuth.instance.currentUser;
+          if (user == null) return;
+
+          final ref = FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .collection('library')
+              .doc(widget.bookId);
+
+          await ref.set({
+            'isCompleted': true,
+            'completedAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+        } catch (_) {}
+      }
+
+      _player.processingStateStream.listen((state) async {
+        if (state == ProcessingState.completed) {
+          await _markCompleted();
+        }
+      });
+
       await _loadAllDurationsFromUrls();
+      await _ensureEstimatedTotalSaved();
+      await _saveBarProgress(force: true);
     } catch (_) {
       setState(() => _loading = false);
-      if (mounted) _showSnack(context, 'تعذّر تشغيل الصوت', icon: Icons.error_outline);
+      if (mounted)
+        _showSnack(context, 'تعذّر تشغيل الصوت', icon: Icons.error_outline);
     }
   }
 
@@ -1111,7 +1277,10 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
 
     final lastIndex = (_durations.length - 1).clamp(0, _durations.length - 1);
     final lastDur = _durations[lastIndex]?.inMilliseconds ?? 0;
-    await _player.seek(Duration(milliseconds: lastDur > 0 ? lastDur : 0), index: lastIndex);
+    await _player.seek(
+      Duration(milliseconds: lastDur > 0 ? lastDur : 0),
+      index: lastIndex,
+    );
   }
 
   // ✅ التعديل: حفظ التقدم لكل يوزر (users/{uid}/library/{bookId})
@@ -1128,14 +1297,369 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
           .doc(user.uid)
           .collection('library')
           .doc(widget.bookId)
-          .set(
-        {
-          'lastPartIndex': idx,
-          'lastPositionMs': pos,
+          .set({
+            'lastPartIndex': idx,
+            'lastPositionMs': pos,
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+    } catch (_) {}
+  }
+
+  Future<void> _saveBarProgress({bool force = false}) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      if (!_durationsReady) return;
+
+      final now = DateTime.now();
+      if (!force && now.difference(_lastWrite).inSeconds < 5) return;
+      _lastWrite = now;
+
+      final total = _totalMs();
+      if (total <= 0) return;
+
+      final currentContent = _globalPosMs().clamp(0, total);
+
+      final ref = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('library')
+          .doc(widget.bookId);
+
+      await FirebaseFirestore.instance.runTransaction((tx) async {
+        final snap = await tx.get(ref);
+        final data = snap.data() as Map<String, dynamic>? ?? {};
+
+        final oldContent = (data['contentMs'] is num)
+            ? (data['contentMs'] as num).toInt()
+            : 0;
+        final oldTotal = (data['totalMs'] is num)
+            ? (data['totalMs'] as num).toInt()
+            : 0;
+        final oldCompleted = (data['isCompleted'] == true);
+
+        final newTotal = (oldTotal > total) ? oldTotal : total;
+        final newContent = (oldContent > currentContent)
+            ? oldContent
+            : currentContent;
+
+        final finalCompleted =
+            oldCompleted || (newTotal > 0 && newContent >= newTotal);
+
+        tx.set(ref, {
+          'totalMs': newTotal,
+          'contentMs': finalCompleted ? newTotal : newContent,
+          'isCompleted': finalCompleted,
           'updatedAt': FieldValue.serverTimestamp(),
-        },
-        SetOptions(merge: true),
-      );
+        }, SetOptions(merge: true));
+      });
+    } catch (_) {}
+  }
+
+  DateTime _startOfWeek(DateTime d) {
+    // Saturday = 6 in Dart (Mon=1..Sun=7)
+    final start = DateTime.saturday; // 6
+    final diff = (d.weekday - start + 7) % 7; // 0..6
+    return DateTime(d.year, d.month, d.day).subtract(Duration(days: diff));
+  }
+
+  String _weekKey(DateTime d) {
+    final s = _startOfWeek(d);
+    return '${s.year}-${s.month.toString().padLeft(2, '0')}-${s.day.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _saveListeningStats() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      if (_sessionListenedSeconds < 1) return;
+
+      final statsRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('stats')
+          .doc('main');
+
+      // ✅ تحقق من الأسبوع وصفّر إذا أسبوع جديد
+      final now = DateTime.now();
+      final wk = _weekKey(now);
+
+      final statsSnap = await statsRef.get();
+      final stats = statsSnap.data() ?? {};
+      final storedWeek = (stats['weeklyKey'] ?? '') as String;
+
+      // ✅ لو أسبوع جديد -> صفّر weeklyListenedSeconds
+      if (storedWeek != wk) {
+        await statsRef.set({
+          'weeklyKey': wk,
+          'weeklyListenedSeconds': 0,
+          'weeklyResetAt': FieldValue.serverTimestamp(),
+          // ✅ تنظيف جدولة نهاية الأسبوع للأسبوع الجديد
+          'endWeekNudgeScheduledKey': '',
+          'weeklyGoalCompletedKey': '',
+        }, SetOptions(merge: true));
+
+        // (اختياري) نلغي إشعارات الأسبوع القديم
+        await GoalNotifications.instance.cancel(4001);
+        await GoalNotifications.instance.cancel(4002);
+      }
+
+      // ✅ زيدي الأسبوعي + الإجمالي
+      await statsRef.set({
+        'weeklyKey': wk,
+        'weeklyListenedSeconds': FieldValue.increment(_sessionListenedSeconds),
+        'totalListenedSeconds': FieldValue.increment(_sessionListenedSeconds),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      await _maybeNotifyNearWeeklyGoal(wk: wk, statsRef: statsRef);
+      await _maybeHandleEndOfWeekLowProgress(wk: wk, statsRef: statsRef);
+      await _maybeCelebrateWeeklyGoal(wk: wk, statsRef: statsRef);
+
+      _sessionListenedSeconds = 0;
+    } catch (_) {}
+  }
+
+  // الحاله الثاني هي اشعار اذا قربت للهدف
+  Future<int> _getWeeklyGoalMinutesForMe() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return 60;
+
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
+    final data = doc.data() ?? {};
+
+    final weeklyGoal = data['weeklyGoal'];
+    if (weeklyGoal is Map) {
+      final v = weeklyGoal['minutes'];
+      if (v is int) return v;
+      if (v is num) return v.toInt();
+      if (v is String) return int.tryParse(v) ?? 60;
+    }
+    return 60;
+  }
+
+  Future<void> _maybeNotifyNearWeeklyGoal({
+    required String wk,
+    required DocumentReference<Map<String, dynamic>> statsRef,
+  }) async {
+    final goalMinutes = await _getWeeklyGoalMinutesForMe();
+    final goalSeconds = goalMinutes * 60;
+    if (goalSeconds <= 0) return;
+
+    // نقرأ الأسبوعي الحالي من الداتابيس (بعد الزيادة)
+    final snap = await statsRef.get();
+    final stats = snap.data() ?? {};
+    final weeklySeconds = (stats['weeklyListenedSeconds'] is num)
+        ? (stats['weeklyListenedSeconds'] as num).toInt()
+        : 0;
+
+    // شرط "قربت" — مثال 75%
+    const nearRatio = 0.75;
+    final reachedNear = weeklySeconds >= (goalSeconds * nearRatio).floor();
+    if (!reachedNear) return;
+
+    // منع التكرار: مرة واحدة لكل أسبوع
+    final sentKey = (stats['nearGoalNotifiedKey'] ?? '') as String;
+    if (sentKey == wk) return;
+
+    await statsRef.set({
+      'nearGoalNotifiedKey': wk,
+      'nearGoalNotifiedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    await GoalNotifications.instance.showNow(
+      2001,
+      'أحسنتِ التقدّم',
+      'أنتِ قريبة من تحقيق هدفك الأسبوعي… واصلي، فأنتِ على الطريق الصحيح.',
+    );
+  }
+
+  //الحاله الثالثه و هي اذا تاخر عن الهدف
+  Future<void> _maybeHandleEndOfWeekLowProgress({
+    required String wk,
+    required DocumentReference<Map<String, dynamic>> statsRef,
+  }) async {
+    // 1) نجيب الهدف
+    final goalMinutes = await _getWeeklyGoalMinutesForMe();
+    final goalSeconds = goalMinutes * 60;
+    if (goalSeconds <= 0) return;
+
+    // 2) نجيب الاستماع الأسبوعي الحالي
+    final snap = await statsRef.get();
+    final stats = snap.data() ?? {};
+    final weeklySeconds = (stats['weeklyListenedSeconds'] is num)
+        ? (stats['weeklyListenedSeconds'] as num).toInt()
+        : 0;
+
+    // 3) شرط "ضعيف جدًا" (مثال: أقل من 25%)
+    const lowRatio = 0.25;
+    final isLow = weeklySeconds < (goalSeconds * lowRatio);
+
+    // نخزن مفتاح الأسبوع عشان ما نعيد الجدولة كل مرة
+    final scheduledKey = (stats['endWeekNudgeScheduledKey'] ?? '') as String;
+
+    // IDs ثابتة
+    const thuId = 4001;
+    const friId = 4002;
+
+    if (!isLow) {
+      // تحسن -> نلغي إشعارات نهاية الأسبوع (لو كانت مجدولة)
+      await GoalNotifications.instance.cancel(thuId);
+      await GoalNotifications.instance.cancel(friId);
+
+      // (اختياري) نثبت إننا مو محتاجينها هذا الأسبوع
+      await statsRef.set({
+        'endWeekNudgeScheduledKey': '',
+      }, SetOptions(merge: true));
+
+      return;
+    }
+
+    // لو ضعيف + مو مجدول لهذا الأسبوع -> جدوله مرة واحدة فقط
+    if (scheduledKey == wk) return;
+
+    // 4) جدولة تذكير الخميس 8 مساء
+    await GoalNotifications.instance.scheduleEndOfWeekReminder(
+      id: thuId,
+      weekday: DateTime.thursday,
+      hour: 20,
+      minute: 0,
+      title: 'لا تدعي الأسبوع يفوتك',
+      body: 'خطوة بسيطة اليوم قد تقرّبك من هدفك… استمعي قليلًا وابدئي من جديد.',
+    );
+
+    // 5) جدولة تذكير الجمعة 8 مساء
+    await GoalNotifications.instance.scheduleEndOfWeekReminder(
+      id: friId,
+      weekday: DateTime.friday,
+      hour: 20,
+      minute: 0,
+      title: 'فرصة أخيرة هذا الأسبوع',
+      body: 'ما زال بإمكانك التقدّم… دقائق قليلة الآن تصنع فرقًا جميلًا.',
+    );
+
+    await statsRef.set({
+      'endWeekNudgeScheduledKey': wk,
+      'endWeekNudgeScheduledAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  //الحاله الرابعه و الخامسخه في حال اكتمال الهدف سوا وسط الاسبوع او نهايه الاسبوع
+  Future<void> _maybeCelebrateWeeklyGoal({
+    required String wk,
+    required DocumentReference<Map<String, dynamic>> statsRef,
+  }) async {
+    // 1) الهدف
+    final goalMinutes = await _getWeeklyGoalMinutesForMe();
+    final goalSeconds = goalMinutes * 60;
+    if (goalSeconds <= 0) return;
+
+    // 2) نقرأ الأسبوعي الحالي (بعد الزيادة)
+    final snap = await statsRef.get();
+    final stats = snap.data() ?? {};
+    final weeklySeconds = (stats['weeklyListenedSeconds'] is num)
+        ? (stats['weeklyListenedSeconds'] as num).toInt()
+        : 0;
+
+    // 3) تحقق من الوصول للهدف
+    final reached = weeklySeconds >= goalSeconds;
+    if (!reached) return;
+
+    // 4) منع التكرار: مرة واحدة لكل أسبوع
+    final completedKey = (stats['weeklyGoalCompletedKey'] ?? '') as String;
+    if (completedKey == wk) return;
+
+    // 5) نخزن علامة الإكمال
+    await statsRef.set({
+      'weeklyGoalCompletedKey': wk,
+      'weeklyGoalCompletedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    // 6) احتفال داخل التطبيق
+    if (!mounted) return;
+    await showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+          child: Directionality(
+            textDirection: TextDirection.rtl,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 8),
+                const Text(
+                  'مبروك! حقّقتِ هدفك الأسبوعي',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF0E3A2C),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'استمري على هذا الإيقاع الجميل… أنتِ تبنين عادة رائعة.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.35,
+                    color: const Color(0xFF0E3A2C).withOpacity(0.85),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF6F8E63),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text(
+                      'تمام',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _ensureEstimatedTotalSaved() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      if (!_durationsReady) return;
+
+      final totalSeconds = (_totalMs() / 1000).round();
+      if (totalSeconds <= 0) return;
+
+      final ref = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('library')
+          .doc(widget.bookId);
+
+      await ref.set({
+        'estimatedTotalSeconds': totalSeconds,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
     } catch (_) {}
   }
 
@@ -1153,14 +1677,11 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
     if (_isBookmarked) {
       // إلغاء الحفظ
       try {
-        await ref.set(
-          {
-            'lastPartIndex': FieldValue.delete(),
-            'lastPositionMs': FieldValue.delete(),
-            'updatedAt': FieldValue.serverTimestamp(),
-          },
-          SetOptions(merge: true),
-        );
+        await ref.set({
+          'lastPartIndex': FieldValue.delete(),
+          'lastPositionMs': FieldValue.delete(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
       } catch (_) {}
 
       if (!mounted) return;
@@ -1193,6 +1714,19 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
 
   @override
   void dispose() {
+    // ✅ احفظي قبل ما تطلعين
+    if (_listenWatch.isRunning) {
+      _listenWatch.stop();
+      _sessionListenedSeconds += _listenWatch.elapsed.inSeconds;
+      _listenWatch.reset();
+    }
+
+    if (_sessionListenedSeconds > 0) {
+      _saveListeningStats();
+    }
+
+    _saveBarProgress(force: true);
+    _saveListeningStats();
     _player.dispose();
     super.dispose();
   }
@@ -1206,7 +1740,10 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
       child: Stack(
         children: [
           Positioned.fill(
-            child: Image.asset('assets/images/back_private.png', fit: BoxFit.cover),
+            child: Image.asset(
+              'assets/images/back_private.png',
+              fit: BoxFit.cover,
+            ),
           ),
           Scaffold(
             backgroundColor: Colors.transparent,
@@ -1218,215 +1755,247 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
               toolbarHeight: 150,
               leading: IconButton(
                 tooltip: 'رجوع',
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _primary, size: 22),
+                icon: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: _primary,
+                  size: 22,
+                ),
                 onPressed: () => Navigator.of(context).maybePop(),
               ),
-              title: const Text('تشغيل الكتاب', style: TextStyle(color: _primary)),
+              title: const Text(
+                'تشغيل الكتاب',
+                style: TextStyle(color: _primary),
+              ),
             ),
             body: Padding(
               padding: const EdgeInsets.fromLTRB(16, 6, 16, 18),
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
                   : Column(
-                children: [
-                  const SizedBox(height: 45),
-
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: whiteCard,
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: Column(
                       children: [
+                        const SizedBox(height: 45),
                         Container(
-                          width: 190,
-                          height: 235,
+                          padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: whiteCard,
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: Column(
+                            children: [
+                              Container(
+                                width: 190,
+                                height: 235,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                clipBehavior: Clip.antiAlias,
+                                child: widget.coverUrl.isNotEmpty
+                                    ? Image.network(
+                                        widget.coverUrl,
+                                        fit: BoxFit.contain,
+                                      )
+                                    : const Icon(
+                                        Icons.menu_book,
+                                        size: 70,
+                                        color: _primary,
+                                      ),
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                widget.bookTitle,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w900,
+                                  color: _primary,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                widget.bookAuthor,
+                                style: const TextStyle(
+                                  color: Colors.black54,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: whiteCard,
                             borderRadius: BorderRadius.circular(16),
                           ),
-                          clipBehavior: Clip.antiAlias,
-                          child: widget.coverUrl.isNotEmpty
-                              ? Image.network(widget.coverUrl, fit: BoxFit.contain)
-                              : const Icon(Icons.menu_book, size: 70, color: _primary),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          widget.bookTitle,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            color: _primary,
+                          child: StreamBuilder<Duration>(
+                            stream: _player.positionStream,
+                            builder: (context, snap) {
+                              final total = _totalMs();
+                              final gpos = _globalPosMs();
+
+                              final leftMs = gpos < 0 ? 0 : gpos;
+                              final rightMs = total > 0 ? total : 0;
+
+                              final value = (total > 0)
+                                  ? (leftMs / total)
+                                  : 0.0;
+
+                              return Column(
+                                children: [
+                                  Slider(
+                                    value: value.clamp(0, 1),
+                                    onChanged: total <= 0
+                                        ? null
+                                        : (v) async {
+                                            final target = (total * v).round();
+                                            await _seekGlobalMs(target);
+                                          },
+                                  ),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        _fmtMs(leftMs),
+                                        style: const TextStyle(
+                                          color: Colors.black54,
+                                        ),
+                                      ),
+                                      Text(
+                                        _fmtMs(rightMs),
+                                        style: const TextStyle(
+                                          color: Colors.black54,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (!_durationsReady)
+                                    const Padding(
+                                      padding: EdgeInsets.only(top: 6),
+                                      child: Text(
+                                        'جاري حساب مدة الكتاب...',
+                                        style: TextStyle(color: Colors.black54),
+                                      ),
+                                    ),
+                                ],
+                              );
+                            },
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          widget.bookAuthor,
-                          style: const TextStyle(
-                            color: Colors.black54,
-                            fontWeight: FontWeight.w600,
-                          ),
+                        const SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            IconButton(
+                              iconSize: 42,
+                              onPressed: () => _seekBy(-10),
+                              icon: const Icon(
+                                Icons.replay_10_rounded,
+                                color: _primary,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            StreamBuilder<PlayerState>(
+                              stream: _player.playerStateStream,
+                              builder: (context, s) {
+                                final playing = s.data?.playing ?? false;
+                                return CircleAvatar(
+                                  radius: 34,
+                                  backgroundColor: _accent,
+                                  child: IconButton(
+                                    iconSize: 40,
+                                    onPressed: () async {
+                                      if (playing) {
+                                        await _saveBarProgress(
+                                          force: true,
+                                        ); // ✅ نحفظ التقدم
+                                        await _player.pause();
+                                      } else {
+                                        await _player.play();
+                                      }
+                                    },
+                                    icon: Icon(
+                                      playing
+                                          ? Icons.pause_rounded
+                                          : Icons.play_arrow_rounded,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(width: 16),
+                            IconButton(
+                              iconSize: 42,
+                              onPressed: () => _seekBy(10),
+                              icon: const Icon(
+                                Icons.forward_10_rounded,
+                                color: _primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              height: 64,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: whiteCard,
+                                  foregroundColor: _primary,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(24),
+                                  ),
+                                  elevation: 0,
+                                ),
+                                onPressed: _toggleBookmark,
+                                icon: Icon(
+                                  _isBookmarked
+                                      ? Icons.bookmark_rounded
+                                      : Icons.bookmark_border_rounded,
+                                  color: _primary,
+                                  size: 26,
+                                ),
+                                label: const Text(
+                                  'حفظ',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            SizedBox(
+                              height: 64,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: whiteCard,
+                                  foregroundColor: _primary,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(24),
+                                  ),
+                                  elevation: 0,
+                                ),
+                                onPressed: _toggleSpeed,
+                                icon: const Icon(Icons.speed_rounded, size: 26),
+                                label: Text(
+                                  '${_speed.toStringAsFixed(2)}x',
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ),
-
-                  const SizedBox(height: 2),
-
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: whiteCard,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: StreamBuilder<Duration>(
-                      stream: _player.positionStream,
-                      builder: (context, snap) {
-                        final total = _totalMs();
-                        final gpos = _globalPosMs();
-
-                        final leftMs = gpos < 0 ? 0 : gpos;
-                        final rightMs = total > 0 ? total : 0;
-
-                        final value = (total > 0) ? (leftMs / total) : 0.0;
-
-                        return Column(
-                          children: [
-                            Slider(
-                              value: value.clamp(0, 1),
-                              onChanged: total <= 0
-                                  ? null
-                                  : (v) async {
-                                final target = (total * v).round();
-                                await _seekGlobalMs(target);
-                              },
-                            ),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(_fmtMs(leftMs), style: const TextStyle(color: Colors.black54)),
-                                Text(_fmtMs(rightMs), style: const TextStyle(color: Colors.black54)),
-                              ],
-                            ),
-                            if (!_durationsReady)
-                              const Padding(
-                                padding: EdgeInsets.only(top: 6),
-                                child: Text('جاري حساب مدة الكتاب...', style: TextStyle(color: Colors.black54)),
-                              ),
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      IconButton(
-                        iconSize: 42,
-                        onPressed: () => _seekBy(-10),
-                        icon: const Icon(Icons.replay_10_rounded, color: _primary),
-                      ),
-                      const SizedBox(width: 16),
-                      StreamBuilder<PlayerState>(
-                        stream: _player.playerStateStream,
-                        builder: (context, s) {
-                          final playing = s.data?.playing ?? false;
-                          return CircleAvatar(
-                            radius: 34,
-                            backgroundColor: _accent,
-                            child: IconButton(
-                              iconSize: 40,
-                              onPressed: () async {
-                                if (playing) {
-                                  // ❌ لا نحفظ عند الإيقاف
-                                  await _player.pause();
-                                } else {
-                                  await _player.play();
-                                }
-                              },
-                              icon: Icon(
-                                playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                                color: Colors.white,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(width: 16),
-                      IconButton(
-                        iconSize: 42,
-                        onPressed: () => _seekBy(10),
-                        icon: const Icon(Icons.forward_10_rounded, color: _primary),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SizedBox(
-                        height: 64,
-                        child: ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: whiteCard,
-                            foregroundColor: _primary,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(24),
-                            ),
-                            elevation: 0,
-                          ),
-                          onPressed: _toggleBookmark,
-                          icon: Icon(
-                            _isBookmarked ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
-                            color: _primary,
-                            size: 26,
-                          ),
-                          label: const Text(
-                            'حفظ',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      SizedBox(
-                        height: 64,
-                        child: ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: whiteCard,
-                            foregroundColor: _primary,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(24),
-                            ),
-                            elevation: 0,
-                          ),
-                          onPressed: _toggleSpeed,
-                          icon: const Icon(
-                            Icons.speed_rounded,
-                            size: 26,
-                          ),
-                          label: Text(
-                            '${_speed.toStringAsFixed(2)}x',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
             ),
           ),
         ],
