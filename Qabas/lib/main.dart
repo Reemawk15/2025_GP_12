@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/services.dart';
@@ -9,7 +10,6 @@ import 'package:firebase_app_check/firebase_app_check.dart';
 import 'firebase_options.dart';
 import 'sign_up_page.dart';
 import 'sign_in_page.dart';
-import 'splash_logo_page.dart';
 import 'goal_notifications.dart';
 
 /// Qabas color palette
@@ -42,30 +42,25 @@ Future<void> main() async {
   await GoalNotifications.instance.init();
   await GoalNotifications.instance.scheduleWeeklyStartMotivation();
 
-  runApp(const QabasApp());
-  // ✅ اطبع projectId (مهم جداً عشان نتأكد انه نفس مشروع الفنكشن)
-  debugPrint('APP projectId = ${Firebase.app().options.projectId}');
-  debugPrint('APP appId     = ${Firebase.app().options.appId}');
-
-  // ✅ App Check
+  // ✅ App Check (فعّليه قبل runApp)
   if (kDebugMode) {
-    // في الديبق: استخدمي Debug provider عشان ما يعطل Requests
     await FirebaseAppCheck.instance.activate(
       androidProvider: AndroidProvider.debug,
       appleProvider: AppleProvider.debug,
     );
-
     debugPrint('✅ AppCheck: Debug provider activated');
-    // ملاحظة: لا نستدعي getToken هنا لأنه أحيانًا ما يطبع شيء ويشوّش.
   } else {
-    // 🔒 في الريليز (اختياري): فعّليه فقط إذا فعلتي Enforcement في الكونسول
-    // إذا ما تبين AppCheck الآن، خليه معلق أو احذفيه.
     await FirebaseAppCheck.instance.activate(
       androidProvider: AndroidProvider.playIntegrity,
-      appleProvider: AppleProvider.deviceCheck, // أو appAttest لو فعلتيه
+      appleProvider: AppleProvider.deviceCheck,
     );
   }
 
+  // ✅ اطبع projectId (بعد init)
+  debugPrint('APP projectId = ${Firebase.app().options.projectId}');
+  debugPrint('APP appId     = ${Firebase.app().options.appId}');
+
+  // ✅ runApp مرة وحدة فقط
   runApp(const QabasApp());
 }
 
@@ -76,14 +71,13 @@ class QabasApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = ThemeData(
       useMaterial3: true,
-      colorScheme:
-          ColorScheme.fromSeed(
-            seedColor: QabasColors.primary,
-            brightness: Brightness.light,
-          ).copyWith(
-            primary: QabasColors.primary,
-            background: QabasColors.background,
-          ),
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: QabasColors.primary,
+        brightness: Brightness.light,
+      ).copyWith(
+        primary: QabasColors.primary,
+        background: QabasColors.background,
+      ),
       scaffoldBackgroundColor: QabasColors.background,
       appBarTheme: const AppBarTheme(
         centerTitle: true,
@@ -125,7 +119,9 @@ class QabasApp extends StatelessWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       theme: theme,
-      home: const SplashLogoPage(),
+
+      // ✅ بدل SplashLogoPage: خلي أول صفحة مباشرة بعد الـ native splash
+      home: const HomePage(),
     );
   }
 }
@@ -140,7 +136,8 @@ class HomePage extends StatelessWidget {
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.dark,
-        systemNavigationBarColor: Colors.white,
+        // ✅ خلي الناف بار نفس خلفية قبس (بدل الأبيض)
+        systemNavigationBarColor: QabasColors.background,
         systemNavigationBarIconBrightness: Brightness.dark,
       ),
       child: Scaffold(

@@ -3,6 +3,124 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+const _primary = Color(0xFF0E3A2C);
+const _accent = Color(0xFF6F8E63);
+const _pillGreen = Color(0xFFE6F0E0);
+const _midPillGreen = Color(0xFFBFD6B5);
+
+// retuer the weeklyGoal from database
+Future<int> _getWeeklyGoalMinutesForMe() async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return 0;
+
+  final doc = await FirebaseFirestore.instance
+      .collection('users')
+      .doc(user.uid)
+      .get();
+
+  final data = doc.data() ?? {};
+  final weeklyGoal = data['weeklyGoal'];
+
+  if (weeklyGoal is! Map) return 0;
+
+  final v = weeklyGoal['minutes'];
+  if (v is int) return v;
+  if (v is num) return v.toInt();
+  if (v is String) return int.tryParse(v) ?? 0;
+
+  return 0;
+}
+
+Future<int> _getWeeklyListenedSecondsForMe() async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return 0;
+
+  final doc = await FirebaseFirestore.instance
+      .collection('users')
+      .doc(user.uid)
+      .collection('stats')
+      .doc('main')
+      .get();
+
+  final data = doc.data() ?? {};
+  final v = data['weeklyListenedSeconds'] ?? data['weeklyListenedSeconds'];
+
+  if (v is int) return v;
+  if (v is num) return v.toInt();
+  if (v is String) return int.tryParse(v) ?? 0;
+  return 0;
+}
+
+Widget _weeklyGoalBar() {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return const SizedBox.shrink();
+
+  final statsRef = FirebaseFirestore.instance
+      .collection('users')
+      .doc(user.uid)
+      .collection('stats')
+      .doc('main');
+
+  return StreamBuilder<DocumentSnapshot>(
+    stream: statsRef.snapshots(),
+    builder: (context, snap) {
+      final data = snap.data?.data() as Map<String, dynamic>? ?? {};
+      final weeklySec =
+          (data['weeklyListenedSeconds'] as num?)?.toInt() ??
+              (data['weeklyListenedSeconds'] as num?)?.toInt() ??
+              0;
+
+      return FutureBuilder<int>(
+        future: _getWeeklyGoalMinutesForMe(),
+        builder: (context, g) {
+          final goalMinutes = g.data ?? 0;
+          final minutes = (weeklySec / 60).floor();
+          final progress = (goalMinutes <= 0)
+              ? 0.0
+              : (minutes / goalMinutes).clamp(0.0, 1.0);
+
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(15, 0, 15, 6),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // ✅ Bar + Text inside
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      LinearProgressIndicator(
+                        value: progress,
+                        minHeight: 24, // زودناها شوي عشان النص يوضح داخل البار
+                        backgroundColor: _pillGreen, // ✅ خلفية البار
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          _midPillGreen, // ✅ لون التعبئة
+                        ),
+                      ),
+
+                      // ✅ Text inside the bar
+                      Text(
+                        '$minutes / $goalMinutes د',
+                        style: const TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w800,
+                          color: _primary, // ✅ لون النص
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    },
+  );
+}
+
 class WeeklyGoalPage extends StatefulWidget {
   const WeeklyGoalPage({super.key});
 
@@ -286,6 +404,13 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
                         ),
                         const SizedBox(height: 6),
 
+
+                        const SizedBox(height: 25),
+
+                        _weeklyGoalBar(),
+
+                        const SizedBox(height: 25),
+
                         // Title
                         Align(
                           alignment: Alignment.centerRight,
@@ -313,7 +438,8 @@ class _WeeklyGoalPageState extends State<WeeklyGoalPage> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 30),
+
+                        const SizedBox(height: 16),
 
                         // Goal level tiles
                         _goalTile('beginner'),

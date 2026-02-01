@@ -116,7 +116,7 @@ class LibraryTab extends StatelessWidget {
                         ),
                       ),
                     ),
-                    _weeklyGoalBar(),
+
                     const SizedBox(height: 8),
 
                     Expanded(
@@ -401,7 +401,7 @@ class _ShelfViewState extends State<_ShelfView> {
 
                     final slots = _perShelf;
                     final totalSpacing = _spacing * (slots - 1);
-                    final bookWidth = ((width - totalSpacing) / slots * 0.9)
+                    final bookWidth = ((width - totalSpacing) / slots * 0.80)
                         .clamp(40.0, 140.0);
                     final bookHeight = (bookWidth / _bookAspect * _bookStretch);
 
@@ -889,11 +889,6 @@ class _BookCard extends StatelessWidget {
                           ),
                   ),
 
-                  _MiniBarOnly(
-                    contentMs: book.contentMs,
-                    totalMs: book.totalMs,
-                    isCompleted: book.isCompleted,
-                  ),
                 ],
               ),
             ),
@@ -1075,7 +1070,7 @@ class _MyShelfViewState extends State<_MyShelfView> {
   static const int _booksPerPage = _perShelf * _shelvesPerPage;
   static const double _spacing = 1;
   static const double _bookAspect = .25;
-  static const double _bookStretch = 1.2;
+  static const double _bookStretch = 1.5;
 
   final PageController _pageController = PageController();
   late List<List<MyBook>> _pages;
@@ -1150,7 +1145,7 @@ class _MyShelfViewState extends State<_MyShelfView> {
                     final slots = _perShelf;
                     final totalSpacing = _spacing * (slots - 1);
                     final bookWidth = ((width - totalSpacing) / slots * 0.95)
-                        .clamp(40.0, 160.0);
+                        .clamp(40.0, 170.0);
                     final bookHeight = (bookWidth / _bookAspect * _bookStretch);
 
                     return Positioned(
