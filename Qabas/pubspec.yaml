@@ -47,7 +47,7 @@ dependencies:
   just_audio: ^0.9.38
   audio_session: ^0.1.19
   audioplayers: ^6.0.0
-  
+
   # FlutterFire (متوافقة مع App Check)
   firebase_core: ^3.15.2
   firebase_auth: ^5.3.4

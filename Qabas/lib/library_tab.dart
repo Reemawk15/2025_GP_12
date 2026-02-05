@@ -698,36 +698,6 @@ class _BookCard extends StatelessWidget {
     }
   }
 
-  // restart bar
-  Future<void> _resetProgress(BuildContext context) async {
-    final ref = FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .collection('library')
-        .doc(book.id);
-
-    try {
-      await ref.set({
-        'contentMs': 0,
-        'isCompleted': false,
-        'completedAt': FieldValue.delete(),
-        'lastPositionMs': 0,
-        'lastPartIndex': 0,
-        // Back the book after reset the bar to listen now tab
-        'status': 'listen_now',
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-
-      Navigator.pop(context);
-      _showSnack(context, 'تمت إعادة التتبع من البداية', icon: Icons.refresh);
-    } catch (e) {
-      _showSnack(
-        context,
-        'تعذّرت إعادة التتبع. حاول مجددًا',
-        icon: Icons.error_outline,
-      );
-    }
-  }
 
   void _showOptionsMenu(BuildContext context) {
     showModalBottomSheet(
@@ -737,18 +707,6 @@ class _BookCard extends StatelessWidget {
       ),
       builder: (sheetContext) {
         final List<Widget> tiles = [];
-
-        // choose to reset the bar appear only if the book complate + it in listened tab
-        if (book.status == 'listened' && book.isCompleted == true) {
-          tiles.add(
-            ListTile(
-              leading: const Icon(Icons.refresh, color: Colors.teal),
-              title: const Text('إعادة التتبع من البداية'),
-              onTap: () => _resetProgress(sheetContext),
-            ),
-          );
-          tiles.add(const Divider(height: 0));
-        }
 
         tiles.add(
           ListTile(
@@ -774,23 +732,7 @@ class _BookCard extends StatelessWidget {
             ),
           );
         } else if (book.status == 'listened') {
-          tiles.add(
-            ListTile(
-              leading: const Icon(Icons.bookmark_border, color: Colors.teal),
-              title: const Text('نقل إلى: أرغب بالاستماع لها'),
-              onTap: () => _moveToStatus(sheetContext, 'want'),
-            ),
-          );
-          tiles.add(
-            ListTile(
-              leading: const Icon(
-                Icons.play_arrow_outlined,
-                color: Colors.teal,
-              ),
-              title: const Text('نقل إلى: استمع لها الآن'),
-              onTap: () => _moveToStatus(sheetContext, 'listen_now'),
-            ),
-          );
+          // ✅ إذا في "استمعت لها" ما نعرض أي نقل (بس حذف)
         } else if (book.status == 'listen_now') {
           tiles.add(
             ListTile(

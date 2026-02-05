@@ -6,6 +6,7 @@ import 'package:just_audio/just_audio.dart';
 import 'friend_details_page.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'goal_notifications.dart';
+import 'marks_notes_page.dart';
 
 import 'Book_chatbot.dart';
 import 'dart:async';
@@ -70,12 +71,15 @@ class BookDetailsPage extends StatelessWidget {
   }
 
   Future<void> _startOrGenerateAudio(
-    BuildContext context, {
-    required Map<String, dynamic> data,
-    required String title,
-    required String author,
-    required String cover,
-  }) async {
+      BuildContext context, {
+        required Map<String, dynamic> data,
+        required String title,
+        required String author,
+        required String cover,
+
+        int? overridePartIndex,
+        int? overridePositionMs,
+      }) async {
     final status = (data['audioStatus'] ?? 'idle').toString();
     final partsRaw = data['audioParts'];
 
@@ -103,6 +107,12 @@ class BookDetailsPage extends StatelessWidget {
           lastPartIndex = _asInt(p['lastPartIndex'], fallback: 0);
           lastPositionMs = _asInt(p['lastPositionMs'], fallback: 0);
         } catch (_) {}
+      }
+
+// ✅ بعد Firestore، نغلبه لو جايين من علامة
+      if (overridePartIndex != null && overridePositionMs != null) {
+        lastPartIndex = overridePartIndex;
+        lastPositionMs = overridePositionMs;
       }
 
       if (!context.mounted) return;
@@ -419,8 +429,31 @@ class BookDetailsPage extends StatelessWidget {
                           cover: cover,
                         ),
                         onDownload: null,
-                        onReview: () =>
-                            _showAddReviewSheet(context, bookId, title, cover),
+                        onReview: () => _showAddReviewSheet(context, bookId, title, cover),
+
+                        onMarks: () async {
+                          final result = await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => MarksNotesPage(bookId: bookId),
+                            ),
+                          );
+
+                          if (result is Map && result['partIndex'] is int && result['positionMs'] is int) {
+                            final partIndex = result['partIndex'] as int;
+                            final positionMs = result['positionMs'] as int;
+
+                            // ✅ افتحي المشغل مباشرة عند الموضع
+                            await _startOrGenerateAudio(
+                              context,
+                              data: data,
+                              title: title,
+                              author: author,
+                              cover: cover,
+                              overridePartIndex: partIndex,
+                              overridePositionMs: positionMs,
+                            );
+                          }
+                        },
                       ),
 
                       const SizedBox(height: 90),
@@ -468,19 +501,20 @@ class BookDetailsPage extends StatelessWidget {
   }
 
   void _showAddReviewSheet(
-    BuildContext context,
-    String bookId,
-    String title,
-    String cover,
-  ) {
+      BuildContext context,
+      String bookId,
+      String title,
+      String cover,
+      ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _AddReviewSheet(
+        bookId: bookId,
+        bookTitle: title,
+        bookCover: cover,
       ),
-      builder: (ctx) =>
-          _AddReviewSheet(bookId: bookId, bookTitle: title, bookCover: cover),
     );
   }
 }
@@ -490,7 +524,15 @@ class _InlineActionsRow extends StatelessWidget {
   final VoidCallback? onAddToList;
   final VoidCallback? onDownload;
   final VoidCallback? onReview;
-  const _InlineActionsRow({this.onAddToList, this.onDownload, this.onReview});
+
+  final VoidCallback? onMarks;
+
+  const _InlineActionsRow({
+    this.onAddToList,
+    this.onDownload,
+    this.onReview,
+    this.onMarks,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -535,9 +577,11 @@ class _InlineActionsRow extends StatelessWidget {
       children: [
         item(Icons.folder_copy_rounded, 'إضافة', 'إلى قائمة', onAddToList),
         const _DividerV(),
-        item(Icons.download_rounded, 'تحميل الكتاب', ' ', onDownload),
+        item(Icons.download_rounded, 'تحميل', 'الكتاب', onDownload),
         const _DividerV(),
         item(Icons.star_rate_rounded, 'أضف', 'تقييماً', onReview),
+        const _DividerV(),
+        item(Icons.bookmark_added_rounded, 'العلامات', 'والملاحظات', onMarks),
       ],
     );
   }
@@ -905,6 +949,7 @@ class _AddReviewSheet extends StatefulWidget {
   final String bookId;
   final String bookTitle;
   final String bookCover;
+
   const _AddReviewSheet({
     required this.bookId,
     required this.bookTitle,
@@ -923,21 +968,18 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
   Future<void> _save() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      _showSnack(
-        context,
-        'الرجاء تسجيل الدخول أولاً',
-        icon: Icons.info_outline,
-      );
+      _showSnack(context, 'الرجاء تسجيل الدخول أولاً', icon: Icons.info_outline);
+      return;
+    }
+    if (_rating == 0) {
+      _showSnack(context, 'اختاري عدد النجوم أولاً', icon: Icons.info_outline);
       return;
     }
     if (_ctrl.text.trim().isEmpty) {
-      _showSnack(
-        context,
-        'فضلاً اكتب تعليقاً مختصراً',
-        icon: Icons.info_outline,
-      );
+      _showSnack(context, 'فضلاً اكتبي تعليقاً مختصراً', icon: Icons.info_outline);
       return;
     }
+
     setState(() => _saving = true);
 
     String userName = user.displayName ?? 'قارئ';
@@ -951,8 +993,7 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
       if (u.exists) {
         final data = u.data() ?? {};
         final candidateName =
-            (data['name'] ?? data['fullName'] ?? data['displayName'] ?? '')
-                as String;
+        (data['name'] ?? data['fullName'] ?? data['displayName'] ?? '') as String;
         if (candidateName.trim().isNotEmpty) userName = candidateName;
 
         final candidateImage = (data['photoUrl'] ?? '') as String;
@@ -960,94 +1001,139 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
       }
     } catch (_) {}
 
-    final batch = FirebaseFirestore.instance.batch();
+    try {
+      final batch = FirebaseFirestore.instance.batch();
 
-    final bookReviewRef = FirebaseFirestore.instance
-        .collection('audiobooks')
-        .doc(widget.bookId)
-        .collection('reviews')
-        .doc();
+      final bookReviewRef = FirebaseFirestore.instance
+          .collection('audiobooks')
+          .doc(widget.bookId)
+          .collection('reviews')
+          .doc();
 
-    final userReviewRef = FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .collection('reviews')
-        .doc(bookReviewRef.id);
+      final userReviewRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('reviews')
+          .doc(bookReviewRef.id);
 
-    final payload = {
-      'userId': user.uid,
-      'userName': userName,
-      'userImageUrl': userImageUrl,
-      'bookId': widget.bookId,
-      'bookTitle': widget.bookTitle,
-      'bookCover': widget.bookCover,
-      'rating': _rating,
-      'text': _ctrl.text.trim(),
-      'createdAt': FieldValue.serverTimestamp(),
-    };
+      final payload = {
+        'userId': user.uid,
+        'userName': userName,
+        'userImageUrl': userImageUrl,
+        'bookId': widget.bookId,
+        'bookTitle': widget.bookTitle,
+        'bookCover': widget.bookCover,
+        'rating': _rating,
+        'text': _ctrl.text.trim(),
+        'createdAt': FieldValue.serverTimestamp(),
+      };
 
-    batch.set(bookReviewRef, payload);
-    batch.set(userReviewRef, payload);
-    await batch.commit();
+      batch.set(bookReviewRef, payload);
+      batch.set(userReviewRef, payload);
+      await batch.commit();
 
-    if (!mounted) return;
-    Navigator.pop(context);
-    _showSnack(context, 'تم إضافة تعليقك بنجاح', icon: Icons.check_circle);
+      if (!mounted) return;
+      Navigator.pop(context);
+      _showSnack(context, 'تم حفظ تعليقك بنجاح', icon: Icons.check_circle);
+    } catch (_) {
+      if (!mounted) return;
+      _showSnack(context, 'تعذّر حفظ التعليق', icon: Icons.error_outline);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.of(context).viewInsets.bottom;
+
     return Padding(
       padding: EdgeInsets.only(bottom: bottom),
       child: Directionality(
         textDirection: TextDirection.rtl,
         child: Container(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: _pillGreen.withOpacity(0.96), // ✅ نفس الملاحظة
+            borderRadius: BorderRadius.circular(18),
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                height: 4,
-                width: 40,
-                decoration: BoxDecoration(
-                  color: Colors.black26,
-                  borderRadius: BorderRadius.circular(2),
+              // ✅ Handle زي اللي بالملاحظات/التعليق
+              Center(
+                child: Container(
+                  height: 4,
+                  width: 44,
+                  decoration: BoxDecoration(
+                    color: Colors.black26,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
+
               const Text(
                 'إضافة تعليق',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
               ),
               const SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(5, (i) {
-                  final filled = i < _rating;
-                  return IconButton(
-                    onPressed: () => setState(() => _rating = i + 1),
-                    icon: Icon(
-                      filled ? Icons.star : Icons.star_border,
-                      color: Colors.amber[700],
-                    ),
-                  );
-                }),
+
+              // ⭐ النجوم
+              Center(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (i) {
+                    final filled = i < _rating;
+                    return IconButton(
+                      onPressed: _saving ? null : () => setState(() => _rating = i + 1),
+                      icon: Icon(
+                        filled ? Icons.star : Icons.star_border,
+                        color: Colors.amber[700],
+                      ),
+                    );
+                  }),
+                ),
               ),
+
               TextField(
                 controller: _ctrl,
-                maxLines: 3,
+                maxLines: 4,
                 decoration: const InputDecoration(
                   hintText: 'اكتب رأيك حول الكتاب...',
                   border: OutlineInputBorder(),
                 ),
               ),
+
               const SizedBox(height: 10),
+
               SizedBox(
                 width: double.infinity,
-                child: FilledButton(
+                height: 46,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _accent, // ✅ نفس زر الملاحظة الأخضر
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
                   onPressed: _saving ? null : _save,
-                  child: Text(_saving ? 'جارٍ الحفظ...' : 'حفظ التعليق'),
+                  child: Text(
+                    _saving ? 'جارٍ الحفظ...' : 'حفظ التعليق',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -1096,6 +1182,8 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
 
   double _speed = 1.0;
   final List<double> _speeds = const [0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
+  bool _movedToListened = false;
+
   List<Duration?> _durations = [];
 
   bool _durationsReady = false;
@@ -1105,6 +1193,29 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
   int _maxReachedMs = 0;
 
   Timer? _statsTimer;
+
+  Timer? _resumeTimer;
+
+  Future<void> _autoSaveResume() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      final idx = _player.currentIndex ?? 0;
+      final pos = _player.position.inMilliseconds;
+
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('library')
+          .doc(widget.bookId)
+          .set({
+        'lastPartIndex': idx,
+        'lastPositionMs': pos,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (_) {}
+  }
 
   Future<void> _flushListeningTick() async {
     if (!_listenWatch.isRunning) return;
@@ -1151,18 +1262,25 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
 
     _player.playingStream.listen((isPlaying) async {
       if (isPlaying) {
-        if (!_listenWatch.isRunning) {
-          _listenWatch.start();
-        }
+        if (!_listenWatch.isRunning) _listenWatch.start();
 
-        // ✅ شغّل تايمر يسجّل كل 25 ثانية
         _statsTimer ??= Timer.periodic(const Duration(seconds: 25), (_) async {
           await _flushListeningTick();
         });
+
+        // ✅ NEW: حفظ مكان الاستماع تلقائيًا
+        _resumeTimer ??= Timer.periodic(const Duration(seconds: 8), (_) async {
+          await _autoSaveResume();
+        });
+
       } else {
-        // ✅ وقف التايمر
         _statsTimer?.cancel();
         _statsTimer = null;
+
+        // ✅ NEW: أول ما يوقف احفظ مرة
+        _resumeTimer?.cancel();
+        _resumeTimer = null;
+        await _autoSaveResume();
 
         if (_listenWatch.isRunning) {
           _listenWatch.stop();
@@ -1178,17 +1296,14 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
 
   Future<void> _init() async {
     try {
-      final sources = widget.audioUrls
-          .map((u) => AudioSource.uri(Uri.parse(u)))
-          .toList();
+      final sources =
+      widget.audioUrls.map((u) => AudioSource.uri(Uri.parse(u))).toList();
       final playlist = ConcatenatingAudioSource(children: sources);
 
       await _player.setAudioSource(
         playlist,
-        initialIndex: widget.initialPartIndex.clamp(
-          0,
-          widget.audioUrls.length - 1,
-        ),
+        initialIndex:
+        widget.initialPartIndex.clamp(0, widget.audioUrls.length - 1),
         initialPosition: Duration(milliseconds: widget.initialPositionMs),
       );
 
@@ -1209,49 +1324,28 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
 
       setState(() => _loading = false);
 
-      // ✅ راقب حالة التشغيل: إذا شغّل → ابدأ عدّ، إذا وقف → وقف العد واجمع الوقت واحفظ
+      // ✅ اكتمل الكتاب -> نحفظ "مكتمل" + إجمالي المدة + التقدم للنهاية
       _player.processingStateStream.listen((state) async {
         if (state == ProcessingState.completed) {
           final user = FirebaseAuth.instance.currentUser;
           if (user == null) return;
 
           final total = _totalMs();
+
           await FirebaseFirestore.instance
               .collection('users')
               .doc(user.uid)
               .collection('library')
               .doc(widget.bookId)
               .set({
-                'isCompleted': true,
-                'totalMs': total,
-                'contentMs': total,
-                'updatedAt': FieldValue.serverTimestamp(),
-              }, SetOptions(merge: true));
-        }
-      });
-
-      Future<void> _markCompleted() async {
-        try {
-          final user = FirebaseAuth.instance.currentUser;
-          if (user == null) return;
-
-          final ref = FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .collection('library')
-              .doc(widget.bookId);
-
-          await ref.set({
+            'inLibrary': true,
+            'status': 'listened', // ✅ هنا النقل لتبويب استمعت لها
             'isCompleted': true,
             'completedAt': FieldValue.serverTimestamp(),
+            'totalMs': total,
+            'contentMs': total,
             'updatedAt': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
-        } catch (_) {}
-      }
-
-      _player.processingStateStream.listen((state) async {
-        if (state == ProcessingState.completed) {
-          await _markCompleted();
         }
       });
 
@@ -1261,10 +1355,12 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
       await _saveBarProgress(force: true);
     } catch (_) {
       setState(() => _loading = false);
-      if (mounted)
+      if (mounted) {
         _showSnack(context, 'تعذّر تشغيل الصوت', icon: Icons.error_outline);
+      }
     }
   }
+
 
   Future<void> _loadAllDurationsFromUrls() async {
     try {
@@ -1343,6 +1439,157 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
     );
   }
 
+  Future<String?> _addMark({String note = ''}) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return null;
+
+      final idx = _player.currentIndex ?? 0;
+      final posMs = _player.position.inMilliseconds;
+      final gMs = _globalPosMs(); // عندك جاهزة
+
+      final ref = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('library')
+          .doc(widget.bookId)
+          .collection('marks')
+          .doc();
+
+      await ref.set({
+        'createdAt': FieldValue.serverTimestamp(),
+        'partIndex': idx,
+        'positionMs': posMs,
+        'globalMs': gMs,
+        'note': note,
+      });
+
+      return ref.id;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _showAddNoteSheet({required String markId}) async {
+    final ctrl = TextEditingController();
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final bottom = MediaQuery.of(ctx).viewInsets.bottom;
+        return Padding(
+          padding: EdgeInsets.only(bottom: bottom),
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: _pillGreen.withOpacity(0.96),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Directionality(
+              textDirection: TextDirection.rtl,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'إضافة ملاحظة',
+                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: ctrl,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      hintText: 'اكتب ملاحظة عن هذا الموضع...',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 46,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _accent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        elevation: 0,
+                      ),
+                      onPressed: () async {
+                        final user = FirebaseAuth.instance.currentUser;
+                        if (user == null) return;
+
+                        await FirebaseFirestore.instance
+                            .collection('users')
+                            .doc(user.uid)
+                            .collection('library')
+                            .doc(widget.bookId)
+                            .collection('marks')
+                            .doc(markId)
+                            .set({
+                          'note': ctrl.text.trim(),
+                          'updatedAt': FieldValue.serverTimestamp(),
+                        }, SetOptions(merge: true));
+
+                        if (ctx.mounted) Navigator.pop(ctx);
+
+                        if (mounted) {
+                          _showSnack(context, 'تم حفظ الملاحظة ');
+                        }
+                      },
+                      child: const Text(
+                        'حفظ الملاحظة',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _onMarkPressed() async {
+    final id = await _addMark(); // يضيف علامة بدون ملاحظة
+    if (!mounted) return;
+
+    if (id == null) {
+      _showSnack(context, 'تعذّر إضافة علامة', icon: Icons.error_outline);
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        backgroundColor: _accent,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        content: const Text(
+          'تمت إضافة علامة ',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+        ),
+        action: SnackBarAction(
+          label: 'إضافة ملاحظة',
+          textColor: Colors.white,
+          onPressed: () => _showAddNoteSheet(markId: id),
+        ),
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
   // ✅ التعديل: حفظ التقدم لكل يوزر (users/{uid}/library/{bookId})
   Future<void> _saveProgress() async {
     try {
@@ -1401,9 +1648,7 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
         final oldCompleted = (data['isCompleted'] == true);
 
         final newTotal = (oldTotal > total) ? oldTotal : total;
-        final newContent = (oldContent > currentContent)
-            ? oldContent
-            : currentContent;
+        final newContent = (oldContent > currentContent) ? oldContent : currentContent;
 
         final finalCompleted =
             oldCompleted || (newTotal > 0 && newContent >= newTotal);
@@ -1415,6 +1660,31 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
           'updatedAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
       });
+
+      // ✅ NEW: إذا وصل 100% انقلي الكتاب إلى "استمعت لها" مرة واحدة فقط
+      final reachedEnd = currentContent >= total;
+      if (reachedEnd && !_movedToListened) {
+        _movedToListened = true;
+
+        await ref.set({
+          'bookId': widget.bookId,
+          'inLibrary': true,
+
+          // ✅ بيانات عشان يظهر في المكتبة بشكل صحيح حتى لو ما كان مضاف
+          'title': widget.bookTitle,
+          'author': widget.bookAuthor,
+          'coverUrl': widget.coverUrl,
+          'addedAt': FieldValue.serverTimestamp(),
+
+          // ✅ النقل
+          'status': 'listened',
+          'isCompleted': true,
+          'completedAt': FieldValue.serverTimestamp(),
+          'contentMs': total,
+          'totalMs': total,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
     } catch (_) {}
   }
 
@@ -1508,6 +1778,91 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
     return 60;
   }
 
+  void _showAutoDialogMessage({
+    required IconData icon,
+    required String title,
+    required String body,
+    int seconds = 10,
+  }) {
+    if (!mounted) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (_) => TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0.85, end: 1.0),
+          duration: const Duration(milliseconds: 420),
+          curve: Curves.easeOutBack,
+          builder: (context, scale, child) {
+            final o = scale.clamp(0.0, 1.0);
+            return Opacity(
+              opacity: o,
+              child: Transform.scale(scale: scale, child: child),
+            );
+          },
+          child: Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.symmetric(horizontal: 22),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(18, 22, 18, 18),
+              decoration: BoxDecoration(
+                color: _pillGreen,
+                borderRadius: BorderRadius.circular(22),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.12),
+                    blurRadius: 18,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Directionality(
+                textDirection: TextDirection.rtl,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, color: _accent, size: 56),
+                    const SizedBox(height: 10),
+                    Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: _primary,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 22,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      body,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: _primary,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 17,
+                        height: 1.35,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      Future.delayed(Duration(seconds: seconds), () {
+        if (!mounted) return;
+        final nav = Navigator.of(context, rootNavigator: true);
+        if (nav.canPop()) nav.pop();
+      });
+    });
+  }
+
   Future<void> _maybeNotifyNearWeeklyGoal({
     required String wk,
     required DocumentReference<Map<String, dynamic>> statsRef,
@@ -1537,10 +1892,11 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
       'nearGoalNotifiedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
 
-    await GoalNotifications.instance.showNow(
-      2001,
-      'أحسنت التقدّم 👏🏻',
-      'أنت على بُعد خطوات من تحقيق هدفك الأسبوعي 🎖️ واصل، فأنت على الطريق الصحيح 💚',
+    _showAutoDialogMessage(
+      icon: Icons.trending_up_rounded,
+      title: 'أحسنت التقدّم 👏🏻',
+      body: 'أنت قريب من تحقيق هدفك الأسبوعي 🎖️\nاستمر… أنت على الطريق الصحيح 💚',
+      seconds: 10,
     );
   }
 
@@ -1614,7 +1970,7 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
     }, SetOptions(merge: true));
   }
 
-  //الحاله الرابعه و الخامسخه في حال اكتمال الهدف سوا وسط الاسبوع او نهايه الاسبوع
+  //الحاله الرابعه و الخامسه في حال اكتمال الهدف سوا وسط الاسبوع او نهايه الاسبوع
   Future<void> _maybeCelebrateWeeklyGoal({
     required String wk,
     required DocumentReference<Map<String, dynamic>> statsRef,
@@ -1704,15 +2060,14 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
                     textDirection: TextDirection.rtl,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
+                      children: const [
+                        Icon(
                           Icons.emoji_events_rounded,
                           color: _accent,
                           size: 56,
                         ),
-                        const SizedBox(height: 10),
-
-                        const Text(
+                        SizedBox(height: 10),
+                        Text(
                           'مبروك! 🎉',
                           textAlign: TextAlign.center,
                           style: TextStyle(
@@ -1721,9 +2076,8 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
                             fontSize: 22,
                           ),
                         ),
-                        const SizedBox(height: 8),
-
-                        const Text(
+                        SizedBox(height: 8),
+                        Text(
                           'تم تحقيق هدفك الأسبوعي 👏🏻\nاستمر على هذا التقدّم الجميل ',
                           textAlign: TextAlign.center,
                           style: TextStyle(
@@ -1731,31 +2085,6 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
                             fontWeight: FontWeight.w800,
                             fontSize: 17,
                             height: 1.35,
-                          ),
-                        ),
-
-                        const SizedBox(height: 16),
-
-                        SizedBox(
-                          width: double.infinity,
-                          height: 46,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _accent,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                            ),
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text(
-                              'إغلاق',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w900,
-                                fontSize: 16,
-                                color: Colors.white,
-                              ),
-                            ),
                           ),
                         ),
                       ],
@@ -1767,6 +2096,13 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
           ],
         ),
       );
+
+      // ⏱️ إغلاق تلقائي بعد 10 ثواني
+      Future.delayed(const Duration(seconds: 10), () {
+        if (!mounted) return;
+        final nav = Navigator.of(context, rootNavigator: true);
+        if (nav.canPop()) nav.pop();
+      });
     });
   }
 
@@ -1831,15 +2167,94 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
     await _seekGlobalMs(target);
   }
 
-  Future<void> _toggleSpeed() async {
-    final idx = _speeds.indexOf(_speed);
-    final next = _speeds[(idx + 1) % _speeds.length];
-    setState(() => _speed = next);
-    await _player.setSpeed(next);
+  Future<void> _showSpeedMenu(BuildContext btnContext) async {
+    final RenderBox button = btnContext.findRenderObject() as RenderBox;
+    final RenderBox overlay =
+    Overlay.of(btnContext).context.findRenderObject() as RenderBox;
+
+    final Offset pos = button.localToGlobal(Offset.zero, ancestor: overlay);
+
+    // ✅ تقدير عرض القائمة (صغير)
+    const double menuW = 140;
+
+    final RelativeRect position = RelativeRect.fromRect(
+      Rect.fromLTWH(
+        // ✅ يسار الزر (RTL أفضل)
+        (pos.dx - menuW + 6).clamp(0.0, overlay.size.width - menuW),
+        pos.dy + 4,
+        menuW,
+        button.size.height,
+      ),
+      Offset.zero & overlay.size,
+    );
+
+    final picked = await showMenu<double>(
+      context: btnContext,
+      position: position,
+      elevation: 0,
+      // ✅ لون pillGreen مع شفافية
+      color: _pillGreen.withOpacity(0.75),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+      ),
+      items: _speeds.reversed.map((s) {
+        final selected = s == _speed;
+        final label = '${s.toStringAsFixed(s % 1 == 0 ? 0 : 2)}x';
+
+        return PopupMenuItem<double>(
+          value: s,
+          height: 38,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  color: _primary, // ✅ صار غامق عشان خلفية فاتحة
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              if (selected)
+                const Icon(Icons.check, color: _primary, size: 18)
+              else
+                const SizedBox(width: 18),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+
+    if (picked == null) return;
+
+    setState(() => _speed = picked);
+    await _player.setSpeed(picked);
+  }
+
+  Future<void> _openMarks() async {
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => MarksNotesPage(bookId: widget.bookId),
+      ),
+    );
+
+    if (!mounted) return;
+
+    if (result is Map && result['globalMs'] is int) {
+      final ms = result['globalMs'] as int;
+      await _seekGlobalMs(ms);
+    }
   }
 
   @override
   void dispose() {
+    _resumeTimer?.cancel();
+    _resumeTimer = null;
+
+    _autoSaveResume();          // ✅ آخر حفظ للمكان
+    _saveBarProgress(force: true);
+
     _statsTimer?.cancel();
     _statsTimer = null;
 
@@ -1848,15 +2263,9 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
       _sessionListenedSeconds += _listenWatch.elapsed.inSeconds;
       _listenWatch.reset();
     }
-
-    if (_sessionListenedSeconds > 0) {
-      _saveListeningStats(); // ✅ آخر دفعة
-    }
-
-    _saveBarProgress(force: true);
+    if (_sessionListenedSeconds > 0) _saveListeningStats();
 
     _confettiController.dispose();
-
     _player.dispose();
     super.dispose();
   }
@@ -2090,16 +2499,13 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
                                   ),
                                   elevation: 0,
                                 ),
-                                onPressed: _toggleBookmark,
-                                icon: Icon(
-                                  _isBookmarked
-                                      ? Icons.bookmark_rounded
-                                      : Icons.bookmark_border_rounded,
+                                onPressed: _onMarkPressed,
+                                icon: const Icon(Icons.bookmark_add_rounded,
                                   color: _midDarkGreen2,
                                   size: 26,
                                 ),
                                 label: const Text(
-                                  'حفظ',
+                                  'علامة',
                                   style: TextStyle(
                                     fontSize: 18,
                                     color: _midDarkGreen2,
@@ -2109,27 +2515,31 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
                               ),
                             ),
                             const SizedBox(width: 12),
-                            SizedBox(
-                              height: 64,
-                              child: ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: whiteCard,
-                                  foregroundColor: _midDarkGreen2,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(24),
+                            Builder(
+                              builder: (btnContext) {
+                                return SizedBox(
+                                  height: 64,
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: whiteCard,
+                                      foregroundColor: _midDarkGreen2,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(24),
+                                      ),
+                                      elevation: 0,
+                                    ),
+                                    onPressed: () => _showSpeedMenu(btnContext),
+                                    icon: const Icon(Icons.speed_rounded, size: 26),
+                                    label: Text(
+                                      '${_speed.toStringAsFixed(2)}x',
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
                                   ),
-                                  elevation: 0,
-                                ),
-                                onPressed: _toggleSpeed,
-                                icon: const Icon(Icons.speed_rounded, size: 26),
-                                label: Text(
-                                  '${_speed.toStringAsFixed(2)}x',
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
+                                );
+                              },
                             ),
                           ],
                         ),

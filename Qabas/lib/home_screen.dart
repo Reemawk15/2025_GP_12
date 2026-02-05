@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'weekly_goal_page.dart';
 import 'community_tab.dart';
 import 'library_tab.dart';
 import 'profile_tab.dart';
@@ -13,6 +14,130 @@ class _HomeColors {
   static const navBg = Color(0xFFC9DABF);
   static const selected = Color(0xFF0E3A2C);
   static const unselected = Color(0xFF2F5145);
+}
+
+Future<int> _getWeeklyGoalMinutesForMe() async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return 0;
+
+  final doc = await FirebaseFirestore.instance
+      .collection('users')
+      .doc(user.uid)
+      .get();
+
+  final data = doc.data() ?? {};
+  final weeklyGoal = data['weeklyGoal'];
+  if (weeklyGoal is! Map) return 0;
+
+  final v = weeklyGoal['minutes'];
+  if (v is int) return v;
+  if (v is num) return v.toInt();
+  if (v is String) return int.tryParse(v) ?? 0;
+  return 0;
+}
+
+// ====== Weekly goal helpers ======
+String? _goalMotivationText(double progress) {
+  if (progress >= 1.0) {
+    return ' تم تحقيق هدفك الأسبوعي بنجاح🎉';
+  }
+  if (progress >= 0.75) {
+    return ' تقدّم جميل، اقتربت من تحقيق هدفك الأسبوعي✨';
+  }
+  return null;
+}
+
+
+Widget _weeklyGoalBar() {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return const SizedBox.shrink();
+
+  final statsRef = FirebaseFirestore.instance
+      .collection('users')
+      .doc(user.uid)
+      .collection('stats')
+      .doc('main');
+
+  return StreamBuilder<DocumentSnapshot>(
+    stream: statsRef.snapshots(),
+    builder: (context, snap) {
+      final data = snap.data?.data() as Map<String, dynamic>? ?? {};
+      final weeklySec = (data['weeklyListenedSeconds'] as num?)?.toInt() ?? 0;
+
+      return FutureBuilder<int>(
+        future: _getWeeklyGoalMinutesForMe(),
+        builder: (context, g) {
+          final goalMinutes = g.data ?? 0;
+          final minutes = (weeklySec / 60).floor();
+          final progress = (goalMinutes <= 0)
+              ? 0.0
+              : (minutes / goalMinutes).clamp(0.0, 1.0);
+
+          if (goalMinutes <= 0) {
+            return Container(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              alignment: Alignment.center,
+              child: Text(
+                'حدد هدفك الأسبوعي الآن',
+                style: TextStyle(
+                  color: _HomeColors.unselected.withOpacity(0.8),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            );
+          }
+
+          final message = _goalMotivationText(progress);
+
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 24,
+                      backgroundColor: const Color(0xFFE6F0E0),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        Color(0xFFBFD6B5),
+                      ),
+                    ),
+                    Text(
+                      '$minutes / $goalMinutes د',
+                      style: const TextStyle(
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0E3A2C),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // ===== رسالة التحفيز =====
+              if (message != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: progress >= 1.0
+                        ? _HomeColors.confirm       // أخضر إنجاز
+                        : _HomeColors.selected,     // أخضر داكن تحفيزي
+                  ),
+                ),
+              ],
+            ],
+          );
+        },
+      );
+    },
+  );
 }
 
 class BottomNavItem {
@@ -574,35 +699,37 @@ class _HomeScreenState extends State<HomeScreen> {
 
               const SizedBox(height: 16),
 
-              // Promo banner
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FBEF),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  children: const [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'الرياض تقرأ، وقبس يروي الحكاية',
-                            style: TextStyle(fontWeight: FontWeight.w700),
+              InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const WeeklyGoalPage()),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FBEF),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Align(
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          'هدفك الأسبوعي',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 14,
+                            color: _HomeColors.selected,
                           ),
-                          SizedBox(height: 4),
-                          Text(
-                            ' تصفّح في قبس أبرز إصدارات معرض الرياض الدولي للكتاب',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.black54,
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 10),
+                      _weeklyGoalBar(),
+                    ],
+                  ),
                 ),
               ),
 
