@@ -509,7 +509,7 @@ class _HistoryTabHost extends StatelessWidget {
 }
 
 // ===============================
-// Request details page (نفسه)
+// Request details page
 // ===============================
 enum _Decision { accepted, rejected }
 

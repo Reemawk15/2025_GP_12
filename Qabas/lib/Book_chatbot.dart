@@ -36,7 +36,7 @@ class _BookChatPageState extends State<BookChatPage> {
     {
       "role": "assistant",
       "text":
-      "أهلًا! هذا مساعد قبس لهذا الكتاب فقط 📚\nيمكنك السؤال عن أي جزء، أو قول: \"لخّص\" / \"اشرح\" / \"ما معنى كلمة…؟\"",
+      "أهلًا! هذا مساعد قبس لهذا الكتاب فقط.\nيمكنك السؤال عن أي جزء، أو قول: \"لخّص\" / \"اشرح\" / \"ما معنى كلمة…؟\"",
       "quotes": <String>[],
     }
   ];
@@ -75,9 +75,7 @@ class _BookChatPageState extends State<BookChatPage> {
       final fn = _functions.httpsCallable('prepareBookChat');
       await fn.call({"bookId": widget.bookId});
     } on FirebaseFunctionsException catch (e) {
-      debugPrint(
-        'prepareBookChat code=${e.code} message=${e.message} details=${e.details}',
-      );
+      debugPrint('prepareBookChat code=${e.code} message=${e.message} details=${e.details}');
       if (!mounted) return;
       setState(() {
         _messages.add({
@@ -103,9 +101,71 @@ class _BookChatPageState extends State<BookChatPage> {
     }
   }
 
+  // Builds a short chat history from the current in-page conversation only.
+  // Keeps only the latest messages to avoid sending very old context.
+  // This history is sent to the Cloud Function so the assistant can follow up correctly.
+  List<Map<String, String>> _buildHistoryForApi({int maxTurns = 8}) {
+    final items = _messages
+        .where((m) => m["role"] == "user" || m["role"] == "assistant")
+    // Optional: exclude the initial welcome message to avoid biasing the model.
+        .where((m) {
+      final txt = (m["text"] ?? "").toString();
+      return !txt.startsWith("أهلًا! هذا مساعد قبس");
+    })
+        .map((m) => {
+      "role": (m["role"] ?? "user").toString(),
+      "text": (m["text"] ?? "").toString(),
+    })
+        .where((m) => m["text"]!.trim().isNotEmpty)
+        .toList();
+
+    if (items.length <= maxTurns) return items;
+    return items.sublist(items.length - maxTurns);
+  }
+
+  List<String> _cleanQuotes(List<String> quotes) {
+    final seen = <String>{};
+    final out = <String>[];
+
+    for (final raw in quotes) {
+      final q = raw.trim();
+      if (q.isEmpty) continue;
+
+      // Normalize lines and remove duplicate/consecutive lines
+      final lines = q
+          .split('\n')
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+
+      // Remove consecutive duplicates (A, A)
+      final dedupLines = <String>[];
+      for (final line in lines) {
+        if (dedupLines.isNotEmpty && dedupLines.last == line) continue;
+        dedupLines.add(line);
+      }
+
+      final cleaned = dedupLines.join('\n').trim();
+      if (cleaned.isEmpty) continue;
+
+      // Deduplicate whole quote
+      final key = cleaned.replaceAll(RegExp(r'\s+'), ' ').trim();
+      if (seen.contains(key)) continue;
+      seen.add(key);
+
+      out.add(cleaned);
+      if (out.length == 3) break;
+    }
+
+    return out;
+  }
+
   Future<void> _send() async {
     final t = _controller.text.trim();
     if (t.isEmpty || _sending || _preparing) return;
+
+    // Build history BEFORE adding the new user message to avoid duplication.
+    final history = _buildHistoryForApi(maxTurns: 8);
 
     setState(() {
       _messages.add({"role": "user", "text": t, "quotes": <String>[]});
@@ -119,6 +179,7 @@ class _BookChatPageState extends State<BookChatPage> {
       final res = await fn.call({
         "bookId": widget.bookId,
         "message": t,
+        "history": history,
       });
 
       final data = (res.data ?? {}) as Map;
@@ -126,25 +187,21 @@ class _BookChatPageState extends State<BookChatPage> {
       final quotesRaw = data["quotes"];
 
       final List<String> quotes = (quotesRaw is List)
-          ? quotesRaw
-          .map((e) => e.toString())
-          .map((e) => e.trim())
-          .where((e) => e.isNotEmpty)
-          .toList()
+          ? quotesRaw.map((e) => e.toString()).map((e) => e.trim()).where((e) => e.isNotEmpty).toList()
           : <String>[];
+
+      final cleanedQuotes = _cleanQuotes(quotes);
 
       setState(() {
         _messages.add({
           "role": "assistant",
           "text": answer.isEmpty ? "غير مذكور في هذا الكتاب." : answer,
-          "quotes": quotes,
+          "quotes": cleanedQuotes,
         });
       });
       _scrollToBottom();
     } on FirebaseFunctionsException catch (e) {
-      debugPrint(
-        'askBookChat code=${e.code} message=${e.message} details=${e.details}',
-      );
+      debugPrint('askBookChat code=${e.code} message=${e.message} details=${e.details}');
       setState(() {
         _messages.add({
           "role": "assistant",
@@ -194,8 +251,7 @@ class _BookChatPageState extends State<BookChatPage> {
                       .doc(widget.bookId)
                       .snapshots(),
                   builder: (context, snap) {
-                    final data =
-                        snap.data?.data() as Map<String, dynamic>? ?? {};
+                    final data = snap.data?.data() as Map<String, dynamic>? ?? {};
                     final bookTitle = (data['title'] ?? '').toString().trim();
 
                     return Column(
@@ -262,9 +318,7 @@ class _BookChatPageState extends State<BookChatPage> {
                       final mine = role == 'user';
                       final text = (m['text'] ?? '').toString();
                       final quotes = (m['quotes'] is List)
-                          ? (m['quotes'] as List)
-                          .map((e) => e.toString())
-                          .toList()
+                          ? (m['quotes'] as List).map((e) => e.toString()).toList()
                           : <String>[];
 
                       return _ChatRow(
@@ -285,25 +339,18 @@ class _BookChatPageState extends State<BookChatPage> {
                         SizedBox(
                           height: 44,
                           child: TextButton(
-                            onPressed:
-                            (_sending || _preparing) ? null : _send,
+                            onPressed: (_sending || _preparing) ? null : _send,
                             style: TextButton.styleFrom(
                               backgroundColor: _confirm,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
                             ),
                             child: Text(
-                              _preparing
-                                  ? '...'
-                                  : (_sending ? '...' : 'إرسال'),
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w800,
-                              ),
+                              _preparing ? '...' : (_sending ? '...' : 'إرسال'),
+                              style: const TextStyle(fontWeight: FontWeight.w800),
                             ),
                           ),
                         ),
@@ -328,9 +375,7 @@ class _BookChatPageState extends State<BookChatPage> {
                               maxLines: 4,
                               enabled: !_preparing,
                               decoration: InputDecoration(
-                                hintText: _preparing
-                                    ? 'جارٍ تجهيز المساعد...'
-                                    : 'اسأل عن هذا الكتاب...',
+                                hintText: _preparing ? 'جارٍ تجهيز المساعد...' : 'اسأل عن هذا الكتاب...',
                                 border: InputBorder.none,
                               ),
                               textInputAction: TextInputAction.send,
@@ -394,6 +439,17 @@ class _ChatRow extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             ...quotes.take(3).map((q) {
+              final normalized = q.trim();
+              final parts = normalized
+                  .split('\n')
+                  .map((e) => e.trim())
+                  .where((e) => e.isNotEmpty)
+                  .toList();
+
+              final hasSource = parts.isNotEmpty && parts.first.startsWith('من:');
+              final source = hasSource ? parts.first : '';
+              final snippet = hasSource ? parts.skip(1).join('\n').trim() : normalized;
+
               return Container(
                 margin: const EdgeInsets.only(bottom: 6),
                 padding: const EdgeInsets.all(10),
@@ -401,13 +457,28 @@ class _ChatRow extends StatelessWidget {
                   color: Colors.white70,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Text(
-                  '“$q”',
-                  style: const TextStyle(
-                    fontSize: 12.5,
-                    height: 1.45,
-                    color: Colors.black87,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (source.isNotEmpty)
+                      Text(
+                        source,
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black54,
+                        ),
+                      ),
+                    if (source.isNotEmpty) const SizedBox(height: 6),
+                    Text(
+                      snippet,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        height: 1.45,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
                 ),
               );
             }),
@@ -419,8 +490,7 @@ class _ChatRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
-        mainAxisAlignment:
-        mine ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: mine ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [bubble],
       ),
