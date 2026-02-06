@@ -46,3 +46,9 @@ app.*.map.json
 functions/ocr.json
 .DS_Store
 .DS_Store
+
+# Local junk
+.DS_Store
+book.txt
+book_clean.txt
+book_fix.txt
