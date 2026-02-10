@@ -8,6 +8,7 @@ import 'community_tab.dart';
 import 'library_tab.dart';
 import 'profile_tab.dart';
 import 'book_details_page.dart';
+import 'podcast_details_page.dart';
 
 class _HomeColors {
   static const confirm = Color(0xFF6F8E63);
@@ -254,15 +255,15 @@ class _HomeScreenState extends State<HomeScreen> {
   int visibleCount = 3; // How many covers are centered at once
 
   String _timeGreeting() {
-  final hour = DateTime.now().hour;
+    final hour = DateTime.now().hour;
 
-  if (hour >= 0 && hour < 12) {
-  // من 12 بالليل إلى 11:59 صباحاً
-  return 'صباحك سعيد';
-  } else {
-  // من 12 الظهر إلى 11:59 مساءً
-  return 'مساؤك سعيد';
-  }
+    if (hour >= 0 && hour < 12) {
+      // من 12 بالليل إلى 11:59 صباحاً
+      return 'صباحك سعيد';
+    } else {
+      // من 12 الظهر إلى 11:59 مساءً
+      return 'مساؤك سعيد';
+    }
   }
 
   final _items = const [
@@ -305,22 +306,22 @@ class _HomeScreenState extends State<HomeScreen> {
           .doc(user.uid)
           .snapshots()
           .listen((doc) {
-            String? name;
-            if (doc.exists) {
-              final data = doc.data() ?? {};
-              name =
-                  (data['name'] ??
-                          data['fullName'] ??
-                          data['displayName'] ??
-                          '')
-                      as String?;
-              if ((name ?? '').trim().isEmpty) name = null;
-            }
-            name ??= user.displayName;
-            if (mounted) {
-              setState(() => _displayName = name);
-            }
-          }, onError: (_) {});
+        String? name;
+        if (doc.exists) {
+          final data = doc.data() ?? {};
+          name =
+          (data['name'] ??
+              data['fullName'] ??
+              data['displayName'] ??
+              '')
+          as String?;
+          if ((name ?? '').trim().isEmpty) name = null;
+        }
+        name ??= user.displayName;
+        if (mounted) {
+          setState(() => _displayName = name);
+        }
+      }, onError: (_) {});
     }
   }
 
@@ -336,8 +337,8 @@ class _HomeScreenState extends State<HomeScreen> {
       if (doc.exists) {
         final data = doc.data() ?? {};
         name =
-            (data['name'] ?? data['fullName'] ?? data['displayName'] ?? '')
-                as String;
+        (data['name'] ?? data['fullName'] ?? data['displayName'] ?? '')
+        as String;
         if (name.trim().isEmpty) name = null;
       }
     } catch (_) {}
@@ -361,13 +362,13 @@ class _HomeScreenState extends State<HomeScreen> {
         .doc(user.uid)
         .snapshots()
         .map((doc) {
-          final data = doc.data();
-          String? name =
-              (data?['name'] ?? data?['fullName'] ?? data?['displayName'])
-                  as String?;
-          if ((name ?? '').trim().isEmpty) name = null;
-          return name;
-        });
+      final data = doc.data();
+      String? name =
+      (data?['name'] ?? data?['fullName'] ?? data?['displayName'])
+      as String?;
+      if ((name ?? '').trim().isEmpty) name = null;
+      return name;
+    });
   }
 
   // Search state
@@ -401,6 +402,36 @@ class _HomeScreenState extends State<HomeScreen> {
 
       // Final filtered result
       return books;
+    });
+  }
+
+  /// Podcasts stream with local filtering (search + category)
+  Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _podcastsStream() {
+    final col = FirebaseFirestore.instance.collection('podcasts');
+
+    return col.orderBy('createdAt', descending: true).snapshots().map((snap) {
+      var pods = snap.docs;
+
+      // Title search filter
+      if (_searchQuery.isNotEmpty) {
+        final queryLower = _searchQuery.toLowerCase();
+        pods = pods.where((doc) {
+          final data = doc.data();
+          final title = (data['title'] ?? '').toString().toLowerCase();
+          return title.contains(queryLower);
+        }).toList();
+      }
+
+      // ✅ Category filter (مثل الكتب)
+      if (_selectedCategories.isNotEmpty) {
+        pods = pods.where((doc) {
+          final data = doc.data();
+          final category = (data['category'] ?? '').toString();
+          return _selectedCategories.contains(category);
+        }).toList();
+      }
+
+      return pods;
     });
   }
 
@@ -512,15 +543,15 @@ class _HomeScreenState extends State<HomeScreen> {
                               clipBehavior: Clip.antiAlias,
                               child: cover.isNotEmpty
                                   ? Image.network(
-                                      cover,
-                                      fit: BoxFit
-                                          .contain, // Show full cover without cropping
-                                    )
+                                cover,
+                                fit: BoxFit
+                                    .contain, // Show full cover without cropping
+                              )
                                   : const Icon(
-                                      Icons.menu_book,
-                                      size: 48,
-                                      color: _HomeColors.unselected,
-                                    ),
+                                Icons.menu_book,
+                                size: 48,
+                                color: _HomeColors.unselected,
+                              ),
                             ),
                             const SizedBox(height: 6),
                             SizedBox(
@@ -562,8 +593,97 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Home content stack (background + list)
+  Widget _podcastsRail() {
+    final double cardW = coverW;
+    final double cardH = coverH;
+    final double gap = coverGap;
+    final int count = visibleCount;
+
+    return LayoutBuilder(
+      builder: (context, c) {
+        final w = c.maxWidth;
+        final visibleWidth = cardW * count + gap * (count - 1);
+        final double sidePad = ((w - visibleWidth) / 2).clamp(0.0, double.infinity).toDouble();
+
+        return SizedBox(
+          height: cardH + 30.0,
+          child: StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+            stream: _podcastsStream(),
+            builder: (context, snap) {
+              if (snap.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (!snap.hasData || snap.data!.isEmpty) {
+                return Center(
+                  child: Text(
+                    _searchQuery.isNotEmpty ? 'لا توجد نتائج مطابقة' : 'لا توجد بودكاستات مضافة',
+                  ),
+                );
+              }
+
+              final docs = snap.data!;
+              return ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.symmetric(horizontal: sidePad),
+                itemCount: docs.length,
+                separatorBuilder: (_, __) => SizedBox(width: gap),
+                itemBuilder: (context, i) {
+                  final d = docs[i];
+                  final data = d.data();
+                  final cover = (data['coverUrl'] ?? '').toString();
+                  final title = (data['title'] ?? '').toString();
+
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => PodcastDetailsPage(podcastId: d.id),
+                        ),
+                      );
+                    },
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: cardW,
+                          height: cardH,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(14),
+                            color: Colors.white,
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: cover.isNotEmpty
+                              ? Image.network(cover, fit: BoxFit.contain)
+                              : const Icon(Icons.podcasts, size: 48, color: _HomeColors.unselected),
+                        ),
+                        const SizedBox(height: 6),
+                        SizedBox(
+                          width: cardW,
+                          child: Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
   Widget _homeContent() {
+    final bottomSafe = MediaQuery.of(context).padding.bottom;
+    const navH = kBottomNavigationBarHeight; // 56 غالباً
+    const navExtra = 24.0; // لأن عندك padding في QabasBottomNav
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Stack(
@@ -571,206 +691,200 @@ class _HomeScreenState extends State<HomeScreen> {
           // Background image
           Positioned.fill(
             child: Image.asset(
-              'assets/images/back.png', // Adjust path if needed
+              'assets/images/back.png',
               fit: BoxFit.cover,
               alignment: Alignment.topCenter,
             ),
           ),
 
-          // Foreground content
-          ListView(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
-            children: [
-              // Spacing under header curves
-              SizedBox(height: _topSpacingUnderHeader),
+          // Foreground
+          SafeArea(
+            top: false, // لأن الخلفية عندك منحنيات، خليه زي ما تحبين
+            child: Column(
+              children: [
+                // ====== (A) الجزء الثابت فوق ======
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: Column(
+                    children: [
+                      SizedBox(height: _topSpacingUnderHeader),
 
-              // Greeting (live from Firestore)
-              /*
-              StreamBuilder<String?>(
-                stream: _userNameStream(),
-                builder: (context, snap) {
-                  final liveName = snap.data;
-                  final fallbackName =
-                      _displayName ??
-                          FirebaseAuth.instance.currentUser?.displayName ??
-                          'صديقي';
-                  final name = (liveName == null || liveName.trim().isEmpty)
-                      ? fallbackName
-                      : liveName;
+                      // Greeting
+                      StreamBuilder<String?>(
+                        stream: _userNameStream(),
+                        builder: (context, snap) {
+                          final liveName = snap.data;
+                          final fallbackName =
+                              _displayName ??
+                                  FirebaseAuth.instance.currentUser?.displayName ??
+                                  'صديقي';
+                          final name = (liveName == null || liveName.trim().isEmpty)
+                              ? fallbackName
+                              : liveName;
 
-                  return Transform.translate(
-                    offset: const Offset(0, -11),
-                    child: Text(
-                      '${_timeGreeting()} $name',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: _HomeColors.selected,
-                      ),
-                    ),
-                  );
-                },
-              ),
-              */
-              // New update
-              StreamBuilder<String?>(
-                stream: _userNameStream(),
-                builder: (context, snap) {
-                  final liveName = snap.data;
-                  final fallbackName =
-                      _displayName ??
-                      FirebaseAuth.instance.currentUser?.displayName ??
-                      'صديقي';
-                  final name = (liveName == null || liveName.trim().isEmpty)
-                      ? fallbackName
-                      : liveName;
+                          final hour = DateTime.now().hour;
+                          final greeting = (hour < 12) ? "صباحك سعيد" : "مساؤك سعيد";
 
-                  final hour = DateTime.now().hour;
-                  final greeting = (hour < 12) ? "صباحك سعيد" : "مساؤك سعيد";
-
-                  return Transform.translate(
-                    offset: const Offset(0, -11),
-                    child: Text(
-                      '$greeting $name',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: _HomeColors.selected,
-                      ),
-                    ),
-                  );
-                },
-              ),
-
-              const SizedBox(height: 26),
-
-              // Search box
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(26),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Colors.black12,
-                      blurRadius: 10,
-                      offset: Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.search, color: _HomeColors.unselected),
-                    const SizedBox(width: 8),
-
-                    // Title search field
-                    Expanded(
-                      child: TextField(
-                        textAlign: TextAlign.right,
-                        decoration: const InputDecoration(
-                          hintText: 'ابحث عن كتاب بالاسم',
-                          border: InputBorder.none,
-                          isDense: true,
-                          hintStyle: TextStyle(color: _HomeColors.unselected),
-                        ),
-                        style: const TextStyle(color: _HomeColors.selected),
-                        onChanged: (value) {
-                          setState(() {
-                            _searchQuery = value.trim();
-                          });
+                          return Transform.translate(
+                            offset: const Offset(0, -11),
+                            child: Align(
+                              alignment: Alignment.centerRight, // 👈 هذا المهم
+                              child: Text(
+                                '$greeting $name',
+                                textAlign: TextAlign.right, // 👈 تأكيد
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                  color: _HomeColors.selected,
+                                ),
+                              ),
+                            ),
+                          );
                         },
                       ),
-                    ),
 
-                    // Filter button
-                    GestureDetector(
-                      onTap: _openFilterSheet,
-                      child: const Icon(
-                        Icons.tune,
-                        color: _HomeColors.unselected,
+                      const SizedBox(height: 26),
+
+                      // Search box
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(26),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Colors.black12,
+                              blurRadius: 10,
+                              offset: Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.search, color: _HomeColors.unselected),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                textAlign: TextAlign.right,
+                                decoration: const InputDecoration(
+                                  hintText: 'ابحث',
+                                  border: InputBorder.none,
+                                  isDense: true,
+                                  hintStyle: TextStyle(color: _HomeColors.unselected),
+                                ),
+                                style: const TextStyle(color: _HomeColors.selected),
+                                onChanged: (value) {
+                                  setState(() => _searchQuery = value.trim());
+                                },
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: _openFilterSheet,
+                              child: const Icon(Icons.tune, color: _HomeColors.unselected),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
 
-              const SizedBox(height: 16),
+                      const SizedBox(height: 16),
 
-              InkWell(
-                borderRadius: BorderRadius.circular(16),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const WeeklyGoalPage()),
-                  );
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FBEF),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const Align(
-                        alignment: Alignment.centerRight,
-                        child: Text(
-                          'هدفك الأسبوعي',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 14,
-                            color: _HomeColors.selected,
+                      // Weekly goal card (ثابت)
+                      InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => const WeeklyGoalPage()),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FBEF),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const Align(
+                                alignment: Alignment.centerRight,
+                                child: Text(
+                                  'هدفك الأسبوعي',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 14,
+                                    color: _HomeColors.selected,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              _weeklyGoalBar(),
+                            ],
                           ),
                         ),
                       ),
-                      const SizedBox(height: 10),
-                      _weeklyGoalBar(),
                     ],
                   ),
                 ),
-              ),
 
-              const SizedBox(height: 16),
+                // ====== (B) اللي يتحرك تحت الهدف فقط ======
+                Expanded(
+                  child: ListView(
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      0,
+                      16,
+                      navH + navExtra + bottomSafe + 16, // يمنع نزول المحتوى تحت الناف بار
+                    ),
+                    children: [
+                      const SizedBox(height: 16),
 
-              // Section title (new)
-              const Align(
-                alignment: Alignment.centerRight,
-                child: Text(
-                  'جديد قبس',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                      const Align(
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          'جديد قبس',
+                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      _centeredCoversRail(),
+
+                      const SizedBox(height: 20),
+
+                      const Align(
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          'بودكاست قبس',
+                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      _podcastsRail(),
+
+                      const SizedBox(height: 24),
+
+                      const Align(
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          'اختيارات قبس لك',
+                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      Container(
+                        padding: const EdgeInsets.symmetric(vertical: 20),
+                        alignment: Alignment.center,
+                        child: const Text(
+                          'لا توجد كتب مقترحة لك حاليًا.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.black54),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 10),
-
-              // Centered covers rail with overlay arrows
-              _centeredCoversRail(),
-
-              const SizedBox(height: 24),
-
-              // Section title (recommendations placeholder)
-              const Align(
-                alignment: Alignment.centerRight,
-                child: Text(
-                  'اختيارات قبس لك',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // Recommendations area placeholder (message only for now)
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 20),
-                alignment: Alignment.center,
-                child: const Text(
-                  'لا توجد كتب مقترحة لك حاليًا.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.black54),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -861,12 +975,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: GridView.builder(
                         padding: const EdgeInsets.only(bottom: 12),
                         gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              mainAxisSpacing: 12,
-                              crossAxisSpacing: 12,
-                              childAspectRatio: 3.2,
-                            ),
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          mainAxisSpacing: 12,
+                          crossAxisSpacing: 12,
+                          childAspectRatio: 3.2,
+                        ),
                         itemCount: _categories.length,
                         itemBuilder: (context, i) {
                           final cat = _categories[i];

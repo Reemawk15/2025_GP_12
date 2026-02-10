@@ -4,7 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'admin_book_manager.dart';
 import 'admin_community_tab.dart';
 import 'admin_statistics_page.dart';
-
+import 'admin_podcast_manager_screen.dart';
 
 class _HomeColors {
   static const confirm    = Color(0xFF6F8E63);
@@ -142,6 +142,19 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(builder: (_) => const AdminBookManagerScreen()),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 12),
+
+                    _ActionCard(
+                      title: 'إدارة البودكاست',
+                      subtitle: 'يمكنك إضافة وإدارة بودكاست قَبَس من هنا.',
+                      buttonText: 'إضافة بودكاست جديد',
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const AdminPodcastManagerScreen()),
                         );
                       },
                     ),
