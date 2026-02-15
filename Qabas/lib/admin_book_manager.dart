@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -641,7 +642,7 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
                   ),
                 ),
               ),
-              body:  TabBarView(
+              body: TabBarView(
                 children: [
                   _AddTabHost(),
                   _ListTabHost(),
@@ -764,18 +765,14 @@ class _EditBookPageState extends State<_EditBookPage> {
   static const double _kGap = 14;
   static const double _kDescH = 120;
 
-  // =======================
-
-
-  static const double kSummaryCardPaddingV = 12; //
-  static const double kSummaryCardPaddingH = 14; //
+  static const double kSummaryCardPaddingV = 12;
+  static const double kSummaryCardPaddingH = 14;
 
   static const double kSummaryTitleTopSpace = 0;
   static const double kSummaryAfterTitleGap = 6;
   static const double kSummaryTextTopSpace = 0;
   static const double kSummaryBeforeButtonGap = 12;
   static const double kSummaryButtonTopSpace = 0;
-  // =======================
 
   late final TextEditingController _titleCtrl;
   late final TextEditingController _authorCtrl;
@@ -899,20 +896,12 @@ class _EditBookPageState extends State<_EditBookPage> {
         ),
       );
 
-      final res = await callable.call({'bookId': widget.docId});
-
-      final m = (res.data as Map?)?.cast<String, dynamic>() ?? {};
-      final alreadyExists = (m['alreadyExists'] == true);
+      await callable.call({'bookId': widget.docId});
 
       if (!mounted) return;
 
       await _checkSummaryExists();
-
-      if (alreadyExists || _hasSummaryTxt) {
-        _showSnack('تم توليد الملخص بنجاح');
-      } else {
-        _showSnack('تم توليد الملخص بنجاح');
-      }
+      _showSnack('تم توليد الملخص بنجاح');
     } catch (e) {
       if (mounted) _showSnack('تعذّر توليد الملخص: $e', icon: Icons.error_outline);
     } finally {
@@ -1336,19 +1325,57 @@ class _SummaryViewerPageState extends State<SummaryViewerPage> {
   static const _titleColor = Color(0xFF0E3A2C);
   static const _fillGreen = Color(0xFFC9DABF);
 
-  // =======================
-  // =======================
   static const double kAppBarTitleDown = 30; // title
   static const double kBoxTopDown = 50; // green box
   static const double kBoxHeight = 420;
   static const double kBoxPaddingH = 14;
   static const double kBoxPaddingV = 12;
-  static const double kGapBetweenBoxAndAudioBtn = 14;
-  // =======================
+  static const double kGapBetweenBoxAndEditBtn = 12;
+  static const double kGapBetweenEditAndAudioBtn = 12;
 
   bool _loading = true;
   String? _text;
   String? _error;
+
+  // ===== Edit mode =====
+  bool _editing = false;
+  bool _savingEdit = false;
+  final TextEditingController _editCtrl = TextEditingController();
+
+  final ScrollController _scrollCtrl = ScrollController();
+
+  void _showSnack(String message, {IconData icon = Icons.check_circle}) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        backgroundColor: _confirmColor,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        content: Row(
+          children: [
+            Icon(icon, color: const Color(0xFFE7C4DA)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                message,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          ],
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -1356,11 +1383,20 @@ class _SummaryViewerPageState extends State<SummaryViewerPage> {
     _loadSummary();
   }
 
+  @override
+  void dispose() {
+    _editCtrl.dispose();
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadSummary() async {
     setState(() {
       _loading = true;
       _error = null;
       _text = null;
+      _editing = false;
+      _savingEdit = false;
     });
 
     try {
@@ -1374,9 +1410,10 @@ class _SummaryViewerPageState extends State<SummaryViewerPage> {
         return;
       }
 
-      final decoded = utf8.decode(bytes);
+      final decoded = utf8.decode(bytes).trim();
       setState(() {
-        _text = decoded.trim();
+        _text = decoded;
+        _editCtrl.text = decoded;
         _loading = false;
       });
     } catch (e) {
@@ -1387,9 +1424,46 @@ class _SummaryViewerPageState extends State<SummaryViewerPage> {
     }
   }
 
+  Future<void> _saveEditedSummary() async {
+    final newText = _editCtrl.text.trim();
+    if (newText.isEmpty) {
+      _showSnack('لا يمكن حفظ ملخص فارغ', icon: Icons.info_outline);
+      return;
+    }
+
+    try {
+      setState(() => _savingEdit = true);
+
+      final ref = FirebaseStorage.instance.ref('audiobooks/${widget.bookId}/summary.txt');
+      final data = Uint8List.fromList(utf8.encode(newText));
+
+      await ref.putData(
+        data,
+        SettableMetadata(contentType: 'text/plain; charset=utf-8'),
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _text = newText;
+        _editing = false;
+        _savingEdit = false;
+      });
+
+      _showSnack('تم حفظ التعديل');
+    } catch (e) {
+      if (mounted) _showSnack('تعذّر حفظ التعديل: $e', icon: Icons.error_outline);
+    } finally {
+      if (mounted) setState(() => _savingEdit = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool hasText = (_text != null && _text!.trim().isNotEmpty);
+
+    final bool canEdit = !_loading && _error == null && hasText && !_savingEdit;
+    final bool canSave = _editing && !_savingEdit;
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -1435,6 +1509,8 @@ class _SummaryViewerPageState extends State<SummaryViewerPage> {
                 child: Column(
                   children: [
                     SizedBox(height: kBoxTopDown),
+
+                    // ======== BOX ========
                     SizedBox(
                       height: kBoxHeight,
                       width: double.infinity,
@@ -1489,21 +1565,141 @@ class _SummaryViewerPageState extends State<SummaryViewerPage> {
                             ),
                           ],
                         )
-                            : SingleChildScrollView(
-                          child: Text(
-                            hasText ? _text! : 'لا يوجد نص',
-                            style: TextStyle(
-                              color: _titleColor.withOpacity(0.9),
-                              fontSize: 14.5,
-                              height: 1.6,
+                            : (_editing
+                            ? TextField(
+                          controller: _editCtrl,
+                          maxLines: null,
+                          expands: true,
+                          textAlign: TextAlign.right,
+                          style: TextStyle(
+                            color: _titleColor.withOpacity(0.9),
+                            fontSize: 14.5,
+                            height: 1.6,
+                          ),
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            hintText: 'اكتب الملخص هنا...',
+                          ),
+                        )
+                            : RawScrollbar(
+                          controller: _scrollCtrl,
+                          thumbVisibility: true,
+                          thickness: 6,
+                          radius: const Radius.circular(8),
+                          scrollbarOrientation: ScrollbarOrientation.right, // ✅ يمين البوكس
+                          child: SingleChildScrollView(
+                            controller: _scrollCtrl,
+                            child: Text(
+                              hasText ? _text! : 'لا يوجد نص',
+                              style: TextStyle(
+                                color: _titleColor.withOpacity(0.9),
+                                fontSize: 14.5,
+                                height: 1.6,
+                              ),
                             ),
                           ),
-                        ),
+                        )),
                       ),
                     ),
 
-                    SizedBox(height: kGapBetweenBoxAndAudioBtn),
+                    SizedBox(height: kGapBetweenBoxAndEditBtn),
 
+                    // ✅ EDIT BUTTON (فوق الصوتي)
+                    if (!_editing)
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: canEdit
+                              ? () {
+                            setState(() {
+                              _editing = true;
+                              _editCtrl.text = (_text ?? '').trim();
+                            });
+                          }
+                              : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _confirmColor,
+                            disabledBackgroundColor: _confirmColor.withOpacity(0.45),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          icon: const Icon(Icons.edit_outlined, color: Colors.white),
+                          label: const Text(
+                            'تعديل الملخص',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: canSave ? _saveEditedSummary : null,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _confirmColor,
+                                disabledBackgroundColor: _confirmColor.withOpacity(0.45),
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              icon: _savingEdit
+                                  ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              )
+                                  : const Icon(Icons.check, color: Colors.white),
+                              label: const Text(
+                                'حفظ التعديل',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: _savingEdit
+                                  ? null
+                                  : () {
+                                setState(() {
+                                  _editing = false;
+                                  _editCtrl.text = (_text ?? '').trim();
+                                });
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _confirmColor.withOpacity(0.75),
+                                disabledBackgroundColor: _confirmColor.withOpacity(0.45),
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              icon: const Icon(Icons.close, color: Colors.white),
+                              label: const Text(
+                                'إلغاء',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                    SizedBox(height: kGapBetweenEditAndAudioBtn),
+
+                    // ======== AUDIO BUTTON ========
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
