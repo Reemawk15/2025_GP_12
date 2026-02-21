@@ -6,7 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
-
+import 'podcast_details_page.dart';
 import 'book_details_page.dart';
 import 'my_book_details_page.dart';
 
@@ -157,6 +157,9 @@ class Book {
   final String title;
   final ImageProvider? cover;
   final String status;
+
+  final String type; // ✅ جديد: 'book' أو 'podcast'
+
   final int listenedSeconds;
   final int estimatedTotalSeconds;
   final bool isCompleted;
@@ -168,6 +171,7 @@ class Book {
     required this.title,
     this.cover,
     required this.status,
+    this.type = 'book', // ✅ الافتراضي كتاب
     this.listenedSeconds = 0,
     this.estimatedTotalSeconds = 0,
     this.isCompleted = false,
@@ -240,6 +244,7 @@ class _LibraryShelfState extends State<_LibraryShelf> {
           final title = (m['title'] ?? '') as String;
           final cover = (m['coverUrl'] ?? '') as String;
           final status = (m['status'] ?? 'want') as String;
+          final type = (m['type'] ?? 'book') as String; // ✅ جديد
           final listenedSeconds = (m['listenedSeconds'] as num?)?.toInt() ?? 0;
           final estimatedTotalSeconds =
               (m['estimatedTotalSeconds'] as num?)?.toInt() ?? 0;
@@ -252,6 +257,7 @@ class _LibraryShelfState extends State<_LibraryShelf> {
             title: title.isEmpty ? 'كتاب' : title,
             cover: cover.isNotEmpty ? NetworkImage(cover) : null,
             status: status,
+            type: type,
             listenedSeconds: listenedSeconds,
             estimatedTotalSeconds: estimatedTotalSeconds,
             isCompleted: isCompleted,
@@ -784,8 +790,14 @@ class _BookCard extends StatelessWidget {
     final radius = BorderRadius.circular(8);
     return InkWell(
       onTap: () {
+        final isPodcast = book.type == 'podcast';
+
         Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => BookDetailsPage(bookId: book.id)),
+          MaterialPageRoute(
+            builder: (_) => isPodcast
+                ? PodcastDetailsPage(podcastId: book.id)
+                : BookDetailsPage(bookId: book.id),
+          ),
         );
       },
       child: Stack(
