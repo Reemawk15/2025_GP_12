@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -25,10 +26,10 @@ const _midPillGreen = Color(0xFFBFD6B5);
 
 /// Unified SnackBar with app style
 void _showSnack(
-  BuildContext context,
-  String message, {
-  IconData icon = Icons.check_circle,
-}) {
+    BuildContext context,
+    String message, {
+      IconData icon = Icons.check_circle,
+    }) {
   final messenger = ScaffoldMessenger.of(context);
   messenger.hideCurrentSnackBar();
   messenger.showSnackBar(
@@ -176,6 +177,114 @@ class BookDetailsPage extends StatelessWidget {
     }
   }
 
+  Future<void> _startOrGenerateSummaryAudio(
+      BuildContext context, {
+        required Map<String, dynamic> data,
+        required String title,
+        required String author,
+        required String cover,
+      }) async {
+    final status = (data['summaryAudioStatus'] ?? 'idle').toString();
+    final partsRaw = data['summaryAudioParts'];
+    final bool hasParts = partsRaw is List && partsRaw.isNotEmpty;
+
+    // ✅ لو فيه أجزاء: افتحي مشغل الملخص مباشرة
+    if (hasParts) {
+      final urls = partsRaw.map((e) => e.toString()).toList();
+
+      if (!context.mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => SummaryAudioPlayerPage(
+            bookId: bookId,
+            bookTitle: title,
+            bookAuthor: author,
+            coverUrl: cover,
+            audioUrls: urls,
+          ),
+        ),
+      );
+      return;
+    }
+
+    // ✅ ما فيه أجزاء: نولّد الملخص الصوتي
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        _showSnack(context, 'لازم تسجلين دخول أولاً', icon: Icons.info_outline);
+        return;
+      }
+
+      _showSnack(context, 'جاري توليد الملخص الصوتي…', icon: Icons.settings_rounded);
+
+      final functions = FirebaseFunctions.instanceFor(region: 'us-central1');
+      final callable = functions.httpsCallable(
+        'generateSummaryAudio',
+        options: HttpsCallableOptions(timeout: const Duration(minutes: 9)),
+      );
+
+      await callable.call({'bookId': bookId});
+
+      // ✅ ننتظر لين يصير فيه أول جزء ثم نفتح المشغل
+      _pollUntilHasAnySummaryPart(context);
+    } on FirebaseFunctionsException catch (e) {
+      _showSnack(context, 'تعذّر: ${e.code}', icon: Icons.error_outline);
+      _pollUntilHasAnySummaryPart(context);
+    } catch (_) {
+      _showSnack(context, 'تعذّر توليد الملخص الصوتي', icon: Icons.error_outline);
+    }
+  }
+
+  void _pollUntilHasAnySummaryPart(BuildContext context) {
+    int tries = 0;
+    Future.doWhile(() async {
+      if (!context.mounted) return false;
+      await Future.delayed(const Duration(seconds: 4));
+      tries++;
+
+      final snap = await FirebaseFirestore.instance
+          .collection('audiobooks')
+          .doc(bookId)
+          .get();
+
+      if (!snap.exists) return false;
+      final d = snap.data() as Map<String, dynamic>? ?? {};
+      final parts = d['summaryAudioParts'];
+      final count = (parts is List) ? parts.length : 0;
+
+      if (count > 0) {
+        _showSnack(context, 'تم تجهيز الملخص ✅', icon: Icons.check_circle);
+
+        // افتحي المشغل مباشرة بعد ما جهز
+        final title = (d['title'] ?? '') as String;
+        final author = (d['author'] ?? '') as String;
+        final cover = (d['coverUrl'] ?? '') as String;
+        final urls = parts.map((e) => e.toString()).toList();
+
+        if (!context.mounted) return false;
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => SummaryAudioPlayerPage(
+              bookId: bookId,
+              bookTitle: title,
+              bookAuthor: author,
+              coverUrl: cover,
+              audioUrls: urls,
+            ),
+          ),
+        );
+
+        return false;
+      }
+
+      if (tries >= 45) {
+        _showSnack(context, 'التوليد يأخذ وقت… جربي بعد شوي', icon: Icons.info_outline);
+        return false;
+      }
+      return true;
+    });
+  }
+
   /// ✅ ينتظر لين يصير فيه أول جزء جاهز ثم يترك الـ StreamBuilder يحدث UI
   void _pollUntilHasAnyPart(BuildContext context) {
     int tries = 0;
@@ -270,6 +379,20 @@ class BookDetailsPage extends StatelessWidget {
                 final bool hasAudioParts =
                     partsRaw is List && partsRaw.isNotEmpty;
 
+                final summaryStatus = (data['summaryAudioStatus'] ?? 'idle').toString();
+                final summaryPartsRaw = data['summaryAudioParts'];
+                final bool hasSummaryParts =
+                    summaryPartsRaw is List && summaryPartsRaw.isNotEmpty;
+
+                final bool summaryProcessing =
+                    summaryStatus == 'processing' && !hasSummaryParts;
+
+                final summaryLabel = hasSummaryParts
+                    ? 'استمع للملخص'
+                    : summaryProcessing
+                    ? 'جاري توليد الملخص...'
+                    : 'ملخص عن الكتاب';
+
                 // ✅ هنا: لو فيه أجزاء نسمح بالاستماع حتى لو processing
                 final bool isGenerating =
                     (audioStatus == 'processing') && !hasAudioParts;
@@ -296,10 +419,10 @@ class BookDetailsPage extends StatelessWidget {
                           child: cover.isNotEmpty
                               ? Image.network(cover, fit: BoxFit.contain)
                               : const Icon(
-                                  Icons.menu_book,
-                                  size: 80,
-                                  color: _primary,
-                                ),
+                            Icons.menu_book,
+                            size: 80,
+                            color: _primary,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -357,11 +480,44 @@ class BookDetailsPage extends StatelessWidget {
                       ),
                       const SizedBox(height: 12),
 
-                      // (UI only)
-                      const _AudioPillButton(
-                        icon: Icons.record_voice_over,
-                        label: 'ملخص عن الكتاب',
+                      SizedBox(
+                        height: 56,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _pillGreen,
+                            foregroundColor: _darkGreen,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                          ),
+                          onPressed: summaryProcessing
+                              ? null
+                              : () => _startOrGenerateSummaryAudio(
+                            context,
+                            data: data,
+                            title: title,
+                            author: author,
+                            cover: cover,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.record_voice_over_rounded, size: 20),
+                              const SizedBox(width: 12),
+                              Text(
+                                summaryLabel,
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
+                      const SizedBox(height: 10),
                       const SizedBox(height: 10),
 
                       SizedBox(
@@ -378,24 +534,24 @@ class BookDetailsPage extends StatelessWidget {
                           onPressed: isGenerating
                               ? null
                               : () => _startOrGenerateAudio(
-                                  context,
-                                  data: data,
-                                  title: title,
-                                  author: author,
-                                  cover: cover,
-                                ),
+                            context,
+                            data: data,
+                            title: title,
+                            author: author,
+                            cover: cover,
+                          ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(Icons.headphones_rounded, size: 24),
+                              const Icon(Icons.headphones_rounded, size: 20),
                               const SizedBox(width: 12),
                               Text(
                                 listenLabel == 'بدء الاستماع'
                                     ? 'استمع'
                                     : listenLabel,
                                 style: const TextStyle(
-                                  fontSize: 20,
+                                  fontSize: 18,
                                   fontWeight: FontWeight.w800,
                                 ),
                               ),
@@ -480,12 +636,12 @@ class BookDetailsPage extends StatelessWidget {
   }
 
   void _showAddToListSheet(
-    BuildContext context, {
-    required String bookId,
-    required String title,
-    required String author,
-    required String cover,
-  }) {
+      BuildContext context, {
+        required String bookId,
+        required String title,
+        required String author,
+        required String cover,
+      }) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -797,12 +953,12 @@ class _ReviewsList extends StatelessWidget {
               backgroundImage: hasImage ? NetworkImage(userImageUrl) : null,
               child: !hasImage
                   ? Text(
-                      userName.isNotEmpty ? userName.characters.first : 'ق',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: _darkGreen,
-                      ),
-                    )
+                userName.isNotEmpty ? userName.characters.first : 'ق',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: _darkGreen,
+                ),
+              )
                   : null,
             );
 
@@ -1658,10 +1814,10 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
           .collection('library')
           .doc(widget.bookId)
           .set({
-            'lastPartIndex': idx,
-            'lastPositionMs': pos,
-            'updatedAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
+        'lastPartIndex': idx,
+        'lastPositionMs': pos,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
     } catch (_) {}
   }
 
@@ -2331,240 +2487,240 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
                   : Column(
+                children: [
+                  const SizedBox(height: 15),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: whiteCard,
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Column(
                       children: [
-                        const SizedBox(height: 15),
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: whiteCard,
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                          child: Column(
-                            children: [
 
-                              _playerMiniBar(),
-                              const SizedBox(height:45),
+                        _playerMiniBar(),
+                        const SizedBox(height:45),
 
-                              Container(
-                                width: 190,
-                                height: 235,
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                clipBehavior: Clip.antiAlias,
-                                child: widget.coverUrl.isNotEmpty
-                                    ? Image.network(
-                                        widget.coverUrl,
-                                        fit: BoxFit.contain,
-                                      )
-                                    : const Icon(
-                                        Icons.menu_book,
-                                        size: 70,
-                                        color: _primary,
-                                      ),
-                              ),
-                              const SizedBox(height: 10),
-                              Text(
-                                widget.bookTitle,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w900,
-                                  color: _primary,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                widget.bookAuthor,
-                                style: const TextStyle(
-                                  color: Colors.black54,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 2),
                         Container(
-                          padding: const EdgeInsets.all(14),
+                          width: 190,
+                          height: 235,
                           decoration: BoxDecoration(
-                            color: whiteCard,
+                            color: Colors.white,
                             borderRadius: BorderRadius.circular(16),
                           ),
-                          child: Column(
-                            children: [
-
-                              StreamBuilder<Duration>(
-                                stream: _player.positionStream,
-                                builder: (context, snap) {
-                                  final total = _totalMs();
-                                  final gpos = _globalPosMs();
-                                  final currentMs = gpos.clamp(0, total > 0 ? total : 0);
-
-                                  if (currentMs > _maxReachedMs) _maxReachedMs = currentMs;
-
-                                  final value = (total > 0) ? (currentMs / total) : 0.0;
-
-                                  final leftMs = currentMs;
-                                  final rightMs = total > 0 ? total : 0;
-
-                                  return Column(
-                                    children: [
-                                      SliderTheme(
-                                        data: SliderTheme.of(context).copyWith(
-                                          activeTrackColor: _darkGreen,
-                                          inactiveTrackColor: _pillGreen,
-                                          thumbColor: _darkGreen,
-                                          overlayColor: _darkGreen.withOpacity(0.15),
-                                          trackHeight: 4,
-                                        ),
-                                        child: Slider(
-                                          value: value.clamp(0.0, 1.0),
-                                          onChanged: total <= 0
-                                              ? null
-                                              : (v) async {
-                                            final target = (total * v).round();
-                                            await _seekGlobalMs(target);
-                                          },
-                                        ),
-                                      ),
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text(_fmtMs(leftMs), style: const TextStyle(color: Colors.black54)),
-                                          Text(_fmtMs(rightMs), style: const TextStyle(color: Colors.black54)),
-                                        ],
-                                      ),
-                                      if (!_durationsReady)
-                                        const Padding(
-                                          padding: EdgeInsets.only(top: 6),
-                                          child: Text(
-                                            'جاري حساب مدة الكتاب...',
-                                            style: TextStyle(color: Colors.black54),
-                                          ),
-                                        ),
-                                    ],
-                                  );
-                                },
-                              ),
-                            ],
+                          clipBehavior: Clip.antiAlias,
+                          child: widget.coverUrl.isNotEmpty
+                              ? Image.network(
+                            widget.coverUrl,
+                            fit: BoxFit.contain,
+                          )
+                              : const Icon(
+                            Icons.menu_book,
+                            size: 70,
+                            color: _primary,
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            IconButton(
-                              iconSize: 42,
-                              onPressed: () => _seekBy(-10),
-                              icon: const Icon(
-                                Icons.replay_10_rounded,
-                                color: _midDarkGreen2,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            StreamBuilder<PlayerState>(
-                              stream: _player.playerStateStream,
-                              builder: (context, s) {
-                                final playing = s.data?.playing ?? false;
-                                return CircleAvatar(
-                                  radius: 34,
-                                  backgroundColor: _midPillGreen,
-                                  child: IconButton(
-                                    iconSize: 40,
-                                    onPressed: () async {
-                                      if (playing) {
-                                        await _saveBarProgress(
-                                          force: true,
-                                        );
-                                        await _player.pause();
-                                      } else {
-                                        await _player.play();
-                                      }
-                                    },
-                                    icon: Icon(
-                                      playing
-                                          ? Icons.pause_rounded
-                                          : Icons.play_arrow_rounded,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                            const SizedBox(width: 16),
-                            IconButton(
-                              iconSize: 42,
-                              onPressed: () => _seekBy(10),
-                              icon: const Icon(
-                                Icons.forward_10_rounded,
-                                color: _midDarkGreen2,
-                              ),
-                            ),
-                          ],
+                        const SizedBox(height: 10),
+                        Text(
+                          widget.bookTitle,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            color: _primary,
+                          ),
                         ),
-                        const SizedBox(height: 24),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            SizedBox(
-                              height: 64,
-                              child: ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: whiteCard,
-                                  foregroundColor: _primary,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(24),
-                                  ),
-                                  elevation: 0,
-                                ),
-                                onPressed: _onMarkPressed,
-                                icon: const Icon(Icons.bookmark_add_rounded,
-                                  color: _midDarkGreen2,
-                                  size: 26,
-                                ),
-                                label: const Text(
-                                  'علامة',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    color: _midDarkGreen2,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Builder(
-                              builder: (btnContext) {
-                                return SizedBox(
-                                  height: 64,
-                                  child: ElevatedButton.icon(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: whiteCard,
-                                      foregroundColor: _midDarkGreen2,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(24),
-                                      ),
-                                      elevation: 0,
-                                    ),
-                                    onPressed: () => _showSpeedMenu(btnContext),
-                                    icon: const Icon(Icons.speed_rounded, size: 26),
-                                    label: Text(
-                                      '${_speed.toStringAsFixed(2)}x',
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ],
+                        const SizedBox(height: 4),
+                        Text(
+                          widget.bookAuthor,
+                          style: const TextStyle(
+                            color: Colors.black54,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ],
                     ),
+                  ),
+                  const SizedBox(height: 2),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: whiteCard,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      children: [
+
+                        StreamBuilder<Duration>(
+                          stream: _player.positionStream,
+                          builder: (context, snap) {
+                            final total = _totalMs();
+                            final gpos = _globalPosMs();
+                            final currentMs = gpos.clamp(0, total > 0 ? total : 0);
+
+                            if (currentMs > _maxReachedMs) _maxReachedMs = currentMs;
+
+                            final value = (total > 0) ? (currentMs / total) : 0.0;
+
+                            final leftMs = currentMs;
+                            final rightMs = total > 0 ? total : 0;
+
+                            return Column(
+                              children: [
+                                SliderTheme(
+                                  data: SliderTheme.of(context).copyWith(
+                                    activeTrackColor: _darkGreen,
+                                    inactiveTrackColor: _pillGreen,
+                                    thumbColor: _darkGreen,
+                                    overlayColor: _darkGreen.withOpacity(0.15),
+                                    trackHeight: 4,
+                                  ),
+                                  child: Slider(
+                                    value: value.clamp(0.0, 1.0),
+                                    onChanged: total <= 0
+                                        ? null
+                                        : (v) async {
+                                      final target = (total * v).round();
+                                      await _seekGlobalMs(target);
+                                    },
+                                  ),
+                                ),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(_fmtMs(leftMs), style: const TextStyle(color: Colors.black54)),
+                                    Text(_fmtMs(rightMs), style: const TextStyle(color: Colors.black54)),
+                                  ],
+                                ),
+                                if (!_durationsReady)
+                                  const Padding(
+                                    padding: EdgeInsets.only(top: 6),
+                                    child: Text(
+                                      'جاري حساب مدة الكتاب...',
+                                      style: TextStyle(color: Colors.black54),
+                                    ),
+                                  ),
+                              ],
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        iconSize: 42,
+                        onPressed: () => _seekBy(-10),
+                        icon: const Icon(
+                          Icons.replay_10_rounded,
+                          color: _midDarkGreen2,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      StreamBuilder<PlayerState>(
+                        stream: _player.playerStateStream,
+                        builder: (context, s) {
+                          final playing = s.data?.playing ?? false;
+                          return CircleAvatar(
+                            radius: 34,
+                            backgroundColor: _midPillGreen,
+                            child: IconButton(
+                              iconSize: 40,
+                              onPressed: () async {
+                                if (playing) {
+                                  await _saveBarProgress(
+                                    force: true,
+                                  );
+                                  await _player.pause();
+                                } else {
+                                  await _player.play();
+                                }
+                              },
+                              icon: Icon(
+                                playing
+                                    ? Icons.pause_rounded
+                                    : Icons.play_arrow_rounded,
+                                color: Colors.white,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 16),
+                      IconButton(
+                        iconSize: 42,
+                        onPressed: () => _seekBy(10),
+                        icon: const Icon(
+                          Icons.forward_10_rounded,
+                          color: _midDarkGreen2,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        height: 64,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: whiteCard,
+                            foregroundColor: _primary,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(24),
+                            ),
+                            elevation: 0,
+                          ),
+                          onPressed: _onMarkPressed,
+                          icon: const Icon(Icons.bookmark_add_rounded,
+                            color: _midDarkGreen2,
+                            size: 26,
+                          ),
+                          label: const Text(
+                            'علامة',
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: _midDarkGreen2,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Builder(
+                        builder: (btnContext) {
+                          return SizedBox(
+                            height: 64,
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: whiteCard,
+                                foregroundColor: _midDarkGreen2,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(24),
+                                ),
+                                elevation: 0,
+                              ),
+                              onPressed: () => _showSpeedMenu(btnContext),
+                              icon: const Icon(Icons.speed_rounded, size: 26),
+                              label: Text(
+                                '${_speed.toStringAsFixed(2)}x',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -2583,6 +2739,7 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
     }
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
+
 
   Widget _playerMiniBar() {
     return StreamBuilder<Duration>(
@@ -2628,6 +2785,445 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
           ),
         );
       },
+    );
+  }
+}
+
+class SummaryAudioPlayerPage extends StatefulWidget {
+  final String bookId;
+  final String bookTitle;
+  final String bookAuthor;
+  final String coverUrl;
+  final List<String> audioUrls;
+
+  const SummaryAudioPlayerPage({
+    super.key,
+    required this.bookId,
+    required this.bookTitle,
+    required this.bookAuthor,
+    required this.coverUrl,
+    required this.audioUrls,
+  });
+
+  @override
+  State<SummaryAudioPlayerPage> createState() => _SummaryAudioPlayerPageState();
+}
+
+class _SummaryAudioPlayerPageState extends State<SummaryAudioPlayerPage> {
+  late final AudioPlayer _player;
+
+  bool _loading = true;
+
+  double _speed = 1.0;
+  final List<double> _speeds = const [0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
+
+  List<Duration?> _durations = [];
+  bool _durationsReady = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _player = AudioPlayer();
+    _init();
+  }
+
+  Future<void> _init() async {
+    try {
+      final sources =
+      widget.audioUrls.map((u) => AudioSource.uri(Uri.parse(u))).toList();
+      final playlist = ConcatenatingAudioSource(children: sources);
+
+      await _player.setAudioSource(
+        playlist,
+        initialIndex: 0,
+        initialPosition: Duration.zero,
+      );
+
+      await _player.setSpeed(_speed);
+
+      _durations = _player.sequence?.map((s) => s.duration).toList() ?? [];
+
+      _player.sequenceStream.listen((seq) {
+        if (!mounted) return;
+        setState(() {
+          _durations = seq?.map((s) => s.duration).toList() ?? _durations;
+        });
+      });
+
+      setState(() => _loading = false);
+
+      await _loadAllDurationsFromUrls();
+    } catch (_) {
+      setState(() => _loading = false);
+      if (mounted) _showSnack(context, 'تعذّر تشغيل الملخص', icon: Icons.error_outline);
+    }
+  }
+
+  Future<void> _loadAllDurationsFromUrls() async {
+    try {
+      if (_durations.isNotEmpty &&
+          _durations.length == widget.audioUrls.length &&
+          _durations.every((d) => d != null && d!.inMilliseconds > 0)) {
+        if (mounted) setState(() => _durationsReady = true);
+        return;
+      }
+
+      final tmp = AudioPlayer();
+      final List<Duration?> result = [];
+
+      for (final url in widget.audioUrls) {
+        try {
+          final d = await tmp.setUrl(url);
+          result.add(d);
+        } catch (_) {
+          result.add(null);
+        }
+      }
+
+      await tmp.dispose();
+
+      if (!mounted) return;
+      setState(() {
+        _durations = result;
+        _durationsReady = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _durationsReady = true);
+    }
+  }
+
+  int _totalMs() {
+    if (_durations.isEmpty) return 0;
+    return _durations.fold<int>(0, (sum, d) => sum + (d?.inMilliseconds ?? 0));
+  }
+
+  int _prefixMsBefore(int index) {
+    if (_durations.isEmpty) return 0;
+    int sum = 0;
+    for (int i = 0; i < index; i++) {
+      sum += (_durations[i]?.inMilliseconds ?? 0);
+    }
+    return sum;
+  }
+
+  int _globalPosMs() {
+    final idx = _player.currentIndex ?? 0;
+    final local = _player.position.inMilliseconds;
+    return _prefixMsBefore(idx) + local;
+  }
+
+  Future<void> _seekGlobalMs(int targetMs) async {
+    if (_durations.isEmpty) return;
+
+    int acc = 0;
+    for (int i = 0; i < _durations.length; i++) {
+      final d = _durations[i]?.inMilliseconds ?? 0;
+      if (d <= 0) continue;
+      if (targetMs < acc + d) {
+        final inside = targetMs - acc;
+        await _player.seek(Duration(milliseconds: inside), index: i);
+        return;
+      }
+      acc += d;
+    }
+
+    final lastIndex = (_durations.length - 1).clamp(0, _durations.length - 1);
+    final lastDur = _durations[lastIndex]?.inMilliseconds ?? 0;
+    await _player.seek(
+      Duration(milliseconds: lastDur > 0 ? lastDur : 0),
+      index: lastIndex,
+    );
+  }
+
+  Future<void> _seekBy(int seconds) async {
+    final total = _totalMs();
+    if (total <= 0) return;
+
+    int target = _globalPosMs() + (seconds * 1000);
+    if (target < 0) target = 0;
+    if (target > total) target = total;
+
+    await _seekGlobalMs(target);
+  }
+
+  Future<void> _showSpeedMenu(BuildContext btnContext) async {
+    final RenderBox button = btnContext.findRenderObject() as RenderBox;
+    final RenderBox overlay =
+    Overlay.of(btnContext).context.findRenderObject() as RenderBox;
+
+    final Offset pos = button.localToGlobal(Offset.zero, ancestor: overlay);
+    const double menuW = 140;
+
+    final RelativeRect position = RelativeRect.fromRect(
+      Rect.fromLTWH(
+        (pos.dx - menuW + 6).clamp(0.0, overlay.size.width - menuW),
+        pos.dy + 4,
+        menuW,
+        button.size.height,
+      ),
+      Offset.zero & overlay.size,
+    );
+
+    final picked = await showMenu<double>(
+      context: btnContext,
+      position: position,
+      elevation: 0,
+      color: _pillGreen.withOpacity(0.75),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      items: _speeds.reversed.map((s) {
+        final selected = s == _speed;
+        final label = '${s.toStringAsFixed(s % 1 == 0 ? 0 : 2)}x';
+        return PopupMenuItem<double>(
+          value: s,
+          height: 38,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  color: _primary,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              if (selected)
+                const Icon(Icons.check, color: _primary, size: 18)
+              else
+                const SizedBox(width: 18),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+
+    if (picked == null) return;
+    setState(() => _speed = picked);
+    await _player.setSpeed(picked);
+  }
+
+  @override
+  void dispose() {
+    _player.dispose();
+    super.dispose();
+  }
+
+  String _fmtMs(int ms) {
+    final d = Duration(milliseconds: ms);
+    final h = d.inHours;
+    final m = d.inMinutes % 60;
+    final s = d.inSeconds % 60;
+    if (h > 0) {
+      return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+    }
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final whiteCard = Colors.white.withOpacity(0.70);
+
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: Image.asset('assets/images/back_private.png', fit: BoxFit.cover),
+          ),
+          Scaffold(
+            backgroundColor: Colors.transparent,
+            appBar: AppBar(
+              backgroundColor: Colors.transparent,
+              surfaceTintColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+              elevation: 0,
+              toolbarHeight: 130,
+              leading: IconButton(
+                tooltip: 'رجوع',
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _primary, size: 22),
+                onPressed: () => Navigator.of(context).maybePop(),
+              ),
+              title: const Text('ملخص صوتي', style: TextStyle(color: _primary)),
+            ),
+            body: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : Column(
+                children: [
+                  const SizedBox(height: 15),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: whiteCard,
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 190,
+                          height: 235,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: widget.coverUrl.isNotEmpty
+                              ? Image.network(widget.coverUrl, fit: BoxFit.contain)
+                              : const Icon(Icons.menu_book, size: 70, color: _primary),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          widget.bookTitle,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            color: _primary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          widget.bookAuthor,
+                          style: const TextStyle(
+                            color: Colors.black54,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: whiteCard,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: StreamBuilder<Duration>(
+                      stream: _player.positionStream,
+                      builder: (context, snap) {
+                        final total = _totalMs();
+                        final gpos = _globalPosMs();
+                        final currentMs = gpos.clamp(0, total > 0 ? total : 0);
+                        final value = (total > 0) ? (currentMs / total) : 0.0;
+
+                        return Column(
+                          children: [
+                            SliderTheme(
+                              data: SliderTheme.of(context).copyWith(
+                                activeTrackColor: _darkGreen,
+                                inactiveTrackColor: _pillGreen,
+                                thumbColor: _darkGreen,
+                                overlayColor: _darkGreen.withOpacity(0.15),
+                                trackHeight: 4,
+                              ),
+                              child: Slider(
+                                value: value.clamp(0.0, 1.0),
+                                onChanged: total <= 0
+                                    ? null
+                                    : (v) async {
+                                  final target = (total * v).round();
+                                  await _seekGlobalMs(target);
+                                },
+                              ),
+                            ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(_fmtMs(currentMs), style: const TextStyle(color: Colors.black54)),
+                                Text(_fmtMs(total > 0 ? total : 0), style: const TextStyle(color: Colors.black54)),
+                              ],
+                            ),
+                            if (!_durationsReady)
+                              const Padding(
+                                padding: EdgeInsets.only(top: 6),
+                                child: Text('جاري حساب مدة الملخص...', style: TextStyle(color: Colors.black54)),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        iconSize: 42,
+                        onPressed: () => _seekBy(-10),
+                        icon: const Icon(Icons.replay_10_rounded, color: _midDarkGreen2),
+                      ),
+                      const SizedBox(width: 16),
+                      StreamBuilder<PlayerState>(
+                        stream: _player.playerStateStream,
+                        builder: (context, s) {
+                          final playing = s.data?.playing ?? false;
+                          return CircleAvatar(
+                            radius: 34,
+                            backgroundColor: _midPillGreen,
+                            child: IconButton(
+                              iconSize: 40,
+                              onPressed: () async {
+                                if (playing) {
+                                  await _player.pause();
+                                } else {
+                                  await _player.play();
+                                }
+                              },
+                              icon: Icon(
+                                playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                                color: Colors.white,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 16),
+                      IconButton(
+                        iconSize: 42,
+                        onPressed: () => _seekBy(10),
+                        icon: const Icon(Icons.forward_10_rounded, color: _midDarkGreen2),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  // ✅ فقط السرعة (بدون علامة/بوكمارك)
+                  Builder(
+                    builder: (btnContext) {
+                      return SizedBox(
+                        height: 64,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: whiteCard,
+                            foregroundColor: _midDarkGreen2,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(24),
+                            ),
+                            elevation: 0,
+                          ),
+                          onPressed: () => _showSpeedMenu(btnContext),
+                          icon: const Icon(Icons.speed_rounded, size: 26),
+                          label: Text(
+                            '${_speed.toStringAsFixed(2)}x',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

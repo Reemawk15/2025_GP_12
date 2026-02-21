@@ -1337,6 +1337,13 @@ class _SummaryViewerPageState extends State<SummaryViewerPage> {
   String? _text;
   String? _error;
 
+  bool _generatingAudio = false;
+  String _summaryAudioStatus = 'idle';
+  String _summaryAudioUrl = '';
+
+  // ✅ lock editing after audio is generated
+  bool _summaryLocked = false;
+
   // ===== Edit mode =====
   bool _editing = false;
   bool _savingEdit = false;
@@ -1400,6 +1407,19 @@ class _SummaryViewerPageState extends State<SummaryViewerPage> {
     });
 
     try {
+      // ✅ اقرأ حالة الصوت من Firestore عشان نقفل التعديل إذا completed
+      final bookSnap = await FirebaseFirestore.instance
+          .collection('audiobooks')
+          .doc(widget.bookId)
+          .get();
+
+      final bookData = bookSnap.data() ?? {};
+      final status = (bookData['summaryAudioStatus'] ?? 'idle').toString();
+      final url = (bookData['summaryAudioUrl'] ?? '').toString();
+
+      final locked = (status == 'completed'); // يقفل فقط إذا اكتمل
+
+      // اقرأ نص الملخص من Storage
       final ref = FirebaseStorage.instance.ref('audiobooks/${widget.bookId}/summary.txt');
       final bytes = await ref.getData(5 * 1024 * 1024);
       if (bytes == null) {
@@ -1412,6 +1432,10 @@ class _SummaryViewerPageState extends State<SummaryViewerPage> {
 
       final decoded = utf8.decode(bytes).trim();
       setState(() {
+        _summaryAudioStatus = status;
+        _summaryAudioUrl = url;
+        _summaryLocked = locked;
+
         _text = decoded;
         _editCtrl.text = decoded;
         _loading = false;
@@ -1425,6 +1449,9 @@ class _SummaryViewerPageState extends State<SummaryViewerPage> {
   }
 
   Future<void> _saveEditedSummary() async {
+    // ✅ إذا مقفول: لا تسوي شيء (الأزرار أصلاً Disabled)
+    if (_summaryLocked) return;
+
     final newText = _editCtrl.text.trim();
     if (newText.isEmpty) {
       _showSnack('لا يمكن حفظ ملخص فارغ', icon: Icons.info_outline);
@@ -1458,12 +1485,74 @@ class _SummaryViewerPageState extends State<SummaryViewerPage> {
     }
   }
 
+  Future<void> _generateSummaryAudio() async {
+    if (_generatingAudio) return;
+
+    // لازم يكون فيه summary.txt أساسًا
+    if (_text == null || _text!.trim().isEmpty) {
+      _showSnack('لا يوجد ملخص نصي لتوليد الصوت', icon: Icons.info_outline);
+      return;
+    }
+
+    try {
+      setState(() => _generatingAudio = true);
+      _showSnack('جاري توليد الملخص الصوتي...', icon: Icons.settings_rounded);
+
+      final callable = FirebaseFunctions.instanceFor(region: 'us-central1').httpsCallable(
+        'generateSummaryAudio',
+        options: HttpsCallableOptions(timeout: const Duration(minutes: 9)),
+      );
+
+      await callable.call({'bookId': widget.bookId});
+
+      // بعد ما يخلص: نقرأ الداتا من Firestore عشان نجيب الرابط والحالة
+      final snap = await FirebaseFirestore.instance
+          .collection('audiobooks')
+          .doc(widget.bookId)
+          .get();
+
+      final d = snap.data() ?? {};
+      final status = (d['summaryAudioStatus'] ?? 'idle').toString();
+      final url = (d['summaryAudioUrl'] ?? '').toString();
+
+      if (!mounted) return;
+      setState(() {
+        _summaryAudioStatus = status;
+        _summaryAudioUrl = url;
+
+        // ✅ اقفل التعديل إذا اكتمل الصوت
+        _summaryLocked = (status == 'completed');
+        if (_summaryLocked) _editing = false;
+      });
+
+      if (status == 'completed' && url.isNotEmpty) {
+        _showSnack('تم توليد الملخص الصوتي ✅');
+      } else if (status == 'processing') {
+        _showSnack('التوليد ما زال جاري...', icon: Icons.info_outline);
+      } else {
+        _showSnack('تعذّر توليد الملخص الصوتي', icon: Icons.error_outline);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      _showSnack('تعذّر توليد الملخص الصوتي: $e', icon: Icons.error_outline);
+    } finally {
+      if (mounted) setState(() => _generatingAudio = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool hasText = (_text != null && _text!.trim().isNotEmpty);
 
-    final bool canEdit = !_loading && _error == null && hasText && !_savingEdit;
-    final bool canSave = _editing && !_savingEdit;
+    // ✅ Disabled فقط بعد completed
+    final bool canEdit =
+        !_loading && _error == null && hasText && !_savingEdit && !_summaryLocked;
+
+    final bool canSave =
+        _editing && !_savingEdit && !_summaryLocked;
+
+    final bool canGenerateAudio =
+        !_loading && _error == null && hasText && !_generatingAudio;
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -1539,7 +1628,10 @@ class _SummaryViewerPageState extends State<SummaryViewerPage> {
                             Text(
                               _error!,
                               textAlign: TextAlign.center,
-                              style: const TextStyle(color: _titleColor, fontSize: 14),
+                              style: const TextStyle(
+                                color: _titleColor,
+                                fontSize: 14,
+                              ),
                             ),
                             const SizedBox(height: 12),
                             SizedBox(
@@ -1586,7 +1678,7 @@ class _SummaryViewerPageState extends State<SummaryViewerPage> {
                           thumbVisibility: true,
                           thickness: 6,
                           radius: const Radius.circular(8),
-                          scrollbarOrientation: ScrollbarOrientation.right, // ✅ يمين البوكس
+                          scrollbarOrientation: ScrollbarOrientation.right,
                           child: SingleChildScrollView(
                             controller: _scrollCtrl,
                             child: Text(
@@ -1604,7 +1696,7 @@ class _SummaryViewerPageState extends State<SummaryViewerPage> {
 
                     SizedBox(height: kGapBetweenBoxAndEditBtn),
 
-                    // ✅ EDIT BUTTON (فوق الصوتي)
+                    // ✅ EDIT BUTTON (بدون تغيير النص/بدون عبارات)
                     if (!_editing)
                       SizedBox(
                         width: double.infinity,
@@ -1621,7 +1713,9 @@ class _SummaryViewerPageState extends State<SummaryViewerPage> {
                             backgroundColor: _confirmColor,
                             disabledBackgroundColor: _confirmColor.withOpacity(0.45),
                             padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
                           icon: const Icon(Icons.edit_outlined, color: Colors.white),
                           label: const Text(
@@ -1644,7 +1738,9 @@ class _SummaryViewerPageState extends State<SummaryViewerPage> {
                                 backgroundColor: _confirmColor,
                                 disabledBackgroundColor: _confirmColor.withOpacity(0.45),
                                 padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
                               ),
                               icon: _savingEdit
                                   ? const SizedBox(
@@ -1681,7 +1777,9 @@ class _SummaryViewerPageState extends State<SummaryViewerPage> {
                                 backgroundColor: _confirmColor.withOpacity(0.75),
                                 disabledBackgroundColor: _confirmColor.withOpacity(0.45),
                                 padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
                               ),
                               icon: const Icon(Icons.close, color: Colors.white),
                               label: const Text(
@@ -1703,17 +1801,30 @@ class _SummaryViewerPageState extends State<SummaryViewerPage> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
-                        onPressed: null, // disabled
+                        onPressed: canGenerateAudio ? _generateSummaryAudio : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: _confirmColor,
                           disabledBackgroundColor: _confirmColor.withOpacity(0.45),
                           padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
-                        icon: const Icon(Icons.volume_up_rounded, color: Colors.white),
-                        label: const Text(
-                          'توليد الملخص الصوتي',
-                          style: TextStyle(
+                        icon: _generatingAudio
+                            ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                            : const Icon(Icons.volume_up_rounded, color: Colors.white),
+                        label: Text(
+                          _generatingAudio
+                              ? 'جاري توليد الملخص الصوتي...'
+                              : 'توليد الملخص الصوتي',
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 16,
                             fontWeight: FontWeight.bold,

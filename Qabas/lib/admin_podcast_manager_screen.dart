@@ -686,7 +686,7 @@ class _AdminPodcastManagerScreenState extends State<AdminPodcastManagerScreen>
                   ),
                 ),
               ),
-              body: const TabBarView(
+              body: TabBarView(
                 children: [
                   _AddTabHost(),
                   _ListTabHost(),
@@ -762,7 +762,7 @@ Widget _fileButton({
 
 // TabBarView needs stable widgets
 class _AddTabHost extends StatelessWidget {
-  const _AddTabHost();
+   _AddTabHost();
 
   @override
   Widget build(BuildContext context) {
@@ -773,7 +773,7 @@ class _AddTabHost extends StatelessWidget {
 }
 
 class _ListTabHost extends StatelessWidget {
-  const _ListTabHost();
+   _ListTabHost();
 
   @override
   Widget build(BuildContext context) {
@@ -1208,3 +1208,4 @@ class _EditPodcastPageState extends State<_EditPodcastPage> {
     );
   }
 }
+

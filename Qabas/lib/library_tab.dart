@@ -1342,7 +1342,9 @@ class _MyBookCard extends StatelessWidget {
     return InkWell(
       onTap: () {
         Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => MyBookDetailsPage(bookId: book.id)),
+          MaterialPageRoute(
+            builder: (_) => MyBookDetailsPage(bookId: book.id),
+          ),
         );
       },
       child: Stack(
