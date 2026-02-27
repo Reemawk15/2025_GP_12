@@ -24,10 +24,19 @@ class ProgressFirestore {
     required int listenedSeconds,
     required int estimatedTotalSeconds,
   }) async {
+    final isCompleted =
+        listenedSeconds >= estimatedTotalSeconds && estimatedTotalSeconds > 0;
+
     await _doc(uid, bookId).set({
       'listenedSeconds': listenedSeconds,
       'estimatedTotalSeconds': estimatedTotalSeconds,
       'updatedAt': FieldValue.serverTimestamp(),
+
+      // Behavior tracking
+      'lastOpenedAt': FieldValue.serverTimestamp(),
+      'lastListenedAt': FieldValue.serverTimestamp(),
+      'isCompleted': isCompleted,
+      'status': isCompleted ? 'listened' : 'listen_now',
     }, SetOptions(merge: true));
   }
 }

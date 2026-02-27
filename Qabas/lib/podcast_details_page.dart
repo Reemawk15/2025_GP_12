@@ -5,11 +5,15 @@
 // 3) باقي كل شيء كما هو: التقييمات/التعليقات/الإضافة للقائمة/العلامات/المشغل/الأهداف…
 //
 // ✅ تعديل مهم: تشغيل من ملف الأدمن فقط (audioUrl) بدون توليد وبدون Cloud Functions
+//
+// ✅ تعديل مهم (Efficiency): بدل ما نسوي events.add كل مرة (وثائق كثيرة)
+// سوّينا Events Aggregation: upsert على وثيقة ثابتة (نفس الحدث يتحدّث lastAt + يزيد count)
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:just_audio/just_audio.dart';
+
 import 'friend_details_page.dart';
 import 'goal_notifications.dart';
 import 'marks_notes_page.dart';
@@ -62,6 +66,60 @@ void _showSnack(
   );
 }
 
+/// ✅ Efficient Events Aggregation (Upsert بدل add)
+/// - يحدّث lastAt ويزيد count لنفس الحدث بدل ما ينشئ وثيقة جديدة كل مرة.
+/// - يحافظ على firstAt أول مرة فقط (Transaction).
+Future<void> _upsertUserEventAgg({
+  required String uid,
+  required String bookId,
+  required String itemType, // 'podcast'
+  required String type, // 'press_listen', 'open_details', 'add_review', 'completed'...
+  String? status,
+  int? rating,
+  String? category,
+}) async {
+  final db = FirebaseFirestore.instance;
+
+  // ✅ وثيقة ثابتة لكل (نوع الحدث + العنصر)
+  final docId = '${itemType}_$type\_$bookId';
+
+  final ref = db
+      .collection('users')
+      .doc(uid)
+      .collection('eventsAgg')
+      .doc(docId);
+
+  await db.runTransaction((tx) async {
+    final snap = await tx.get(ref);
+    final nowTs = FieldValue.serverTimestamp();
+
+    final base = <String, dynamic>{
+      'bookId': bookId,
+      'itemType': itemType,
+      'type': type,
+      if (category != null) 'category': category,
+
+      // aggregation
+      'count': FieldValue.increment(1),
+      'lastAt': nowTs,
+      'updatedAt': nowTs,
+
+      // optional payload
+      if (status != null) 'status': status,
+      if (rating != null) 'rating': rating,
+    };
+
+    if (!snap.exists) {
+      // أول مرة فقط
+      base['firstAt'] = nowTs;
+      tx.set(ref, base, SetOptions(merge: true));
+    } else {
+      // تحديث فقط
+      tx.set(ref, base, SetOptions(merge: true));
+    }
+  });
+}
+
 class PodcastDetailsPage extends StatelessWidget {
   final String podcastId;
   const PodcastDetailsPage({super.key, required this.podcastId});
@@ -72,6 +130,107 @@ class PodcastDetailsPage extends StatelessWidget {
     if (v is num) return v.toInt();
     if (v is String) return int.tryParse(v) ?? fallback;
     return fallback;
+  }
+  Future<void> _upsertUserEventAgg({
+    required String uid,
+    required String bookId,      // (موحّد) يقبل podcastId عادي
+    required String itemType,    // 'podcast' أو 'book'
+    required String type,        // action: open_details, press_listen...
+    String? status,
+    int? rating,
+    String? category,
+  }) async {
+    final eventsRef = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('events');
+
+    // ✅ docId ثابت: نفس (itemType + id + action) ما يعاد
+    final docId = '${itemType}_${bookId}_$type';
+    final evRef = eventsRef.doc(docId);
+
+    await FirebaseFirestore.instance.runTransaction((tx) async {
+      final snap = await tx.get(evRef);
+
+      final base = <String, dynamic>{
+        'type': type,
+        'bookId': bookId,        // ✅ موحد
+        'itemType': itemType,
+        if (category != null && category.trim().isNotEmpty) 'category': category,
+        if (status != null) 'status': status,
+        if (rating != null) 'rating': rating,
+      };
+
+      if (!snap.exists) {
+        tx.set(evRef, {
+          ...base,
+          'count': 1,
+          'firstAt': FieldValue.serverTimestamp(),
+          'lastAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      } else {
+        tx.set(evRef, {
+          ...base,
+          'count': FieldValue.increment(1),
+          'lastAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+    });
+  }
+  Future<void> _trackUserAction({
+    required String podcastId,
+    required Map<String, dynamic> podcastData,
+    required String action, // open_details, press_listen, add_review...
+    String? status,         // want / listen_now / listened / completed
+    int? reviewRating,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final ref = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('library')
+        .doc(podcastId);
+
+    String _s(dynamic v) => (v ?? '').toString();
+
+    final cover = _s(
+      podcastData['coverUrl'] ?? podcastData['cover'] ?? podcastData['imageUrl'],
+    );
+
+    final category = _s(podcastData['category']);
+
+    // ✅ library update (زي ما عندك)
+    await ref.set({
+      'bookId': podcastId, // ✅ موحد مع الكتب
+      'type': 'podcast',
+
+      'title': _s(podcastData['title']),
+      'author': _s(podcastData['author']),
+      'coverUrl': cover,
+      'category': category,
+
+      'lastAction': action,
+      'lastActionAt': FieldValue.serverTimestamp(),
+      'lastSeenAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+
+      if (status != null) 'status': status,
+      if (action == 'press_listen' && status == null) 'status': 'listen_now',
+      if (reviewRating != null) 'reviewRating': reviewRating,
+    }, SetOptions(merge: true));
+
+    // ✅ eventsAgg (بدون add)
+    await _upsertUserEventAgg(
+      uid: user.uid,
+      bookId: podcastId,
+      itemType: 'podcast',
+      type: action,
+      status: status,
+      rating: reviewRating,
+      category: category.isEmpty ? null : category,
+    );
   }
 
   /// ✅ تشغيل فقط من ملف الأدمن (audioUrl)
@@ -177,6 +336,16 @@ class PodcastDetailsPage extends StatelessWidget {
                 }
 
                 final data = snap.data!.data() as Map<String, dynamic>? ?? {};
+
+                // ✅ open_details -> aggregated event
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  _trackUserAction(
+                    podcastId: podcastId,
+                    podcastData: data,
+                    action: 'open_details',
+                  );
+                });
+
                 final title = (data['title'] ?? '').toString();
                 final cover = (data['coverUrl'] ?? '').toString();
                 final category = (data['category'] ?? '').toString();
@@ -211,7 +380,6 @@ class PodcastDetailsPage extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 16),
-
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -221,14 +389,11 @@ class PodcastDetailsPage extends StatelessWidget {
                               color: _pillGreen,
                               borderRadius: BorderRadius.circular(16),
                             ),
-                            child: Text(
-                              category.isEmpty ? 'غير مصنّف' : category,
-                            ),
+                            child: Text(category.isEmpty ? 'غير مصنّف' : category),
                           ),
                         ],
                       ),
                       const SizedBox(height: 10),
-
                       Center(
                         child: Text(
                           title,
@@ -247,9 +412,7 @@ class PodcastDetailsPage extends StatelessWidget {
 
                       _PillCard(
                         title: 'نبذة عن البودكاست :',
-                        child: Text(
-                          desc.isEmpty ? 'لا توجد نبذة متاحة حالياً.' : desc,
-                        ),
+                        child: Text(desc.isEmpty ? 'لا توجد نبذة متاحة حالياً.' : desc),
                       ),
                       const SizedBox(height: 10),
 
@@ -265,12 +428,21 @@ class PodcastDetailsPage extends StatelessWidget {
                             ),
                           ),
                           onPressed: hasAudio
-                              ? () => _startAudioOnly(
-                            context,
-                            audioUrl: audioUrl,
-                            title: title,
-                            cover: cover,
-                          )
+                              ? () async {
+                            await _trackUserAction(
+                              podcastId: podcastId,
+                              podcastData: data,
+                              action: 'press_listen',
+                              // status تلقائياً listen_now داخل _trackUserAction لو ما أرسلناه
+                            );
+
+                            await _startAudioOnly(
+                              context,
+                              audioUrl: audioUrl,
+                              title: title,
+                              cover: cover,
+                            );
+                          }
                               : null,
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -314,7 +486,13 @@ class PodcastDetailsPage extends StatelessWidget {
                           cover: cover,
                         ),
                         onDownload: null,
-                        onReview: () => _showAddReviewSheet(context, podcastId, title, cover),
+                        onReview: () => _showAddReviewSheet(
+                          context,
+                          podcastId,
+                          title,
+                          cover,
+                          category,
+                        ),
                         onMarks: () async {
                           final result = await Navigator.of(context).push(
                             MaterialPageRoute(
@@ -373,6 +551,7 @@ class PodcastDetailsPage extends StatelessWidget {
       String podcastId,
       String title,
       String cover,
+      String category,
       ) {
     showModalBottomSheet(
       context: context,
@@ -382,6 +561,7 @@ class PodcastDetailsPage extends StatelessWidget {
         podcastId: podcastId,
         podcastTitle: title,
         podcastCover: cover,
+        category: category,
       ),
     );
   }
@@ -456,6 +636,7 @@ class _InlineActionsRow extends StatelessWidget {
 
 class _DividerV extends StatelessWidget {
   const _DividerV();
+
   @override
   Widget build(BuildContext context) {
     return const SizedBox(
@@ -613,7 +794,8 @@ class _ReviewsList extends StatelessWidget {
             final userName = (m['userName'] ?? 'مستمع').toString();
             final userImageUrl = (m['userImageUrl'] ?? '').toString();
             final rating = (m['rating'] ?? 0);
-            final ratingDouble = rating is int ? rating.toDouble() : (rating as double? ?? 0.0);
+            final ratingDouble =
+            rating is int ? rating.toDouble() : (rating as double? ?? 0.0);
             final text = (m['text'] ?? '').toString();
             final userId = (m['userId'] ?? '').toString();
 
@@ -710,14 +892,30 @@ class _AddToListSheet extends StatelessWidget {
         .collection('library')
         .doc(podcastId);
 
+    final action = status == 'listen_now' ? 'press_listen' : 'add_to_list_want';
+
     await ref.set({
-      'bookId': podcastId, // ✅ نخليها bookId إذا ملفاتك تعتمد عليه
+      'bookId': podcastId,
+      'type': 'podcast',
       'status': status,
       'title': title,
       'coverUrl': cover,
       'addedAt': FieldValue.serverTimestamp(),
-      'type': 'podcast',
+
+      'lastAction': action,
+      'lastActionAt': FieldValue.serverTimestamp(),
+      'lastSeenAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+
+    // ✅ بدل events.add
+    await _upsertUserEventAgg(
+      uid: user.uid,
+      bookId: podcastId,
+      itemType: 'podcast',
+      type: action,
+      status: status,
+    );
 
     if (context.mounted) {
       Navigator.pop(context);
@@ -770,11 +968,13 @@ class _AddReviewSheet extends StatefulWidget {
   final String podcastId;
   final String podcastTitle;
   final String podcastCover;
+  final String category;
 
   const _AddReviewSheet({
     required this.podcastId,
     required this.podcastTitle,
     required this.podcastCover,
+    required this.category,
   });
 
   @override
@@ -849,7 +1049,42 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
 
       batch.set(podcastReviewRef, payload);
       batch.set(userReviewRef, payload);
+
+      // ✅ كمان نخزن تأثير التقييم في library (عشان الريكمنيدر يشوفه بسهولة)
+      final libRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('library')
+          .doc(widget.podcastId);
+
+      batch.set(
+        libRef,
+        {
+          'bookId': widget.podcastId,
+          'type': 'podcast',
+          'title': widget.podcastTitle,
+          'coverUrl': widget.podcastCover,
+          'category': widget.category,
+          'reviewRating': _rating,
+          'lastAction': 'add_review',
+          'lastActionAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+          'inLibrary': true,
+        },
+        SetOptions(merge: true),
+      );
+
       await batch.commit();
+
+      // ✅ بدل events.add: aggregated event
+      await _upsertUserEventAgg(
+        uid: user.uid,
+        bookId: widget.podcastId,
+        itemType: 'podcast',
+        type: 'add_review',
+        rating: _rating,
+        category: widget.category.isEmpty ? null : widget.category,
+      );
 
       if (!mounted) return;
       Navigator.pop(context);
@@ -994,7 +1229,7 @@ class _PodcastAudioPlayerPageState extends State<PodcastAudioPlayerPage> {
   Duration? _duration;
   bool _durationReady = false;
 
-  bool _isBookmarked = false;
+  bool _isBookmarked = false; // kept (even if unused) to avoid breaking
   int _maxReachedMs = 0;
 
   Timer? _statsTimer;
@@ -1043,7 +1278,8 @@ class _PodcastAudioPlayerPageState extends State<PodcastAudioPlayerPage> {
           .get();
 
       final data = doc.data() ?? {};
-      final savedContent = (data['contentMs'] is num) ? (data['contentMs'] as num).toInt() : 0;
+      final savedContent =
+      (data['contentMs'] is num) ? (data['contentMs'] as num).toInt() : 0;
 
       if (!mounted) return;
       setState(() {
@@ -1097,7 +1333,8 @@ class _PodcastAudioPlayerPageState extends State<PodcastAudioPlayerPage> {
     try {
       final d = await _player.setUrl(widget.audioUrl);
 
-      final startPos = Duration(milliseconds: widget.initialPositionMs.clamp(0, 1 << 30));
+      final startPos =
+      Duration(milliseconds: widget.initialPositionMs.clamp(0, 1 << 30));
       await _player.seek(startPos);
 
       await _player.setSpeed(_speed);
@@ -1133,6 +1370,15 @@ class _PodcastAudioPlayerPageState extends State<PodcastAudioPlayerPage> {
             'title': widget.podcastTitle,
             'coverUrl': widget.coverUrl,
           }, SetOptions(merge: true));
+
+          // ✅ aggregated completion event
+          await _upsertUserEventAgg(
+            uid: user.uid,
+            bookId: widget.podcastId,
+            itemType: 'podcast',
+            type: 'completed',
+            status: 'completed',
+          );
         }
       });
 
@@ -1359,8 +1605,10 @@ class _PodcastAudioPlayerPageState extends State<PodcastAudioPlayerPage> {
         final snap = await tx.get(ref);
         final data = snap.data() as Map<String, dynamic>? ?? {};
 
-        final oldContent = (data['contentMs'] is num) ? (data['contentMs'] as num).toInt() : 0;
-        final oldTotal = (data['totalMs'] is num) ? (data['totalMs'] as num).toInt() : 0;
+        final oldContent =
+        (data['contentMs'] is num) ? (data['contentMs'] as num).toInt() : 0;
+        final oldTotal =
+        (data['totalMs'] is num) ? (data['totalMs'] as num).toInt() : 0;
         final oldCompleted = (data['isCompleted'] == true);
 
         final newTotal = (oldTotal > total) ? oldTotal : total;
@@ -1804,7 +2052,8 @@ class _PodcastAudioPlayerPageState extends State<PodcastAudioPlayerPage> {
 
   Future<void> _showSpeedMenu(BuildContext btnContext) async {
     final RenderBox button = btnContext.findRenderObject() as RenderBox;
-    final RenderBox overlay = Overlay.of(btnContext).context.findRenderObject() as RenderBox;
+    final RenderBox overlay =
+    Overlay.of(btnContext).context.findRenderObject() as RenderBox;
 
     final Offset pos = button.localToGlobal(Offset.zero, ancestor: overlay);
 
@@ -1949,7 +2198,8 @@ class _PodcastAudioPlayerPageState extends State<PodcastAudioPlayerPage> {
                           clipBehavior: Clip.antiAlias,
                           child: widget.coverUrl.isNotEmpty
                               ? Image.network(widget.coverUrl, fit: BoxFit.contain)
-                              : const Icon(Icons.podcasts_rounded, size: 70, color: _primary),
+                              : const Icon(Icons.podcasts_rounded,
+                              size: 70, color: _primary),
                         ),
                         const SizedBox(height: 10),
                         Text(
@@ -1977,7 +2227,8 @@ class _PodcastAudioPlayerPageState extends State<PodcastAudioPlayerPage> {
                           stream: _player.positionStream,
                           builder: (context, snap) {
                             final total = _totalMs();
-                            final currentMs = _globalPosMs().clamp(0, total > 0 ? total : 0);
+                            final currentMs =
+                            _globalPosMs().clamp(0, total > 0 ? total : 0);
 
                             if (currentMs > _maxReachedMs) _maxReachedMs = currentMs;
 
@@ -2034,7 +2285,8 @@ class _PodcastAudioPlayerPageState extends State<PodcastAudioPlayerPage> {
                       IconButton(
                         iconSize: 42,
                         onPressed: () => _seekBy(-10),
-                        icon: const Icon(Icons.replay_10_rounded, color: _midDarkGreen2),
+                        icon: const Icon(Icons.replay_10_rounded,
+                            color: _midDarkGreen2),
                       ),
                       const SizedBox(width: 16),
                       StreamBuilder<PlayerState>(
@@ -2066,7 +2318,8 @@ class _PodcastAudioPlayerPageState extends State<PodcastAudioPlayerPage> {
                       IconButton(
                         iconSize: 42,
                         onPressed: () => _seekBy(10),
-                        icon: const Icon(Icons.forward_10_rounded, color: _midDarkGreen2),
+                        icon: const Icon(Icons.forward_10_rounded,
+                            color: _midDarkGreen2),
                       ),
                     ],
                   ),

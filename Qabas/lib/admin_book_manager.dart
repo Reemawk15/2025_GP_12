@@ -178,6 +178,11 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
         'pdfUrl': pdfUrl,
         'coverUrl': coverUrl,
         'createdAt': FieldValue.serverTimestamp(),
+
+        // ✅ init rating fields
+        'ratingAvg': 0,
+        'ratingCount': 0,
+        'ratingSum': 0,
       });
 
       _formKey.currentState!.reset();

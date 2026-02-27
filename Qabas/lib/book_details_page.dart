@@ -69,9 +69,85 @@ class BookDetailsPage extends StatelessWidget {
     if (v is num) return v.toInt();
     if (v is String) return int.tryParse(v) ?? fallback;
     return fallback;
-  }
+  }Future<void> _trackUserAction({
+    required String bookId,
+    required Map<String, dynamic> bookData,
+    required String action, // "open_details", "press_listen", ...
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
 
+    final ref = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('library')
+        .doc(bookId);
+
+    // ✅ safe string helper
+    String _s(dynamic v) => (v ?? '').toString();
+
+    // ✅ coverUrl fallback (عشان بعض كتبك cover / imageUrl)
+    final cover = _s(
+      bookData['coverUrl'] ?? bookData['cover'] ?? bookData['imageUrl'],
+    );
+
+    // ✅ 1) تحديث library (نفس شغلك)
+    await ref.set({
+      'bookId': bookId,
+      'type': 'book',
+
+      'title': _s(bookData['title']),
+      'author': _s(bookData['author']),
+      'coverUrl': cover,
+      'category': _s(bookData['category']),
+
+      'lastAction': action,
+      'lastActionAt': FieldValue.serverTimestamp(),
+      'lastSeenAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+
+      // ✅ status signal
+      if (action == 'press_listen') 'status': 'listen_now',
+    }, SetOptions(merge: true));
+
+    // ✅ 2) Event dedup: نفس الحدث لنفس الكتاب = نفس doc (ما عاد add)
+    final eventsRef = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('events');
+
+    final category = _s(bookData['category']);
+
+    // docId ثابت حسب (type + bookId + action)
+    final docId = 'book_${bookId}_$action';
+    final evRef = eventsRef.doc(docId);
+
+    await FirebaseFirestore.instance.runTransaction((tx) async {
+      final snap = await tx.get(evRef);
+
+      if (!snap.exists) {
+        tx.set(evRef, {
+          'type': action,
+          'bookId': bookId,
+          'category': category,
+          'itemType': 'book',
+
+          // ✅ بدل createdAt المتكرر
+          'count': 1,
+          'firstAt': FieldValue.serverTimestamp(),
+          'lastAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      } else {
+        tx.set(evRef, {
+          'category': category,
+          'count': FieldValue.increment(1),
+          'lastAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+    });
+  }
   Future<void> _startOrGenerateAudio(
+
       BuildContext context, {
         required Map<String, dynamic> data,
         required String title,
@@ -81,6 +157,11 @@ class BookDetailsPage extends StatelessWidget {
         int? overridePartIndex,
         int? overridePositionMs,
       }) async {
+    await _trackUserAction(
+      bookId: bookId,
+      bookData: data,
+      action: 'press_listen',
+    );
     final status = (data['audioStatus'] ?? 'idle').toString();
     final partsRaw = data['audioParts'];
 
@@ -184,6 +265,11 @@ class BookDetailsPage extends StatelessWidget {
         required String author,
         required String cover,
       }) async {
+    await _trackUserAction(
+      bookId: bookId,
+      bookData: data,
+      action: 'press_summary',
+    );
     final status = (data['summaryAudioStatus'] ?? 'idle').toString();
     final partsRaw = data['summaryAudioParts'];
     final bool hasParts = partsRaw is List && partsRaw.isNotEmpty;
@@ -368,6 +454,13 @@ class BookDetailsPage extends StatelessWidget {
                 }
 
                 final data = snap.data!.data() as Map<String, dynamic>? ?? {};
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  _trackUserAction(
+                    bookId: bookId,
+                    bookData: data,
+                    action: 'open_details',
+                  );
+                });
                 final title = (data['title'] ?? '') as String;
                 final author = (data['author'] ?? '') as String;
                 final cover = (data['coverUrl'] ?? '') as String;
@@ -845,15 +938,32 @@ class _AverageRatingRow extends StatelessWidget {
   final String bookId;
   const _AverageRatingRow({required this.bookId});
 
+  double _asDouble(dynamic v, {double fallback = 0.0}) {
+    if (v == null) return fallback;
+    if (v is double) return v;
+    if (v is int) return v.toDouble();
+    if (v is num) return v.toDouble();
+    if (v is String) return double.tryParse(v) ?? fallback;
+    return fallback;
+  }
+
+  int _asInt(dynamic v, {int fallback = 0}) {
+    if (v == null) return fallback;
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    if (v is String) return int.tryParse(v) ?? fallback;
+    return fallback;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<QuerySnapshot>(
+    return StreamBuilder<DocumentSnapshot>(
       stream: FirebaseFirestore.instance
           .collection('audiobooks')
           .doc(bookId)
-          .collection('reviews')
           .snapshots(),
       builder: (context, snapshot) {
+        // نفس UI حقك بالضبط
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -861,24 +971,9 @@ class _AverageRatingRow extends StatelessWidget {
           );
         }
 
-        final docs = snapshot.data?.docs ?? [];
-        if (docs.isEmpty) {
-          return Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: const [SizedBox(width: 6), _Stars(rating: 0.0)],
-          );
-        }
-
-        double sum = 0;
-        for (final d in docs) {
-          final data = d.data() as Map<String, dynamic>? ?? {};
-          final r = data['rating'];
-          if (r is int)
-            sum += r.toDouble();
-          else if (r is double)
-            sum += r;
-        }
-        final avg = sum / docs.length;
+        final data = snapshot.data?.data() as Map<String, dynamic>? ?? {};
+        final avg = _asDouble(data['ratingAvg'], fallback: 0.0);
+        final count = _asInt(data['ratingCount'], fallback: 0);
 
         return Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -896,7 +991,7 @@ class _AverageRatingRow extends StatelessWidget {
             ),
             const SizedBox(width: 2),
             Text(
-              '(${docs.length})',
+              '($count)',
               style: const TextStyle(fontSize: 12, color: Colors.black54),
             ),
           ],
@@ -1047,11 +1142,18 @@ class _AddToListSheet extends StatelessWidget {
 
     await ref.set({
       'bookId': bookId,
+      'type': 'book', // ✅ مهم
       'status': status,
       'title': title,
       'author': author,
       'coverUrl': cover,
       'addedAt': FieldValue.serverTimestamp(),
+
+      // ✅ مهم للريكمندر + ترتيب updatedAt
+      'lastAction': status == 'listen_now' ? 'press_listen' : 'add_to_list_want',
+      'lastActionAt': FieldValue.serverTimestamp(),
+      'lastSeenAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
 
     if (context.mounted) {
@@ -1120,7 +1222,43 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
   int _rating = 0;
   final _ctrl = TextEditingController();
   bool _saving = false;
+  Future<void> _trackReviewAction({required int rating}) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
 
+    final ref = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('library')
+        .doc(widget.bookId);
+
+    await ref.set({
+      'bookId': widget.bookId,
+      'type': 'book',
+      'title': widget.bookTitle,
+      'coverUrl': widget.bookCover,
+
+      // ✅ الريفيو كـ signal للريكمندر
+      'lastAction': 'add_review',
+      'lastActionAt': FieldValue.serverTimestamp(),
+      'lastSeenAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+
+      'reviewRating': rating, // اختياري لكن مفيد
+    }, SetOptions(merge: true));
+
+    // اختياري: event log
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('events')
+        .add({
+      'type': 'add_review',
+      'bookId': widget.bookId,
+      'rating': rating,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
   Future<void> _save() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -1187,6 +1325,7 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
       batch.set(bookReviewRef, payload);
       batch.set(userReviewRef, payload);
       await batch.commit();
+      await _trackReviewAction(rating: _rating);
 
       if (!mounted) return;
       Navigator.pop(context);
