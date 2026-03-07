@@ -21,6 +21,11 @@ import 'marks_notes_page.dart';
 import 'dart:async';
 import 'package:confetti/confetti.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:dio/dio.dart';
+import 'dart:io';
+
 // Theme colors
 const _primary = Color(0xFF0E3A2C); // Dark text/icons
 const _accent = Color(0xFF6F8E63); // SnackBar + buttons
@@ -34,10 +39,10 @@ const _midPillGreen = Color(0xFFBFD6B5);
 
 /// Unified SnackBar with app style
 void _showSnack(
-    BuildContext context,
-    String message, {
-      IconData icon = Icons.check_circle,
-    }) {
+  BuildContext context,
+  String message, {
+  IconData icon = Icons.check_circle,
+}) {
   final messenger = ScaffoldMessenger.of(context);
   messenger.hideCurrentSnackBar();
   messenger.showSnackBar(
@@ -73,7 +78,8 @@ Future<void> _upsertUserEventAgg({
   required String uid,
   required String bookId,
   required String itemType, // 'podcast'
-  required String type, // 'press_listen', 'open_details', 'add_review', 'completed'...
+  required String
+  type, // 'press_listen', 'open_details', 'add_review', 'completed'...
   String? status,
   int? rating,
   String? category,
@@ -120,9 +126,18 @@ Future<void> _upsertUserEventAgg({
   });
 }
 
-class PodcastDetailsPage extends StatelessWidget {
+class PodcastDetailsPage extends StatefulWidget {
   final String podcastId;
   const PodcastDetailsPage({super.key, required this.podcastId});
+
+  @override
+  State<PodcastDetailsPage> createState() => _PodcastDetailsPageState();
+}
+
+class _PodcastDetailsPageState extends State<PodcastDetailsPage> {
+  bool _isDownloading = false;
+  bool _isDownloaded = false;
+  String? downloadedPath;
 
   int _asInt(dynamic v, {int fallback = 0}) {
     if (v == null) return fallback;
@@ -131,11 +146,12 @@ class PodcastDetailsPage extends StatelessWidget {
     if (v is String) return int.tryParse(v) ?? fallback;
     return fallback;
   }
+
   Future<void> _upsertUserEventAgg({
     required String uid,
-    required String bookId,      // (موحّد) يقبل podcastId عادي
-    required String itemType,    // 'podcast' أو 'book'
-    required String type,        // action: open_details, press_listen...
+    required String bookId, // (موحّد) يقبل podcastId عادي
+    required String itemType, // 'podcast' أو 'book'
+    required String type, // action: open_details, press_listen...
     String? status,
     int? rating,
     String? category,
@@ -154,9 +170,10 @@ class PodcastDetailsPage extends StatelessWidget {
 
       final base = <String, dynamic>{
         'type': type,
-        'bookId': bookId,        // ✅ موحد
+        'bookId': bookId, // ✅ موحد
         'itemType': itemType,
-        if (category != null && category.trim().isNotEmpty) 'category': category,
+        if (category != null && category.trim().isNotEmpty)
+          'category': category,
         if (status != null) 'status': status,
         if (rating != null) 'rating': rating,
       };
@@ -177,11 +194,12 @@ class PodcastDetailsPage extends StatelessWidget {
       }
     });
   }
+
   Future<void> _trackUserAction({
     required String podcastId,
     required Map<String, dynamic> podcastData,
     required String action, // open_details, press_listen, add_review...
-    String? status,         // want / listen_now / listened / completed
+    String? status, // want / listen_now / listened / completed
     int? reviewRating,
   }) async {
     final user = FirebaseAuth.instance.currentUser;
@@ -196,7 +214,9 @@ class PodcastDetailsPage extends StatelessWidget {
     String _s(dynamic v) => (v ?? '').toString();
 
     final cover = _s(
-      podcastData['coverUrl'] ?? podcastData['cover'] ?? podcastData['imageUrl'],
+      podcastData['coverUrl'] ??
+          podcastData['cover'] ??
+          podcastData['imageUrl'],
     );
 
     final category = _s(podcastData['category']);
@@ -235,12 +255,12 @@ class PodcastDetailsPage extends StatelessWidget {
 
   /// ✅ تشغيل فقط من ملف الأدمن (audioUrl)
   Future<void> _startAudioOnly(
-      BuildContext context, {
-        required String audioUrl,
-        required String title,
-        required String cover,
-        int? overridePositionMs,
-      }) async {
+    BuildContext context, {
+    required String audioUrl,
+    required String title,
+    required String cover,
+    int? overridePositionMs,
+  }) async {
     final url = audioUrl.trim();
     if (url.isEmpty) {
       _showSnack(
@@ -260,7 +280,7 @@ class PodcastDetailsPage extends StatelessWidget {
             .collection('users')
             .doc(user.uid)
             .collection('library')
-            .doc(podcastId)
+            .doc(widget.podcastId)
             .get();
 
         final p = progSnap.data() ?? {};
@@ -278,7 +298,7 @@ class PodcastDetailsPage extends StatelessWidget {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => PodcastAudioPlayerPage(
-          podcastId: podcastId,
+          podcastId: widget.podcastId,
           podcastTitle: title,
           coverUrl: cover,
           audioUrl: url, // 🎧 ملف واحد
@@ -325,14 +345,16 @@ class PodcastDetailsPage extends StatelessWidget {
             body: StreamBuilder<DocumentSnapshot>(
               stream: FirebaseFirestore.instance
                   .collection('podcasts')
-                  .doc(podcastId)
+                  .doc(widget.podcastId)
                   .snapshots(),
               builder: (context, snap) {
                 if (snap.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
                 if (!snap.hasData || !snap.data!.exists) {
-                  return const Center(child: Text('تعذّر تحميل تفاصيل البودكاست'));
+                  return const Center(
+                    child: Text('تعذّر تحميل تفاصيل البودكاست'),
+                  );
                 }
 
                 final data = snap.data!.data() as Map<String, dynamic>? ?? {};
@@ -340,7 +362,7 @@ class PodcastDetailsPage extends StatelessWidget {
                 // ✅ open_details -> aggregated event
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   _trackUserAction(
-                    podcastId: podcastId,
+                    podcastId: widget.podcastId,
                     podcastData: data,
                     action: 'open_details',
                   );
@@ -373,10 +395,10 @@ class PodcastDetailsPage extends StatelessWidget {
                           child: cover.isNotEmpty
                               ? Image.network(cover, fit: BoxFit.contain)
                               : const Icon(
-                            Icons.podcasts_rounded,
-                            size: 80,
-                            color: _primary,
-                          ),
+                                  Icons.podcasts_rounded,
+                                  size: 80,
+                                  color: _primary,
+                                ),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -384,12 +406,17 @@ class PodcastDetailsPage extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
                             decoration: BoxDecoration(
                               color: _pillGreen,
                               borderRadius: BorderRadius.circular(16),
                             ),
-                            child: Text(category.isEmpty ? 'غير مصنّف' : category),
+                            child: Text(
+                              category.isEmpty ? 'غير مصنّف' : category,
+                            ),
                           ),
                         ],
                       ),
@@ -407,12 +434,14 @@ class PodcastDetailsPage extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
 
-                      _AverageRatingRow(podcastId: podcastId),
+                      _AverageRatingRow(podcastId: widget.podcastId),
                       const SizedBox(height: 18),
 
                       _PillCard(
                         title: 'نبذة عن البودكاست :',
-                        child: Text(desc.isEmpty ? 'لا توجد نبذة متاحة حالياً.' : desc),
+                        child: Text(
+                          desc.isEmpty ? 'لا توجد نبذة متاحة حالياً.' : desc,
+                        ),
                       ),
                       const SizedBox(height: 10),
 
@@ -429,20 +458,20 @@ class PodcastDetailsPage extends StatelessWidget {
                           ),
                           onPressed: hasAudio
                               ? () async {
-                            await _trackUserAction(
-                              podcastId: podcastId,
-                              podcastData: data,
-                              action: 'press_listen',
-                              // status تلقائياً listen_now داخل _trackUserAction لو ما أرسلناه
-                            );
+                                  await _trackUserAction(
+                                    podcastId: widget.podcastId,
+                                    podcastData: data,
+                                    action: 'press_listen',
+                                    // status تلقائياً listen_now داخل _trackUserAction لو ما أرسلناه
+                                  );
 
-                            await _startAudioOnly(
-                              context,
-                              audioUrl: audioUrl,
-                              title: title,
-                              cover: cover,
-                            );
-                          }
+                                  await _startAudioOnly(
+                                    context,
+                                    audioUrl: audioUrl,
+                                    title: title,
+                                    cover: cover,
+                                  );
+                                }
                               : null,
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -472,7 +501,7 @@ class PodcastDetailsPage extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      _ReviewsList(podcastId: podcastId),
+                      _ReviewsList(podcastId: widget.podcastId),
 
                       const SizedBox(height: 12),
                       const Divider(height: 1),
@@ -481,14 +510,22 @@ class PodcastDetailsPage extends StatelessWidget {
                       _InlineActionsRow(
                         onAddToList: () => _showAddToListSheet(
                           context,
-                          podcastId: podcastId,
+                          podcastId: widget.podcastId,
                           title: title,
                           cover: cover,
                         ),
-                        onDownload: null,
+                        isDownloading: _isDownloading,
+                        isDownloaded: _isDownloaded,
+                        onDownload: (!_isDownloading && !_isDownloaded)
+                            ? () => _onDownloadPressed(
+                                audioUrl: audioUrl,
+                                title: title,
+                                cover: cover,
+                              )
+                            : null,
                         onReview: () => _showAddReviewSheet(
                           context,
-                          podcastId,
+                          widget.podcastId,
                           title,
                           cover,
                           category,
@@ -496,7 +533,8 @@ class PodcastDetailsPage extends StatelessWidget {
                         onMarks: () async {
                           final result = await Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (_) => MarksNotesPage(bookId: podcastId),
+                              builder: (_) =>
+                                  MarksNotesPage(bookId: widget.podcastId),
                             ),
                           );
 
@@ -528,31 +566,28 @@ class PodcastDetailsPage extends StatelessWidget {
   }
 
   void _showAddToListSheet(
-      BuildContext context, {
-        required String podcastId,
-        required String title,
-        required String cover,
-      }) {
+    BuildContext context, {
+    required String podcastId,
+    required String title,
+    required String cover,
+  }) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => _AddToListSheet(
-        podcastId: podcastId,
-        title: title,
-        cover: cover,
-      ),
+      builder: (ctx) =>
+          _AddToListSheet(podcastId: podcastId, title: title, cover: cover),
     );
   }
 
   void _showAddReviewSheet(
-      BuildContext context,
-      String podcastId,
-      String title,
-      String cover,
-      String category,
-      ) {
+    BuildContext context,
+    String podcastId,
+    String title,
+    String cover,
+    String category,
+  ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -565,6 +600,153 @@ class PodcastDetailsPage extends StatelessWidget {
       ),
     );
   }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDownloadState();
+  }
+
+  Future<void> _loadDownloadState() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final savedPath = prefs.getString('downloadPath_${widget.podcastId}');
+    final savedDownloaded =
+        prefs.getBool('downloaded_${widget.podcastId}') ?? false;
+
+    bool exists = false;
+    if (savedPath != null && savedPath.isNotEmpty) {
+      exists = await File(savedPath).exists();
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _isDownloaded = savedDownloaded && exists;
+      downloadedPath = exists ? savedPath : null;
+    });
+
+    // تنظيف لو كانت القيم قديمة والملف مو موجود
+    if (!exists) {
+      await prefs.remove('downloaded_${widget.podcastId}');
+      await prefs.remove('downloadPath_${widget.podcastId}');
+    }
+  }
+
+  String _safeFileName(String name) {
+    var cleaned = name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '');
+    cleaned = cleaned.replaceAll(RegExp(r'[\n\r\t]'), ' ');
+    cleaned = cleaned.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (cleaned.isEmpty) return 'بودكاست';
+    if (cleaned.length > 60) cleaned = cleaned.substring(0, 60).trim();
+    return cleaned;
+  }
+
+  Future<String> _downloadPodcastToDevice({
+    required String audioUrl,
+    required String title,
+  }) async {
+    final appDir = await getApplicationDocumentsDirectory();
+    final baseDir = Directory('${appDir.path}/offline_podcasts');
+
+    if (!await baseDir.exists()) {
+      await baseDir.create(recursive: true);
+    }
+
+    final safeTitle = _safeFileName(title);
+    final filePath = '${baseDir.path}/${widget.podcastId}_$safeTitle.mp3';
+
+    final file = File(filePath);
+    if (await file.exists()) {
+      return file.path;
+    }
+
+    final dio = Dio();
+    await dio.download(audioUrl, file.path);
+
+    return file.path;
+  }
+
+  Future<void> _markPodcastAsDownloaded(String filePath) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('downloaded_${widget.podcastId}', true);
+    await prefs.setString('downloadPath_${widget.podcastId}', filePath);
+
+    if (!mounted) return;
+    setState(() {
+      _isDownloaded = true;
+      downloadedPath = filePath;
+    });
+  }
+
+  Future<void> _saveOfflinePodcastInfo({
+    required String podcastId,
+    required String title,
+    required String coverUrl,
+    required String audioPath,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final existing = prefs.getStringList('offline_podcasts') ?? [];
+
+    final item = '$podcastId|||$title|||$coverUrl|||$audioPath';
+
+    existing.removeWhere((e) => e.startsWith('$podcastId|||'));
+    existing.add(item);
+
+    await prefs.setStringList('offline_podcasts', existing);
+  }
+
+  Future<void> _onDownloadPressed({
+    required String audioUrl,
+    required String title,
+    required String cover,
+  }) async {
+    if (_isDownloading || _isDownloaded) return;
+
+    setState(() {
+      _isDownloading = true;
+    });
+
+    try {
+      if (audioUrl.trim().isEmpty) {
+        _showSnack(
+          context,
+          'لا يوجد ملف صوت مرفوع لهذا البودكاست',
+          icon: Icons.info_outline,
+        );
+        setState(() => _isDownloading = false);
+        return;
+      }
+
+      final filePath = await _downloadPodcastToDevice(
+        audioUrl: audioUrl,
+        title: title,
+      );
+
+      await _markPodcastAsDownloaded(filePath);
+
+      await _saveOfflinePodcastInfo(
+        podcastId: widget.podcastId,
+        title: title,
+        coverUrl: cover,
+        audioPath: filePath,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _isDownloading = false;
+      });
+
+      _showSnack(context, 'تم تحميل البودكاست ', icon: Icons.check_circle);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isDownloading = false;
+        _isDownloaded = false;
+      });
+
+      _showSnack(context, 'فشل تحميل البودكاست', icon: Icons.error_outline);
+    }
+  }
 }
 
 /// Row of inline actions under reviews
@@ -574,11 +756,16 @@ class _InlineActionsRow extends StatelessWidget {
   final VoidCallback? onReview;
   final VoidCallback? onMarks;
 
+  final bool isDownloading;
+  final bool isDownloaded;
+
   const _InlineActionsRow({
     this.onAddToList,
     this.onDownload,
     this.onReview,
     this.onMarks,
+    required this.isDownloading,
+    required this.isDownloaded,
   });
 
   @override
@@ -593,7 +780,16 @@ class _InlineActionsRow extends StatelessWidget {
               CircleAvatar(
                 radius: 18,
                 backgroundColor: _pillGreen,
-                child: Icon(icon, color: _accent),
+                child: (icon == Icons.download_rounded && isDownloading)
+                    ? SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation(_accent),
+                        ),
+                      )
+                    : Icon(icon, color: _accent),
               ),
               const SizedBox(height: 6),
               Text(
@@ -624,7 +820,15 @@ class _InlineActionsRow extends StatelessWidget {
       children: [
         item(Icons.folder_copy_rounded, 'إضافة', 'إلى قائمة', onAddToList),
         const _DividerV(),
-        item(Icons.download_rounded, 'تحميل', 'البودكاست', onDownload),
+        item(
+          Icons.download_rounded,
+          isDownloading ? 'جاري' : (isDownloaded ? 'تم' : 'تحميل'),
+          isDownloading
+              ? 'تحميل'
+                    '\nالبودكاست'
+              : (isDownloaded ? 'التحميل' : 'البودكاست'),
+          onDownload,
+        ),
         const _DividerV(),
         item(Icons.star_rate_rounded, 'أضف', 'تقييماً', onReview),
         const _DividerV(),
@@ -730,8 +934,10 @@ class _AverageRatingRow extends StatelessWidget {
         for (final d in docs) {
           final data = d.data() as Map<String, dynamic>? ?? {};
           final r = data['rating'];
-          if (r is int) sum += r.toDouble();
-          else if (r is double) sum += r;
+          if (r is int)
+            sum += r.toDouble();
+          else if (r is double)
+            sum += r;
         }
         final avg = sum / docs.length;
 
@@ -794,8 +1000,9 @@ class _ReviewsList extends StatelessWidget {
             final userName = (m['userName'] ?? 'مستمع').toString();
             final userImageUrl = (m['userImageUrl'] ?? '').toString();
             final rating = (m['rating'] ?? 0);
-            final ratingDouble =
-            rating is int ? rating.toDouble() : (rating as double? ?? 0.0);
+            final ratingDouble = rating is int
+                ? rating.toDouble()
+                : (rating as double? ?? 0.0);
             final text = (m['text'] ?? '').toString();
             final userId = (m['userId'] ?? '').toString();
 
@@ -807,12 +1014,12 @@ class _ReviewsList extends StatelessWidget {
               backgroundImage: hasImage ? NetworkImage(userImageUrl) : null,
               child: !hasImage
                   ? Text(
-                userName.isNotEmpty ? userName.characters.first : 'م',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: _darkGreen,
-                ),
-              )
+                      userName.isNotEmpty ? userName.characters.first : 'م',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: _darkGreen,
+                      ),
+                    )
                   : null,
             );
 
@@ -849,7 +1056,9 @@ class _ReviewsList extends StatelessWidget {
                             Expanded(
                               child: Text(
                                 userName,
-                                style: const TextStyle(fontWeight: FontWeight.w700),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
                             _Stars(rating: ratingDouble),
@@ -882,7 +1091,11 @@ class _AddToListSheet extends StatelessWidget {
   Future<void> _setStatus(BuildContext context, String status) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      _showSnack(context, 'الرجاء تسجيل الدخول أولاً', icon: Icons.info_outline);
+      _showSnack(
+        context,
+        'الرجاء تسجيل الدخول أولاً',
+        icon: Icons.info_outline,
+      );
       return;
     }
 
@@ -989,7 +1202,11 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
   Future<void> _save() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      _showSnack(context, 'الرجاء تسجيل الدخول أولاً', icon: Icons.info_outline);
+      _showSnack(
+        context,
+        'الرجاء تسجيل الدخول أولاً',
+        icon: Icons.info_outline,
+      );
       return;
     }
     if (_rating == 0) {
@@ -997,7 +1214,11 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
       return;
     }
     if (_ctrl.text.trim().isEmpty) {
-      _showSnack(context, 'فضلاً اكتبي تعليقاً مختصراً', icon: Icons.info_outline);
+      _showSnack(
+        context,
+        'فضلاً اكتبي تعليقاً مختصراً',
+        icon: Icons.info_outline,
+      );
       return;
     }
 
@@ -1007,11 +1228,15 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
     String userImageUrl = user.photoURL ?? '';
 
     try {
-      final u = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      final u = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
       if (u.exists) {
         final data = u.data() ?? {};
         final candidateName =
-        (data['name'] ?? data['fullName'] ?? data['displayName'] ?? '').toString();
+            (data['name'] ?? data['fullName'] ?? data['displayName'] ?? '')
+                .toString();
         if (candidateName.trim().isNotEmpty) userName = candidateName;
 
         final candidateImage = (data['photoUrl'] ?? '').toString();
@@ -1057,22 +1282,18 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
           .collection('library')
           .doc(widget.podcastId);
 
-      batch.set(
-        libRef,
-        {
-          'bookId': widget.podcastId,
-          'type': 'podcast',
-          'title': widget.podcastTitle,
-          'coverUrl': widget.podcastCover,
-          'category': widget.category,
-          'reviewRating': _rating,
-          'lastAction': 'add_review',
-          'lastActionAt': FieldValue.serverTimestamp(),
-          'updatedAt': FieldValue.serverTimestamp(),
-          'inLibrary': true,
-        },
-        SetOptions(merge: true),
-      );
+      batch.set(libRef, {
+        'bookId': widget.podcastId,
+        'type': 'podcast',
+        'title': widget.podcastTitle,
+        'coverUrl': widget.podcastCover,
+        'category': widget.category,
+        'reviewRating': _rating,
+        'lastAction': 'add_review',
+        'lastActionAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+        'inLibrary': true,
+      }, SetOptions(merge: true));
 
       await batch.commit();
 
@@ -1144,7 +1365,9 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
                   children: List.generate(5, (i) {
                     final filled = i < _rating;
                     return IconButton(
-                      onPressed: _saving ? null : () => setState(() => _rating = i + 1),
+                      onPressed: _saving
+                          ? null
+                          : () => setState(() => _rating = i + 1),
                       icon: Icon(
                         filled ? Icons.star : Icons.star_border,
                         color: Colors.amber[700],
@@ -1248,9 +1471,9 @@ class _PodcastAudioPlayerPageState extends State<PodcastAudioPlayerPage> {
           .collection('library')
           .doc(widget.podcastId)
           .set({
-        'lastPositionMs': pos,
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+            'lastPositionMs': pos,
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
     } catch (_) {}
   }
 
@@ -1278,8 +1501,9 @@ class _PodcastAudioPlayerPageState extends State<PodcastAudioPlayerPage> {
           .get();
 
       final data = doc.data() ?? {};
-      final savedContent =
-      (data['contentMs'] is num) ? (data['contentMs'] as num).toInt() : 0;
+      final savedContent = (data['contentMs'] is num)
+          ? (data['contentMs'] as num).toInt()
+          : 0;
 
       if (!mounted) return;
       setState(() {
@@ -1333,8 +1557,9 @@ class _PodcastAudioPlayerPageState extends State<PodcastAudioPlayerPage> {
     try {
       final d = await _player.setUrl(widget.audioUrl);
 
-      final startPos =
-      Duration(milliseconds: widget.initialPositionMs.clamp(0, 1 << 30));
+      final startPos = Duration(
+        milliseconds: widget.initialPositionMs.clamp(0, 1 << 30),
+      );
       await _player.seek(startPos);
 
       await _player.setSpeed(_speed);
@@ -1359,17 +1584,17 @@ class _PodcastAudioPlayerPageState extends State<PodcastAudioPlayerPage> {
               .collection('library')
               .doc(widget.podcastId)
               .set({
-            'inLibrary': true,
-            'status': 'listened',
-            'isCompleted': true,
-            'completedAt': FieldValue.serverTimestamp(),
-            'totalMs': total,
-            'contentMs': total,
-            'updatedAt': FieldValue.serverTimestamp(),
-            'type': 'podcast',
-            'title': widget.podcastTitle,
-            'coverUrl': widget.coverUrl,
-          }, SetOptions(merge: true));
+                'inLibrary': true,
+                'status': 'listened',
+                'isCompleted': true,
+                'completedAt': FieldValue.serverTimestamp(),
+                'totalMs': total,
+                'contentMs': total,
+                'updatedAt': FieldValue.serverTimestamp(),
+                'type': 'podcast',
+                'title': widget.podcastTitle,
+                'coverUrl': widget.coverUrl,
+              }, SetOptions(merge: true));
 
           // ✅ aggregated completion event
           await _upsertUserEventAgg(
@@ -1503,9 +1728,9 @@ class _PodcastAudioPlayerPageState extends State<PodcastAudioPlayerPage> {
                             .collection('marks')
                             .doc(markId)
                             .set({
-                          'note': ctrl.text.trim(),
-                          'updatedAt': FieldValue.serverTimestamp(),
-                        }, SetOptions(merge: true));
+                              'note': ctrl.text.trim(),
+                              'updatedAt': FieldValue.serverTimestamp(),
+                            }, SetOptions(merge: true));
 
                         if (ctx.mounted) Navigator.pop(ctx);
                         if (mounted) _showSnack(context, 'تم حفظ الملاحظة ');
@@ -1572,9 +1797,9 @@ class _PodcastAudioPlayerPageState extends State<PodcastAudioPlayerPage> {
           .collection('library')
           .doc(widget.podcastId)
           .set({
-        'lastPositionMs': pos,
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+            'lastPositionMs': pos,
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
     } catch (_) {}
   }
 
@@ -1605,16 +1830,21 @@ class _PodcastAudioPlayerPageState extends State<PodcastAudioPlayerPage> {
         final snap = await tx.get(ref);
         final data = snap.data() as Map<String, dynamic>? ?? {};
 
-        final oldContent =
-        (data['contentMs'] is num) ? (data['contentMs'] as num).toInt() : 0;
-        final oldTotal =
-        (data['totalMs'] is num) ? (data['totalMs'] as num).toInt() : 0;
+        final oldContent = (data['contentMs'] is num)
+            ? (data['contentMs'] as num).toInt()
+            : 0;
+        final oldTotal = (data['totalMs'] is num)
+            ? (data['totalMs'] as num).toInt()
+            : 0;
         final oldCompleted = (data['isCompleted'] == true);
 
         final newTotal = (oldTotal > total) ? oldTotal : total;
-        final newContent = (oldContent > currentContent) ? oldContent : currentContent;
+        final newContent = (oldContent > currentContent)
+            ? oldContent
+            : currentContent;
 
-        final finalCompleted = oldCompleted || (newTotal > 0 && newContent >= newTotal);
+        final finalCompleted =
+            oldCompleted || (newTotal > 0 && newContent >= newTotal);
 
         tx.set(ref, {
           'totalMs': newTotal,
@@ -1709,7 +1939,10 @@ class _PodcastAudioPlayerPageState extends State<PodcastAudioPlayerPage> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return 60;
 
-    final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
     final data = doc.data() ?? {};
 
     final weeklyGoal = data['weeklyGoal'];
@@ -1837,7 +2070,8 @@ class _PodcastAudioPlayerPageState extends State<PodcastAudioPlayerPage> {
     _showAutoDialogMessage(
       icon: Icons.trending_up_rounded,
       title: 'أحسنت التقدّم 👏🏻',
-      body: 'أنت قريب من تحقيق هدفك الأسبوعي 🎖️\nاستمر… أنت على الطريق الصحيح 💚',
+      body:
+          'أنت قريب من تحقيق هدفك الأسبوعي 🎖️\nاستمر… أنت على الطريق الصحيح 💚',
       seconds: 10,
     );
   }
@@ -1947,12 +2181,7 @@ class _PodcastAudioPlayerPageState extends State<PodcastAudioPlayerPage> {
               numberOfParticles: 25,
               gravity: 0.25,
               shouldLoop: false,
-              colors: const [
-                _accent,
-                _midPillGreen,
-                _softRose,
-                _lightSoftRose,
-              ],
+              colors: const [_accent, _midPillGreen, _softRose, _lightSoftRose],
             ),
             TweenAnimationBuilder<double>(
               tween: Tween(begin: 0.85, end: 1.0),
@@ -1986,7 +2215,11 @@ class _PodcastAudioPlayerPageState extends State<PodcastAudioPlayerPage> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: const [
-                        Icon(Icons.emoji_events_rounded, color: _accent, size: 56),
+                        Icon(
+                          Icons.emoji_events_rounded,
+                          color: _accent,
+                          size: 56,
+                        ),
                         SizedBox(height: 10),
                         Text(
                           'مبروك! 🎉',
@@ -2053,7 +2286,7 @@ class _PodcastAudioPlayerPageState extends State<PodcastAudioPlayerPage> {
   Future<void> _showSpeedMenu(BuildContext btnContext) async {
     final RenderBox button = btnContext.findRenderObject() as RenderBox;
     final RenderBox overlay =
-    Overlay.of(btnContext).context.findRenderObject() as RenderBox;
+        Overlay.of(btnContext).context.findRenderObject() as RenderBox;
 
     final Offset pos = button.localToGlobal(Offset.zero, ancestor: overlay);
 
@@ -2074,9 +2307,7 @@ class _PodcastAudioPlayerPageState extends State<PodcastAudioPlayerPage> {
       position: position,
       elevation: 0,
       color: _pillGreen.withOpacity(0.75),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       items: _speeds.reversed.map((s) {
         final selected = s == _speed;
         final label = '${s.toStringAsFixed(s % 1 == 0 ? 0 : 2)}x';
@@ -2176,208 +2407,249 @@ class _PodcastAudioPlayerPageState extends State<PodcastAudioPlayerPage> {
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
                   : Column(
-                children: [
-                  const SizedBox(height: 15),
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: whiteCard,
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: Column(
                       children: [
-                        _playerMiniBar(),
-                        const SizedBox(height: 45),
+                        const SizedBox(height: 15),
                         Container(
-                          width: 190,
-                          height: 235,
+                          padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: whiteCard,
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: Column(
+                            children: [
+                              _playerMiniBar(),
+                              const SizedBox(height: 45),
+                              Container(
+                                width: 190,
+                                height: 235,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                clipBehavior: Clip.antiAlias,
+                                child: widget.coverUrl.isNotEmpty
+                                    ? Image.network(
+                                        widget.coverUrl,
+                                        fit: BoxFit.contain,
+                                      )
+                                    : const Icon(
+                                        Icons.podcasts_rounded,
+                                        size: 70,
+                                        color: _primary,
+                                      ),
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                widget.podcastTitle,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w900,
+                                  color: _primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: whiteCard,
                             borderRadius: BorderRadius.circular(16),
                           ),
-                          clipBehavior: Clip.antiAlias,
-                          child: widget.coverUrl.isNotEmpty
-                              ? Image.network(widget.coverUrl, fit: BoxFit.contain)
-                              : const Icon(Icons.podcasts_rounded,
-                              size: 70, color: _primary),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          widget.podcastTitle,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            color: _primary,
+                          child: Column(
+                            children: [
+                              StreamBuilder<Duration>(
+                                stream: _player.positionStream,
+                                builder: (context, snap) {
+                                  final total = _totalMs();
+                                  final currentMs = _globalPosMs().clamp(
+                                    0,
+                                    total > 0 ? total : 0,
+                                  );
+
+                                  if (currentMs > _maxReachedMs)
+                                    _maxReachedMs = currentMs;
+
+                                  final value = (total > 0)
+                                      ? (currentMs / total)
+                                      : 0.0;
+
+                                  return Column(
+                                    children: [
+                                      SliderTheme(
+                                        data: SliderTheme.of(context).copyWith(
+                                          activeTrackColor: _darkGreen,
+                                          inactiveTrackColor: _pillGreen,
+                                          thumbColor: _darkGreen,
+                                          overlayColor: _darkGreen.withOpacity(
+                                            0.15,
+                                          ),
+                                          trackHeight: 4,
+                                        ),
+                                        child: Slider(
+                                          value: value.clamp(0.0, 1.0),
+                                          onChanged: total <= 0
+                                              ? null
+                                              : (v) async {
+                                                  final target = (total * v)
+                                                      .round();
+                                                  await _seekGlobalMs(target);
+                                                },
+                                        ),
+                                      ),
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(
+                                            _fmtMs(currentMs),
+                                            style: const TextStyle(
+                                              color: Colors.black54,
+                                            ),
+                                          ),
+                                          Text(
+                                            _fmtMs(total),
+                                            style: const TextStyle(
+                                              color: Colors.black54,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      if (!_durationReady)
+                                        const Padding(
+                                          padding: EdgeInsets.only(top: 6),
+                                          child: Text(
+                                            'جاري حساب مدة البودكاست...',
+                                            style: TextStyle(
+                                              color: Colors.black54,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  );
+                                },
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: whiteCard,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      children: [
-                        StreamBuilder<Duration>(
-                          stream: _player.positionStream,
-                          builder: (context, snap) {
-                            final total = _totalMs();
-                            final currentMs =
-                            _globalPosMs().clamp(0, total > 0 ? total : 0);
-
-                            if (currentMs > _maxReachedMs) _maxReachedMs = currentMs;
-
-                            final value = (total > 0) ? (currentMs / total) : 0.0;
-
-                            return Column(
-                              children: [
-                                SliderTheme(
-                                  data: SliderTheme.of(context).copyWith(
-                                    activeTrackColor: _darkGreen,
-                                    inactiveTrackColor: _pillGreen,
-                                    thumbColor: _darkGreen,
-                                    overlayColor: _darkGreen.withOpacity(0.15),
-                                    trackHeight: 4,
-                                  ),
-                                  child: Slider(
-                                    value: value.clamp(0.0, 1.0),
-                                    onChanged: total <= 0
-                                        ? null
-                                        : (v) async {
-                                      final target = (total * v).round();
-                                      await _seekGlobalMs(target);
+                        const SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            IconButton(
+                              iconSize: 42,
+                              onPressed: () => _seekBy(-10),
+                              icon: const Icon(
+                                Icons.replay_10_rounded,
+                                color: _midDarkGreen2,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            StreamBuilder<PlayerState>(
+                              stream: _player.playerStateStream,
+                              builder: (context, s) {
+                                final playing = s.data?.playing ?? false;
+                                return CircleAvatar(
+                                  radius: 34,
+                                  backgroundColor: _midPillGreen,
+                                  child: IconButton(
+                                    iconSize: 40,
+                                    onPressed: () async {
+                                      if (playing) {
+                                        await _saveBarProgress(force: true);
+                                        await _player.pause();
+                                      } else {
+                                        await _player.play();
+                                      }
                                     },
-                                  ),
-                                ),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(_fmtMs(currentMs),
-                                        style: const TextStyle(color: Colors.black54)),
-                                    Text(_fmtMs(total),
-                                        style: const TextStyle(color: Colors.black54)),
-                                  ],
-                                ),
-                                if (!_durationReady)
-                                  const Padding(
-                                    padding: EdgeInsets.only(top: 6),
-                                    child: Text(
-                                      'جاري حساب مدة البودكاست...',
-                                      style: TextStyle(color: Colors.black54),
+                                    icon: Icon(
+                                      playing
+                                          ? Icons.pause_rounded
+                                          : Icons.play_arrow_rounded,
+                                      color: Colors.white,
                                     ),
                                   ),
-                              ],
-                            );
-                          },
+                                );
+                              },
+                            ),
+                            const SizedBox(width: 16),
+                            IconButton(
+                              iconSize: 42,
+                              onPressed: () => _seekBy(10),
+                              icon: const Icon(
+                                Icons.forward_10_rounded,
+                                color: _midDarkGreen2,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              height: 64,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: whiteCard,
+                                  foregroundColor: _primary,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(24),
+                                  ),
+                                  elevation: 0,
+                                ),
+                                onPressed: _onMarkPressed,
+                                icon: const Icon(
+                                  Icons.bookmark_add_rounded,
+                                  color: _midDarkGreen2,
+                                  size: 26,
+                                ),
+                                label: const Text(
+                                  'علامة',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    color: _midDarkGreen2,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Builder(
+                              builder: (btnContext) {
+                                return SizedBox(
+                                  height: 64,
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: whiteCard,
+                                      foregroundColor: _midDarkGreen2,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(24),
+                                      ),
+                                      elevation: 0,
+                                    ),
+                                    onPressed: () => _showSpeedMenu(btnContext),
+                                    icon: const Icon(
+                                      Icons.speed_rounded,
+                                      size: 26,
+                                    ),
+                                    label: Text(
+                                      '${_speed.toStringAsFixed(2)}x',
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      IconButton(
-                        iconSize: 42,
-                        onPressed: () => _seekBy(-10),
-                        icon: const Icon(Icons.replay_10_rounded,
-                            color: _midDarkGreen2),
-                      ),
-                      const SizedBox(width: 16),
-                      StreamBuilder<PlayerState>(
-                        stream: _player.playerStateStream,
-                        builder: (context, s) {
-                          final playing = s.data?.playing ?? false;
-                          return CircleAvatar(
-                            radius: 34,
-                            backgroundColor: _midPillGreen,
-                            child: IconButton(
-                              iconSize: 40,
-                              onPressed: () async {
-                                if (playing) {
-                                  await _saveBarProgress(force: true);
-                                  await _player.pause();
-                                } else {
-                                  await _player.play();
-                                }
-                              },
-                              icon: Icon(
-                                playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                                color: Colors.white,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(width: 16),
-                      IconButton(
-                        iconSize: 42,
-                        onPressed: () => _seekBy(10),
-                        icon: const Icon(Icons.forward_10_rounded,
-                            color: _midDarkGreen2),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SizedBox(
-                        height: 64,
-                        child: ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: whiteCard,
-                            foregroundColor: _primary,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(24)),
-                            elevation: 0,
-                          ),
-                          onPressed: _onMarkPressed,
-                          icon: const Icon(Icons.bookmark_add_rounded,
-                              color: _midDarkGreen2, size: 26),
-                          label: const Text(
-                            'علامة',
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: _midDarkGreen2,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Builder(
-                        builder: (btnContext) {
-                          return SizedBox(
-                            height: 64,
-                            child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: whiteCard,
-                                foregroundColor: _midDarkGreen2,
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(24)),
-                                elevation: 0,
-                              ),
-                              onPressed: () => _showSpeedMenu(btnContext),
-                              icon: const Icon(Icons.speed_rounded, size: 26),
-                              label: Text(
-                                '${_speed.toStringAsFixed(2)}x',
-                                style: const TextStyle(
-                                    fontSize: 18, fontWeight: FontWeight.w700),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ],
-              ),
             ),
           ),
         ],
@@ -2421,7 +2693,9 @@ class _PodcastAudioPlayerPageState extends State<PodcastAudioPlayerPage> {
                   value: p,
                   minHeight: 18,
                   backgroundColor: _pillGreen,
-                  valueColor: const AlwaysStoppedAnimation<Color>(_midPillGreen),
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                    _midPillGreen,
+                  ),
                 ),
                 Text(
                   '$percent%',

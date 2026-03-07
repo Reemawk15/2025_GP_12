@@ -27,11 +27,17 @@ environment:
 # dependencies can be manually updated by changing the version numbers below to
 # the latest version available on pub.dev. To see which dependencies have newer
 # versions available, run `flutter pub outdated`.
+
 dependencies:
   flutter:
     sdk: flutter
 
+
+  dio: ^5.4.0
+  path_provider: ^2.1.2
   confetti: ^0.7.0
+  shared_preferences: ^2.2.3
+
 
   flutter_local_notifications: ^17.2.2
   timezone: ^0.9.4
@@ -92,6 +98,8 @@ flutter_native_splash:
   android_12:
     color: "#C9DABF"
     image: "assets/images/Loogo.png"
+
+
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

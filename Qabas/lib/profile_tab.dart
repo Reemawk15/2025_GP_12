@@ -4,20 +4,21 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'edit_profile_page.dart';
-import 'main.dart';                // Return to HomePage after logout
+import 'main.dart'; // Return to HomePage after logout
 import 'notifications_page.dart'; // Notifications screen
 import 'weekly_goal_page.dart';
 import 'ratings_page.dart';
+import 'offline_books_page.dart';
 
 class ProfileTab extends StatelessWidget {
   const ProfileTab({super.key});
 
   // Theme colors (same identity colors)
-  static const Color _darkGreen  = Color(0xFF0E3A2C);
+  static const Color _darkGreen = Color(0xFF0E3A2C);
   static const Color _lightGreen = Color(0xFFC9DABF);
-  static const Color _confirm    = Color(0xFF6F8E63);
-  static const _titleColor       = _darkGreen;
-  static const _confirmColor     = _confirm;
+  static const Color _confirm = Color(0xFF6F8E63);
+  static const _titleColor = _darkGreen;
+  static const _confirmColor = _confirm;
 
   // Logout → return to HomePage
   Future<void> _logout(BuildContext context) async {
@@ -25,7 +26,7 @@ class ProfileTab extends StatelessWidget {
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (_) => const HomePage()),
-          (route) => false,
+      (route) => false,
     );
   }
 
@@ -121,25 +122,28 @@ class ProfileTab extends StatelessWidget {
     final authPhoto = user.photoURL;
 
     final docRef = FirebaseFirestore.instance.collection('users').doc(uid);
-    return docRef.snapshots().map((snap) {
-      final data  = snap.data();
-      final name  = (data?['name'] as String?)?.trim();
-      final photo = (data?['photoUrl'] as String?)?.trim();
+    return docRef
+        .snapshots()
+        .map((snap) {
+          final data = snap.data();
+          final name = (data?['name'] as String?)?.trim();
+          final photo = (data?['photoUrl'] as String?)?.trim();
 
-      return _UserProfile(
-        name: (name?.isNotEmpty == true)
-            ? name!
-            : (authName?.isNotEmpty == true ? authName! : 'الاسم'),
-        photoUrl: (photo?.isNotEmpty == true)
-            ? photo
-            : (authPhoto?.isNotEmpty == true ? authPhoto : null),
-      );
-    }).handleError((_) {
-      return _UserProfile(
-        name: (authName?.isNotEmpty == true ? authName! : 'الاسم'),
-        photoUrl: (authPhoto?.isNotEmpty == true ? authPhoto : null),
-      );
-    });
+          return _UserProfile(
+            name: (name?.isNotEmpty == true)
+                ? name!
+                : (authName?.isNotEmpty == true ? authName! : 'الاسم'),
+            photoUrl: (photo?.isNotEmpty == true)
+                ? photo
+                : (authPhoto?.isNotEmpty == true ? authPhoto : null),
+          );
+        })
+        .handleError((_) {
+          return _UserProfile(
+            name: (authName?.isNotEmpty == true ? authName! : 'الاسم'),
+            photoUrl: (authPhoto?.isNotEmpty == true ? authPhoto : null),
+          );
+        });
   }
 
   @override
@@ -148,10 +152,7 @@ class ProfileTab extends StatelessWidget {
       children: [
         // Full background image
         Positioned.fill(
-          child: Image.asset(
-            'assets/images/back.png',
-            fit: BoxFit.cover,
-          ),
+          child: Image.asset('assets/images/back.png', fit: BoxFit.cover),
         ),
 
         // Profile content
@@ -185,7 +186,9 @@ class ProfileTab extends StatelessWidget {
                           Row(
                             children: [
                               Padding(
-                                padding: const EdgeInsetsDirectional.only(start: 20),
+                                padding: const EdgeInsetsDirectional.only(
+                                  start: 20,
+                                ),
                                 child: _Avatar(photoUrl: profile.photoUrl),
                               ),
                               const SizedBox(width: 12),
@@ -210,8 +213,11 @@ class ProfileTab extends StatelessWidget {
                             title: 'المعلومات الشخصية',
                             icon: Icons.badge_outlined,
                             onTap: () {
-                              Navigator.push(context,
-                                MaterialPageRoute(builder: (_) => EditProfilePage()),
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => EditProfilePage(),
+                                ),
                               );
                             },
                           ),
@@ -221,7 +227,9 @@ class ProfileTab extends StatelessWidget {
                             icon: Icons.track_changes_outlined,
                             onTap: () {
                               Navigator.of(context, rootNavigator: true).push(
-                                MaterialPageRoute(builder: (_) => const WeeklyGoalPage()),
+                                MaterialPageRoute(
+                                  builder: (_) => const WeeklyGoalPage(),
+                                ),
                               );
                             },
                           ),
@@ -231,7 +239,9 @@ class ProfileTab extends StatelessWidget {
                             icon: Icons.star_rate_outlined,
                             onTap: () {
                               Navigator.of(context, rootNavigator: true).push(
-                                MaterialPageRoute(builder: (_) => const RatingsPage()),
+                                MaterialPageRoute(
+                                  builder: (_) => const RatingsPage(),
+                                ),
                               );
                             },
                           ),
@@ -241,7 +251,21 @@ class ProfileTab extends StatelessWidget {
                             icon: Icons.notifications_none_outlined,
                             onTap: () {
                               Navigator.of(context, rootNavigator: true).push(
-                                MaterialPageRoute(builder: (_) => const NotificationsPage()),
+                                MaterialPageRoute(
+                                  builder: (_) => const NotificationsPage(),
+                                ),
+                              );
+                            },
+                          ),
+
+                          _ProfileButton(
+                            title: 'الاستماع بدون إنترنت',
+                            icon: Icons.offline_bolt_outlined,
+                            onTap: () {
+                              Navigator.of(context, rootNavigator: true).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const OfflineBooksPage(),
+                                ),
                               );
                             },
                           ),
@@ -279,8 +303,11 @@ class _Avatar extends StatelessWidget {
           ? NetworkImage(photoUrl!)
           : null,
       child: (photoUrl == null || photoUrl!.isEmpty)
-          ? Icon(Icons.person, size: 40,
-          color: ProfileTab._darkGreen.withOpacity(0.75))
+          ? Icon(
+              Icons.person,
+              size: 40,
+              color: ProfileTab._darkGreen.withOpacity(0.75),
+            )
           : null,
     );
   }
