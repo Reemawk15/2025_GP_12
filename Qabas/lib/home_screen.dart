@@ -308,7 +308,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// Scroll controller for the horizontal books list
   final ScrollController _booksScrollController = ScrollController();
-
+  final ScrollController _podcastsScrollController = ScrollController();
+  final ScrollController _recommendedScrollController = ScrollController();
   @override
   void initState() {
     super.initState();
@@ -539,22 +540,27 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// Scroll books horizontally when arrow is pressed
-  void _scrollBooks({required bool forward}) {
-    if (!_booksScrollController.hasClients) return;
+  void _scrollByController({
+    required ScrollController controller,
+    required bool forward,
+  }) {
+    if (!controller.hasClients) return;
 
     final double delta = coverW * visibleCount + coverGap * (visibleCount - 1);
-    final double target =
-        _booksScrollController.offset + (forward ? delta : -delta);
+    final double target = controller.offset + (forward ? delta : -delta);
 
-    _booksScrollController.animateTo(
-      target.clamp(0.0, _booksScrollController.position.maxScrollExtent),
+    controller.animateTo(
+      target.clamp(0.0, controller.position.maxScrollExtent),
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeOut,
     );
   }
 
   /// Small overlay arrow button used on top of the books rail
-  Widget _booksArrow({required bool isLeft}) {
+  Widget _railArrow({
+    required bool isLeft,
+    required ScrollController controller,
+  }) {
     return Container(
       width: 28,
       height: 28,
@@ -568,15 +574,19 @@ class _HomeScreenState extends State<HomeScreen> {
       child: IconButton(
         padding: EdgeInsets.zero,
         iconSize: 18,
-        onPressed: () => _scrollBooks(forward: isLeft),
+        onPressed: () => _scrollByController(
+          controller: controller,
+          forward: isLeft,
+        ),
         icon: Icon(
-          isLeft ? Icons.keyboard_double_arrow_left : Icons.keyboard_double_arrow_right,
+          isLeft
+              ? Icons.keyboard_double_arrow_left
+              : Icons.keyboard_double_arrow_right,
           color: _HomeColors.unselected,
         ),
       ),
     );
   }
-
   /// Centered horizontal list of covers with left/right arrows on top
   Widget _centeredCoversRail() {
     final cardW = coverW;
@@ -609,6 +619,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   return ListView.separated(
                     controller: _booksScrollController,
                     scrollDirection: Axis.horizontal,
+
                     padding: EdgeInsets.symmetric(horizontal: sidePad),
                     itemCount: docs.length,
                     separatorBuilder: (_, __) => SizedBox(width: gap),
@@ -671,11 +682,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
               Align(
-                  alignment: Alignment.centerRight,
-                  child: _booksArrow(isLeft: false)),
+                alignment: Alignment.centerRight,
+                child: _railArrow(
+                  isLeft: false,
+                  controller: _booksScrollController,
+                ),
+              ),
               Align(
-                  alignment: Alignment.centerLeft,
-                  child: _booksArrow(isLeft: true)),
+                alignment: Alignment.centerLeft,
+                child: _railArrow(
+                  isLeft: true,
+                  controller: _booksScrollController,
+                ),
+              ),
             ],
           ),
         );
@@ -698,85 +717,106 @@ class _HomeScreenState extends State<HomeScreen> {
 
         return SizedBox(
           height: cardH + 30.0,
-          child: StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
-            stream: _podcastsStream(),
-            builder: (context, snap) {
-              if (snap.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              if (!snap.hasData || snap.data!.isEmpty) {
-                return Center(
-                  child: Text(
-                    _searchQuery.isNotEmpty
-                        ? 'لا توجد نتائج مطابقة'
-                        : 'لا توجد بودكاستات مضافة',
-                  ),
-                );
-              }
+          child: Stack(
+            children: [
+              StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+                stream: _podcastsStream(),
+                builder: (context, snap) {
+                  if (snap.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
 
-              final docs = snap.data!;
-              return ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: EdgeInsets.symmetric(horizontal: sidePad),
-                itemCount: docs.length,
-                separatorBuilder: (_, __) => SizedBox(width: gap),
-                itemBuilder: (context, i) {
-                  final d = docs[i];
-                  final data = d.data();
-                  final cover = (data['coverUrl'] ?? '').toString();
-                  final title = (data['title'] ?? '').toString();
+                  if (!snap.hasData || snap.data!.isEmpty) {
+                    return Center(
+                      child: Text(
+                        _searchQuery.isNotEmpty
+                            ? 'لا توجد نتائج مطابقة'
+                            : 'لا توجد بودكاستات مضافة',
+                      ),
+                    );
+                  }
 
-                  return GestureDetector(
-                    onTap: () {
-                      Navigator.of(context)
-                          .push(
-                        MaterialPageRoute(
-                          builder: (_) => PodcastDetailsPage(podcastId: d.id),
-                        ),
-                      )
-                          .then((_) {
-                        _refreshRecs();
-                      });
-                    },
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: cardW,
-                          height: cardH,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(14),
-                            color: Colors.white,
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: cover.isNotEmpty
-                              ? Image.network(cover, fit: BoxFit.contain)
-                              : const Icon(
-                            Icons.podcasts,
-                            size: 48,
-                            color: _HomeColors.unselected,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        SizedBox(
-                          width: cardW,
-                          child: Text(
-                            title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                  final docs = snap.data!;
+
+                  return ListView.separated(
+                    controller: _podcastsScrollController,
+                    scrollDirection: Axis.horizontal,
+                    padding: EdgeInsets.symmetric(horizontal: sidePad),
+                    itemCount: docs.length,
+                    separatorBuilder: (_, __) => SizedBox(width: gap),
+                    itemBuilder: (context, i) {
+                      final d = docs[i];
+                      final data = d.data();
+                      final cover = (data['coverUrl'] ?? '').toString();
+                      final title = (data['title'] ?? '').toString();
+
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.of(context)
+                              .push(
+                            MaterialPageRoute(
+                              builder: (_) => PodcastDetailsPage(podcastId: d.id),
                             ),
-                          ),
+                          )
+                              .then((_) {
+                            _refreshRecs();
+                          });
+                        },
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: cardW,
+                              height: cardH,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(14),
+                                color: Colors.white,
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: cover.isNotEmpty
+                                  ? Image.network(cover, fit: BoxFit.contain)
+                                  : const Icon(
+                                Icons.podcasts,
+                                size: 48,
+                                color: _HomeColors.unselected,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            SizedBox(
+                              width: cardW,
+                              child: Text(
+                                title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      );
+                    },
                   );
                 },
-              );
-            },
+              ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: _railArrow(
+                  isLeft: false,
+                  controller: _podcastsScrollController,
+                ),
+              ),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: _railArrow(
+                  isLeft: true,
+                  controller: _podcastsScrollController,
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -829,65 +869,87 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               );
             }
+
             return SizedBox(
               height: cardH + 30.0,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: EdgeInsets.symmetric(horizontal: sidePad),
-                itemCount: items.length,
-                separatorBuilder: (_, __) => SizedBox(width: gap),
-                itemBuilder: (context, i) {
-                  final it = items[i];
-                  return GestureDetector(
-                    onTap: () {
-                      Navigator.of(context)
-                          .push(
-                        MaterialPageRoute(
-                          builder: (_) => (it.type == 'podcast')
-                              ? PodcastDetailsPage(podcastId: it.id)
-                              : BookDetailsPage(bookId: it.id),                        ),
-                      )
-                          .then((_) {
-                        _refreshRecs();
-                      });
-                    },
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: cardW,
-                          height: cardH,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(14),
-                            color: Colors.white,
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: it.coverUrl.isNotEmpty
-                              ? Image.network(it.coverUrl, fit: BoxFit.contain)
-                              : const Icon(
-                            Icons.menu_book,
-                            size: 48,
-                            color: _HomeColors.unselected,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        SizedBox(
-                          width: cardW,
-                          child: Text(
-                            it.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
+              child: Stack(
+                children: [
+                  ListView.separated(
+                    controller: _recommendedScrollController,
+                    scrollDirection: Axis.horizontal,
+                    padding: EdgeInsets.symmetric(horizontal: sidePad),
+                    itemCount: items.length,
+                    separatorBuilder: (_, __) => SizedBox(width: gap),
+                    itemBuilder: (context, i) {
+                      final it = items[i];
+
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.of(context)
+                              .push(
+                            MaterialPageRoute(
+                              builder: (_) => (it.type == 'podcast')
+                                  ? PodcastDetailsPage(podcastId: it.id)
+                                  : BookDetailsPage(bookId: it.id),
                             ),
-                          ),
+                          )
+                              .then((_) {
+                            _refreshRecs();
+                          });
+                        },
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: cardW,
+                              height: cardH,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(14),
+                                color: Colors.white,
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: it.coverUrl.isNotEmpty
+                                  ? Image.network(it.coverUrl, fit: BoxFit.contain)
+                                  : const Icon(
+                                Icons.menu_book,
+                                size: 48,
+                                color: _HomeColors.unselected,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            SizedBox(
+                              width: cardW,
+                              child: Text(
+                                it.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
+                      );
+                    },
+                  ),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: _railArrow(
+                      isLeft: false,
+                      controller: _recommendedScrollController,
                     ),
-                  );
-                },
+                  ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: _railArrow(
+                      isLeft: true,
+                      controller: _recommendedScrollController,
+                    ),
+                  ),
+                ],
               ),
             );
           },
@@ -895,7 +957,6 @@ class _HomeScreenState extends State<HomeScreen> {
       },
     );
   }
-
   Widget _homeContent() {
     final bottomSafe = MediaQuery.of(context).padding.bottom;
     const navH = kBottomNavigationBarHeight;

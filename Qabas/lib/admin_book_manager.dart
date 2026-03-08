@@ -311,11 +311,13 @@ class _AdminBookManagerScreenState extends State<AdminBookManagerScreen>
         }
       }
 
-      deletions.add(doc.reference.delete());
+      await doc.reference.delete(); // احذف الكتاب أولاً
 
-      await Future.wait(deletions);
+      if (mounted) {
+        _showSnack('تم حذف الكتاب بنجاح');
+      }
 
-      if (mounted) _showSnack('تم حذف الكتاب بنجاح');
+      await Future.wait(deletions); // باقي الحذف في الخلفية
     } catch (e, st) {
       debugPrint('Error deleting book ${doc.id}: $e\n$st');
       if (mounted) _showSnack('تعذّر الحذف: $e', icon: Icons.error_outline);
