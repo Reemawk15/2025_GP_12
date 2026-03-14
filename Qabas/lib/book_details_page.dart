@@ -162,31 +162,103 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
     });
   }
 
-  Future<void> _startOrGenerateAudio(
-    BuildContext context, {
-    required Map<String, dynamic> data,
-    required String title,
-    required String author,
-    required String cover,
+  String selectedVoiceId = 'ar_male_common_002';
 
-    int? overridePartIndex,
-    int? overridePositionMs,
-  }) async {
+  final List<Map<String, String>> arabicVoices = [
+    {'label': 'صوت رجل', 'id': 'ar_male_common_002'},
+    {'label': 'صوت امرأة', 'id': 'ar_female_common_002'},
+    {'label': 'صوت طفلة', 'id': 'ar_female_child_001'},
+    {'label': 'صوت كرتوني', 'id': 'ar_male_cartoon_001'},
+  ];
+
+  Future<String?> _showVoicePicker(BuildContext context) async {
+    String tempVoiceId = selectedVoiceId;
+
+    return showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'اختاري الصوت',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ...arabicVoices.map((voice) {
+                      final isSelected = tempVoiceId == voice['id'];
+                      return ListTile(
+                        title: Text(voice['label']!),
+                        trailing: Icon(
+                          isSelected
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_off,
+                        ),
+                        onTap: () {
+                          setModalState(() {
+                            tempVoiceId = voice['id']!;
+                          });
+                        },
+                      );
+                    }),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(context, tempVoiceId),
+                        child: const Text('متابعة'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _startOrGenerateAudio(
+      BuildContext context, {
+        required Map<String, dynamic> data,
+        required String title,
+        required String author,
+        required String cover,
+        int? overridePartIndex,
+        int? overridePositionMs,
+      }) async {
     await _trackUserAction(
       bookId: widget.bookId,
       bookData: data,
       action: 'press_listen',
     );
+
     final status = (data['audioStatus'] ?? 'idle').toString();
     final partsRaw = data['audioParts'];
+    final audioUrl = (data['audioUrl'] ?? '').toString().trim();
 
-    final bool hasParts = partsRaw is List && partsRaw.isNotEmpty;
+    final List<String> urls =
+    (partsRaw is List && partsRaw.isNotEmpty)
+        ? partsRaw.map((e) => e.toString()).toList()
+        : (audioUrl.isNotEmpty ? [audioUrl] : []);
 
-    // ✅ لو فيه أجزاء موجودة افتحي المشغل بكل الموجود
-    if (hasParts) {
-      final urls = partsRaw.map((e) => e.toString()).toList();
+    final bool hasAudio = urls.isNotEmpty;
 
-      // ✅ التعديل: التقدم/البوكمارك لازم يكون لكل يوزر (users/{uid}/library/{bookId})
+    // ✅ إذا فيه صوت جاهز افتحي المشغل مباشرة
+    if (hasAudio) {
       int lastPartIndex = 0;
       int lastPositionMs = 0;
 
@@ -206,7 +278,6 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
         } catch (_) {}
       }
 
-      // ✅ بعد Firestore، نغلبه لو جايين من علامة
       if (overridePartIndex != null && overridePositionMs != null) {
         lastPartIndex = overridePartIndex;
         lastPositionMs = overridePositionMs;
@@ -227,27 +298,10 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
         ),
       );
 
-      // ✅ (اختياري) إذا تبين عند الضغط وهو processing يحاول يكمل جزء واحد بالخلفية
-      if (status == 'processing') {
-        try {
-          if (user != null) {
-            final functions = FirebaseFunctions.instanceFor(
-              region: 'us-central1',
-            );
-            final callable = functions.httpsCallable(
-              'generateBookAudio',
-              options: HttpsCallableOptions(
-                timeout: const Duration(minutes: 9),
-              ),
-            );
-            await callable.call({'bookId': widget.bookId, 'maxParts': 30});
-          }
-        } catch (_) {}
-      }
       return;
     }
 
-    // ✅ ما فيه أجزاء -> نبدأ توليد
+    // ✅ إذا ما فيه صوت: خلي المستخدم يختار الصوت ثم ابدأي التوليد
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
@@ -255,18 +309,38 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
         return;
       }
 
+      final pickedVoiceId = await _showVoicePicker(context);
+      if (pickedVoiceId == null || pickedVoiceId.isEmpty) {
+        return;
+      }
+
+      setState(() {
+        selectedVoiceId = pickedVoiceId;
+      });
+
       _showSnack(context, 'جاري توليد الصوت…', icon: Icons.settings_rounded);
 
-      final functions = FirebaseFunctions.instanceFor(region: 'us-central1');
-      final callable = functions.httpsCallable(
-        'generateBookAudio',
-        options: HttpsCallableOptions(timeout: const Duration(minutes: 9)),
+      final callable = FirebaseFunctions.instanceFor(
+        region: 'us-central1',
+      ).httpsCallable(
+        'generateBookAudioV2',
+        options: HttpsCallableOptions(
+          timeout: const Duration(minutes: 9),
+        ),
       );
 
-      await callable.call({'bookId': widget.bookId, 'maxParts': 30});
+      await callable.call({
+        'bookId': widget.bookId,
+        'voiceId': selectedVoiceId,
+      });
+
       _pollUntilHasAnyPart(context);
     } on FirebaseFunctionsException catch (e) {
-      _showSnack(context, 'تعذّر: ${e.code}', icon: Icons.error_outline);
+      _showSnack(
+        context,
+        'تعذّر: ${e.code}${e.message != null ? ' - ${e.message}' : ''}',
+        icon: Icons.error_outline,
+      );
       _pollUntilHasAnyPart(context);
     } catch (_) {
       _showSnack(context, 'تعذّر توليد الصوت', icon: Icons.error_outline);

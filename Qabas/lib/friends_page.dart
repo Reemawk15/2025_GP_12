@@ -129,7 +129,7 @@ class _FriendsTabBar extends StatelessWidget {
       indicatorSize: TabBarIndicatorSize.tab,
       indicator: const UnderlineTabIndicator(
         borderSide: BorderSide(width: 4, color: _darkGreen),
-        insets: EdgeInsets.symmetric(horizontal: 35), // ← هنا تتحكمين بطول الخط
+        insets: EdgeInsets.symmetric(horizontal: 35),
       ),
       labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
       unselectedLabelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
@@ -214,7 +214,6 @@ class _RequestsTab extends StatelessWidget {
   static const Color _confirm = Color(0xFF6F8E63);
   static const Color _danger  = Color(0xFFB64B4B);
 
-  /// Accept incoming friend request
   Future<void> _accept(BuildContext context, String fromUid) async {
     final myUid = FirebaseAuth.instance.currentUser!.uid;
     final batch = FirebaseFirestore.instance.batch();
@@ -249,7 +248,6 @@ class _RequestsTab extends StatelessWidget {
     }
   }
 
-  /// Decline incoming friend request
   Future<void> _decline(BuildContext context, String fromUid) async {
     final myUid = FirebaseAuth.instance.currentUser!.uid;
     final reqRef = FirebaseFirestore.instance
@@ -341,7 +339,7 @@ class _RequestsTab extends StatelessWidget {
   }
 }
 
-// ======================== Tab: Search Friends (with Pending + Friends) ========================
+// ======================== Tab: Search Friends ========================
 class _SearchTab extends StatefulWidget {
   final String background;
   const _SearchTab({required this.background});
@@ -354,11 +352,8 @@ class _SearchTabState extends State<_SearchTab> {
   final TextEditingController _controller = TextEditingController();
   bool _loading = false;
   List<_FriendUser> _results = const [];
-
-  // Tracks whether a search was performed with a non-empty query
   bool _hasSearched = false;
 
-  // Normalize Arabic text for better matching
   String normalize(String s) => s
       .trim()
       .toLowerCase()
@@ -369,7 +364,6 @@ class _SearchTabState extends State<_SearchTab> {
       .replaceAll('ة', 'ه')
       .replaceAll('ى', 'ي');
 
-  /// Search logic with friend and pending detection (initial snapshot)
   Future<void> _onSearch(String raw) async {
     final me = FirebaseAuth.instance.currentUser;
     if (me == null) return;
@@ -391,17 +385,14 @@ class _SearchTabState extends State<_SearchTab> {
     try {
       final fs = FirebaseFirestore.instance;
 
-      // Current friends
       final myFriendsSnap =
       await fs.collection('users').doc(me.uid).collection('friends').get();
       final myFriends = myFriendsSnap.docs.map((d) => d.id).toSet();
 
-      // Incoming requests to me
       final myIncomingReqsSnap =
       await fs.collection('users').doc(me.uid).collection('friendRequests').get();
       final incomingFrom = myIncomingReqsSnap.docs.map((d) => d.id).toSet();
 
-      // Prefix queries for username and name
       Future<QuerySnapshot<Map<String, dynamic>>> qBy(String field) {
         return fs
             .collection('users')
@@ -423,13 +414,13 @@ class _SearchTabState extends State<_SearchTab> {
       void addDoc(QueryDocumentSnapshot<Map<String, dynamic>> d) {
         final uid = d.id;
         if (uid == me.uid) return;
-        // Hide users who already sent me a request (they appear in Requests tab)
         if (incomingFrom.contains(uid)) return;
 
-        final data     = d.data();
-        final name     = (data['name'] ?? '') as String;
+        final data = d.data();
+        final name = (data['name'] ?? '') as String;
         final username = (data['username'] ?? '') as String;
         final photoUrl = (data['photoUrl'] as String?) ?? '';
+        final isPrivate = (data['isPrivate'] as bool?) ?? false;
 
         final handle = username.isEmpty
             ? ''
@@ -440,6 +431,7 @@ class _SearchTabState extends State<_SearchTab> {
           name: name,
           handle: handle,
           photoUrl: photoUrl.isEmpty ? null : photoUrl,
+          isPrivate: isPrivate,
         );
       }
 
@@ -449,7 +441,6 @@ class _SearchTabState extends State<_SearchTab> {
         }
       }
 
-      // Fallback: client-side filter if nothing matched
       if (map.isEmpty) {
         final allSnap = await fs.collection('users').limit(200).get();
         for (final d in allSnap.docs) {
@@ -457,9 +448,10 @@ class _SearchTabState extends State<_SearchTab> {
           if (uid == me.uid) continue;
           if (incomingFrom.contains(uid)) continue;
 
-          final data     = d.data();
-          final name     = (data['name'] ?? '') as String;
+          final data = d.data();
+          final name = (data['name'] ?? '') as String;
           final username = (data['username'] ?? '') as String;
+          final isPrivate = (data['isPrivate'] as bool?) ?? false;
 
           final nameN = normalize(name);
           final userN = normalize(username);
@@ -475,17 +467,16 @@ class _SearchTabState extends State<_SearchTab> {
               name: name,
               handle: handle,
               photoUrl: photoUrl.isEmpty ? null : photoUrl,
+              isPrivate: isPrivate,
             );
           }
         }
       }
 
-      // Mark which of the results are already friends (initial snapshot only)
       map.updateAll(
             (uid, user) => user.copyWith(isFriend: myFriends.contains(uid)),
       );
 
-      // Mark "pending" (outgoing request) for results if exists (initial snapshot only)
       final uids = map.keys.toList();
       if (uids.isNotEmpty) {
         final futures = uids.map((otherUid) {
@@ -521,7 +512,6 @@ class _SearchTabState extends State<_SearchTab> {
     }
   }
 
-  /// Send friend request (Firestore write; UI will be updated by streams)
   Future<void> _sendRequest(String toUid) async {
     final me = FirebaseAuth.instance.currentUser!;
     final reqRef = FirebaseFirestore.instance
@@ -549,7 +539,6 @@ class _SearchTabState extends State<_SearchTab> {
     }
   }
 
-  /// Cancel outgoing friend request
   Future<void> _cancelRequest(String toUid) async {
     final me = FirebaseAuth.instance.currentUser!;
     final fs = FirebaseFirestore.instance;
@@ -562,7 +551,6 @@ class _SearchTabState extends State<_SearchTab> {
 
     try {
       await reqRef.delete();
-
       FriendsPage._showAppSnack(context, 'تم إلغاء طلب الإضافة');
     } catch (e) {
       FriendsPage._showAppSnack(
@@ -573,7 +561,6 @@ class _SearchTabState extends State<_SearchTab> {
     }
   }
 
-  /// Confirmation dialog (same visual style as unfriend dialog in FriendDetailsPage)
   Future<void> _confirmCancel(String toUid) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -693,7 +680,6 @@ class _SearchTabState extends State<_SearchTab> {
                     ),
                     IconButton(
                       onPressed: () {
-                        // Clear query and results; also reset search state
                         _controller.clear();
                         setState(() {
                           _results = const [];
@@ -752,7 +738,6 @@ class _SearchTabState extends State<_SearchTab> {
   }
 }
 
-/// Row widget that listens in real time to friend and pending state
 class _SearchResultRow extends StatelessWidget {
   final _FriendUser user;
   final VoidCallback onOpenDetails;
@@ -795,7 +780,6 @@ class _SearchResultRow extends StatelessWidget {
         final isFriend = friendSnap.data?.exists == true;
 
         if (isFriend) {
-          // Already a friend
           return _FriendCard(
             name: user.name.isEmpty ? 'بدون اسم' : user.name,
             handle: user.handle,
@@ -820,7 +804,6 @@ class _SearchResultRow extends StatelessWidget {
           );
         }
 
-        // Not a friend -> check pending request in real time
         return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
           stream: pendingStream,
           builder: (context, pendingSnap) {
@@ -828,7 +811,6 @@ class _SearchResultRow extends StatelessWidget {
 
             Widget trailing;
             if (pending) {
-              // Pending request -> show cancel dialog on tap
               trailing = InkWell(
                 onTap: onCancel,
                 borderRadius: BorderRadius.circular(10),
@@ -847,8 +829,33 @@ class _SearchResultRow extends StatelessWidget {
                   ),
                 ),
               );
+            } else if (user.isPrivate) {
+              trailing = Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Text(
+                      'خاص',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0E3A2C),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _TinyActionButton(
+                    label: 'إضافة',
+                    color: const Color(0xFF6F8E63),
+                    onTap: onAdd,
+                  ),
+                ],
+              );
             } else {
-              // No pending request -> show Add button
               trailing = _TinyActionButton(
                 label: 'إضافة',
                 color: const Color(0xFF6F8E63),
@@ -878,8 +885,9 @@ class _FriendUser {
   final String name;
   final String handle;
   final String? photoUrl;
-  final bool pending;   // Initial pending snapshot (not used for real-time state)
-  final bool isFriend;  // Initial friend snapshot (not used for real-time state)
+  final bool pending;
+  final bool isFriend;
+  final bool isPrivate;
 
   _FriendUser({
     required this.uid,
@@ -888,15 +896,17 @@ class _FriendUser {
     this.photoUrl,
     this.pending = false,
     this.isFriend = false,
+    this.isPrivate = false,
   });
 
-  _FriendUser copyWith({bool? pending, bool? isFriend}) => _FriendUser(
+  _FriendUser copyWith({bool? pending, bool? isFriend, bool? isPrivate}) => _FriendUser(
     uid: uid,
     name: name,
     handle: handle,
     photoUrl: photoUrl,
     pending: pending ?? this.pending,
     isFriend: isFriend ?? this.isFriend,
+    isPrivate: isPrivate ?? this.isPrivate,
   );
 }
 
@@ -1026,7 +1036,7 @@ class _FriendTileFromUid extends StatelessWidget {
   }
 }
 
-// ======================== Tiny action button (Accept / Decline / Add) ========================
+// ======================== Tiny action button ========================
 class _TinyActionButton extends StatelessWidget {
   final String label;
   final Color color;

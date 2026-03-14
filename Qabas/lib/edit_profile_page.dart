@@ -27,6 +27,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
   String? _photoUrl;
   bool _loading = true;
   bool _saving = false;
+  bool _isPrivate = false;
+  bool _originalIsPrivate = false;
+
 
   User get _user => FirebaseAuth.instance.currentUser!;
 
@@ -75,6 +78,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
       _username.text  = (data['username'] as String?) ?? '';
       _email.text     = (data['email'] as String?) ?? _user.email ?? '';
       _photoUrl       = (data['photoUrl'] as String?) ?? _user.photoURL;
+      _isPrivate = (data['isPrivate'] as bool?) ?? false;
+      _originalIsPrivate = _isPrivate;
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -237,11 +242,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
           'displayName': newName,
           'nameLower': newName.toLowerCase(),
         },
+        'isPrivate': _isPrivate,
         if (_photoUrl != null) 'photoUrl': _photoUrl,
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
-      final willWriteProfile = nameChanged || photoChanged;
+      final privacyChanged = _isPrivate != _originalIsPrivate;
+      final willWriteProfile = nameChanged || photoChanged || privacyChanged;
       if (willWriteProfile) {
         await FirebaseFirestore.instance
             .collection('users').doc(_user.uid)
@@ -261,6 +268,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       }
 
       if (anySuccess) {
+        _originalIsPrivate = _isPrivate;
         _showSnack('تم حفظ التعديلات ', icon: Icons.check_circle);
         if (mounted) Navigator.pop(context);
       } else {
@@ -420,6 +428,63 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                     ),
                                     validator: (_) => null,
                                   ),
+
+                                  const SizedBox(height: 12),
+
+                                  _label('الخصوصية'),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF6F7F5),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: _lightGreen, width: 2),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Switch(
+                                          value: _isPrivate,
+                                          activeColor: _confirm,
+                                          onChanged: (value) {
+                                            setState(() => _isPrivate = value);
+                                          },
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.end,
+                                            children: [
+                                              SizedBox(
+                                                width: double.infinity,
+                                                child: Directionality(
+                                                  textDirection: TextDirection.ltr,
+                                                  child: Text(
+                                                    'الحساب الخاص',
+                                                    textAlign: TextAlign.left,
+                                                    style: const TextStyle(
+                                                      fontSize: 14.5,
+                                                      fontWeight: FontWeight.w700,
+                                                      color: _darkGreen,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              const Text(
+                                                'عند التفعيل، لا يمكن للآخرين رؤية ملفك الشخصي إلا بعد قبول طلب الإضافة.',
+                                                textAlign: TextAlign.right,
+                                                style: TextStyle(
+                                                  fontSize: 12.5,
+                                                  color: Colors.black54,
+                                                  height: 1.35,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
                                   const SizedBox(height: 12),
 
                                   _label('كلمة المرور'),

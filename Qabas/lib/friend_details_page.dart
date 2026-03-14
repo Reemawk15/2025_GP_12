@@ -15,10 +15,10 @@ const Color _danger = Color(0xFFB64B4B);
 
 /// Unified snack bar helper
 void _showAppSnack(
-  BuildContext context,
-  String message, {
-  IconData icon = Icons.check_circle,
-}) {
+    BuildContext context,
+    String message, {
+      IconData icon = Icons.check_circle,
+    }) {
   final messenger = ScaffoldMessenger.of(context);
   messenger.hideCurrentSnackBar();
   messenger.showSnackBar(
@@ -53,9 +53,8 @@ class FriendDetailsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final userDoc = FirebaseFirestore.instance
-        .collection('users')
-        .doc(friendUid);
+    final userDoc = FirebaseFirestore.instance.collection('users').doc(friendUid);
+    final me = FirebaseAuth.instance.currentUser;
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -82,29 +81,96 @@ class FriendDetailsPage extends StatelessWidget {
               ),
             ),
             flexibleSpace: SafeArea(child: _FriendHeader(userDoc: userDoc)),
-            bottom: const PreferredSize(
-              preferredSize: Size.fromHeight(86),
-              child: _TabbarContainer(),
+            bottom: me == null
+                ? null
+                : PreferredSize(
+              preferredSize: const Size.fromHeight(86),
+              child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                stream: userDoc.snapshots(),
+                builder: (context, userSnap) {
+                  final userData = userSnap.data?.data() ?? {};
+                  final isPrivate = (userData['isPrivate'] as bool?) ?? false;
+
+                  final myFriendDoc = FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(me.uid)
+                      .collection('friends')
+                      .doc(friendUid);
+
+                  return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                    stream: myFriendDoc.snapshots(),
+                    builder: (context, friendSnap) {
+                      final isFriend = friendSnap.data?.exists == true;
+                      final shouldLock = isPrivate && !isFriend;
+
+                      if (shouldLock) {
+                        return const SizedBox(height: 86);
+                      }
+
+                      return const _TabbarContainer();
+                    },
+                  );
+                },
+              ),
             ),
           ),
-          body: Stack(
-            clipBehavior: Clip.none,
-            children: const [
-              Positioned.fill(
-                child: Image(
-                  image: AssetImage('assets/images/friend.png'),
-                  fit: BoxFit.cover,
-                ),
-              ),
-              TabBarView(
-                physics: BouncingScrollPhysics(),
-                children: [
-                  _StatsTabWrapper(),
-                  _ReviewsTabWrapper(),
-                  _ClubsTabWrapper(),
-                ],
-              ),
-            ],
+          body: me == null
+              ? const Center(child: Text('الرجاء تسجيل الدخول.'))
+              : StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+            stream: userDoc.snapshots(),
+            builder: (context, userSnap) {
+              final userData = userSnap.data?.data() ?? {};
+              final isPrivate = (userData['isPrivate'] as bool?) ?? false;
+
+              final myFriendDoc = FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(me.uid)
+                  .collection('friends')
+                  .doc(friendUid);
+
+              return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                stream: myFriendDoc.snapshots(),
+                builder: (context, friendSnap) {
+                  final isFriend = friendSnap.data?.exists == true;
+                  final shouldLock = isPrivate && !isFriend;
+
+                  if (shouldLock) {
+                    return const Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Positioned.fill(
+                          child: Image(
+                            image: AssetImage('assets/images/friend.png'),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        _PrivateAccountView(),
+                      ],
+                    );
+                  }
+
+                  return const Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Positioned.fill(
+                        child: Image(
+                          image: AssetImage('assets/images/friend.png'),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      TabBarView(
+                        physics: BouncingScrollPhysics(),
+                        children: [
+                          _StatsTabWrapper(),
+                          _ReviewsTabWrapper(),
+                          _ClubsTabWrapper(),
+                        ],
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
           ),
         ),
       ),
@@ -132,34 +198,29 @@ class _FriendHeader extends StatelessWidget {
         final userAsTail = username.isEmpty
             ? ''
             : (username.startsWith('@')
-                  ? '${username.substring(1)}@'
-                  : '$username@');
+            ? '${username.substring(1)}@'
+            : '$username@');
 
         return Align(
           alignment: Alignment.topCenter,
           child: Transform.translate(
             offset: const Offset(13, -53),
             child: SizedBox(
-              // Fixed header width so avatar and button stay aligned for all users
               width: 257,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Avatar (fixed position)
                   CircleAvatar(
                     radius: 26,
                     backgroundColor: Colors.white,
-                    backgroundImage: photoUrl.isEmpty
-                        ? null
-                        : NetworkImage(photoUrl),
+                    backgroundImage:
+                    photoUrl.isEmpty ? null : NetworkImage(photoUrl),
                     child: photoUrl.isEmpty
                         ? const Icon(Icons.person, color: Colors.black38)
                         : null,
                   ),
                   const SizedBox(width: 10),
-
-                  // Name + username (do not push the friend button)
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -188,10 +249,7 @@ class _FriendHeader extends StatelessWidget {
                       ],
                     ),
                   ),
-
                   const SizedBox(width: 12),
-
-                  // Friend button (fixed at the end)
                   _DynamicFriendAction(
                     friendUid: userDoc.id,
                     friendName: name.isEmpty ? 'الصديق' : name,
@@ -250,7 +308,6 @@ class _DynamicFriendAction extends StatelessWidget {
           builder: (context, reqSnap) {
             final waiting = reqSnap.data?.exists == true;
             if (waiting) {
-              // Pending state: tapping shows the same cancel-request dialog as in Friends search tab
               return InkWell(
                 onTap: () => _HeaderAndTabs.confirmCancelPendingRequest(
                   context,
@@ -276,7 +333,6 @@ class _DynamicFriendAction extends StatelessWidget {
                 ),
               );
             }
-            // Default: user is not friend and no pending request -> show Add button
             return GestureDetector(
               onTap: () => _HeaderAndTabs.sendFriendRequest(context, friendUid),
               behavior: HitTestBehavior.opaque,
@@ -361,14 +417,70 @@ class _TabsOnly extends StatelessWidget {
 }
 
 /// ===============================
+/// Private account locked view
+/// ===============================
+class _PrivateAccountView extends StatelessWidget {
+  const _PrivateAccountView();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 280, 24, 24),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black12,
+                blurRadius: 10,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: const Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.lock_outline_rounded, size: 42, color: _darkGreen),
+              SizedBox(height: 12),
+              Text(
+                'هذا الحساب خاص',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: _darkGreen,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'أرسل طلب إضافة وانتظر القبول حتى تتمكن من مشاهدة الملف الشخصي.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.black54,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// ===============================
 /// Friend operations (send request / unfriend / cancel pending)
 /// ===============================
 class _HeaderAndTabs {
-  /// Send new friend request from FriendDetails header
   static Future<void> sendFriendRequest(
-    BuildContext context,
-    String friendUid,
-  ) async {
+      BuildContext context,
+      String friendUid,
+      ) async {
     final me = FirebaseAuth.instance.currentUser;
     if (me == null) return;
 
@@ -389,12 +501,11 @@ class _HeaderAndTabs {
     }
   }
 
-  /// Confirmation dialog to unfriend (same style as club leave dialog)
   static Future<void> _confirmUnfollow(
-    BuildContext context,
-    String friendName,
-    String friendUid,
-  ) async {
+      BuildContext context,
+      String friendName,
+      String friendUid,
+      ) async {
     final me = FirebaseAuth.instance.currentUser;
     if (me == null) return;
 
@@ -476,7 +587,6 @@ class _HeaderAndTabs {
     }
   }
 
-  /// Remove friend relationship in both directions and clean any pending requests
   static Future<void> _unfriend(String myUid, String friendUid) async {
     final fs = FirebaseFirestore.instance;
     final batch = fs.batch();
@@ -511,12 +621,10 @@ class _HeaderAndTabs {
     await batch.commit();
   }
 
-  /// Public helper used from the pending badge in header.
-  /// Shows "Cancel friend request" confirmation dialog (same style as search tab).
   static Future<void> confirmCancelPendingRequest(
-    BuildContext context,
-    String friendUid,
-  ) async {
+      BuildContext context,
+      String friendUid,
+      ) async {
     final me = FirebaseAuth.instance.currentUser;
     if (me == null) return;
 
@@ -594,15 +702,13 @@ class _HeaderAndTabs {
       await _cancelPendingRequest(me.uid, friendUid);
       if (!context.mounted) return;
       _showAppSnack(context, 'تم إلغاء طلب الإضافة');
-      // No need to manually update UI; StreamBuilder on friendRequests will update in real time.
     }
   }
 
-  /// Delete outgoing friend request document from Firestore.
   static Future<void> _cancelPendingRequest(
-    String myUid,
-    String friendUid,
-  ) async {
+      String myUid,
+      String friendUid,
+      ) async {
     final fs = FirebaseFirestore.instance;
     final reqRef = fs
         .collection('users')
@@ -647,7 +753,6 @@ class _StatsTab extends StatelessWidget {
         final data = snap.data?.data();
         final best = data?['bestStreak'] ?? 0;
         final current = data?['currentStreak'] ?? 0;
-        final listened = data?['listenedCount'] ?? 0;
 
         final items = <Widget>[
           _StatCard(icon: '🏅', text: 'أفضل مداومة: $best يوم'),
@@ -667,44 +772,6 @@ class _StatsTab extends StatelessWidget {
           separatorBuilder: (_, __) => const SizedBox(height: 32),
           itemCount: items.length,
         );
-
-        /*
-        return ListView.separated(
-          padding: const EdgeInsets.fromLTRB(16, 300, 16, 24),
-          itemBuilder: (_, i) => Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-            decoration: BoxDecoration(
-              color: _card,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: const [
-                BoxShadow(
-                  color: Colors.black12,
-                  blurRadius: 8,
-                  offset: Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(items[i].icon, style: const TextStyle(fontSize: 22)),
-                Expanded(
-                  child: Text(
-                    items[i].text,
-                    textAlign: TextAlign.right,
-                    style: const TextStyle(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w700,
-                      color: _darkGreen,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          separatorBuilder: (_, __) => const SizedBox(height: 32),
-          itemCount: items.length,
-        );*/
       },
     );
   }
@@ -991,17 +1058,17 @@ class _FriendReviewTile extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
             child: (coverUrl != null && coverUrl!.isNotEmpty)
                 ? Image.network(
-                    coverUrl!,
-                    width: 56,
-                    height: 72,
-                    fit: BoxFit.cover,
-                  )
+              coverUrl!,
+              width: 56,
+              height: 72,
+              fit: BoxFit.cover,
+            )
                 : Container(
-                    width: 56,
-                    height: 72,
-                    color: Colors.white.withOpacity(0.6),
-                    child: const Icon(Icons.menu_book, color: _darkGreen),
-                  ),
+              width: 56,
+              height: 72,
+              color: Colors.white.withOpacity(0.6),
+              child: const Icon(Icons.menu_book, color: _darkGreen),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -1123,12 +1190,10 @@ class _ClubsTab extends StatelessWidget {
 
         final clubs = snap.data?.docs ?? const [];
 
-        // ما فيه أندية أصلاً في التطبيق
         if (clubs.isEmpty) {
           return _clubsEmptyBox();
         }
 
-        // هنا نسوي تشيك مرة وحدة: هل صديقك عضو في أي نادي من هذي؟
         return FutureBuilder<List<bool>>(
           future: _loadMembershipForClubs(clubs, friendUid),
           builder: (context, memSnap) {
@@ -1164,21 +1229,18 @@ class _ClubsTab extends StatelessWidget {
             final membership =
                 memSnap.data ?? List<bool>.filled(clubs.length, false);
 
-            // نفلتر فقط الأندية اللي صديقك عضو فيها
             final visibleClubs =
-                <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+            <QueryDocumentSnapshot<Map<String, dynamic>>>[];
             for (int i = 0; i < clubs.length; i++) {
               if (membership[i]) {
                 visibleClubs.add(clubs[i]);
               }
             }
 
-            // لو ما طلع ولا نادي صديقك عضو فيه → نفس فكرة "لا توجد تقييمات بعد"
             if (visibleClubs.isEmpty) {
               return _clubsEmptyBox();
             }
 
-            // نفس كودك القديم تقريباً لكن على قائمة الأندية اللي هو عضو فيها فقط
             return Padding(
               padding: const EdgeInsets.fromLTRB(16, 280, 16, 24),
               child: ListView.separated(
@@ -1261,7 +1323,6 @@ class _ClubsTab extends StatelessWidget {
     );
   }
 
-  // نفس فكرة كارد "لا توجد تقييمات بعد" لكن للنادي
   static Widget _clubsEmptyBox() {
     return Center(
       child: Container(
@@ -1283,11 +1344,10 @@ class _ClubsTab extends StatelessWidget {
     );
   }
 
-  // تشيك مره واحدة لكل الأندية: هل هذا الفرند عضو فيها ولا لا
   static Future<List<bool>> _loadMembershipForClubs(
-    List<QueryDocumentSnapshot<Map<String, dynamic>>> clubs,
-    String friendUid,
-  ) async {
+      List<QueryDocumentSnapshot<Map<String, dynamic>>> clubs,
+      String friendUid,
+      ) async {
     final fs = FirebaseFirestore.instance;
 
     final futures = clubs.map((clubDoc) {
@@ -1348,30 +1408,30 @@ class _JoinOrOpenButtonFDState extends State<_JoinOrOpenButtonFD> {
             onPressed: _busy
                 ? null
                 : () async {
-                    setState(() => _busy = true);
-                    try {
-                      if (!isMember) {
-                        await FirebaseFirestore.instance
-                            .collection('clubs')
-                            .doc(widget.clubId)
-                            .collection('members')
-                            .doc(me.uid)
-                            .set({'joinedAt': FieldValue.serverTimestamp()});
-                      }
-                      if (context.mounted) {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => ClubChatPage(
-                              clubId: widget.clubId,
-                              clubTitle: widget.clubTitle,
-                            ),
-                          ),
-                        );
-                      }
-                    } finally {
-                      if (mounted) setState(() => _busy = false);
-                    }
-                  },
+              setState(() => _busy = true);
+              try {
+                if (!isMember) {
+                  await FirebaseFirestore.instance
+                      .collection('clubs')
+                      .doc(widget.clubId)
+                      .collection('members')
+                      .doc(me.uid)
+                      .set({'joinedAt': FieldValue.serverTimestamp()});
+                }
+                if (context.mounted) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => ClubChatPage(
+                        clubId: widget.clubId,
+                        clubTitle: widget.clubTitle,
+                      ),
+                    ),
+                  );
+                }
+              } finally {
+                if (mounted) setState(() => _busy = false);
+              }
+            },
             style: TextButton.styleFrom(
               backgroundColor: bg,
               foregroundColor: _darkGreen,
@@ -1383,17 +1443,17 @@ class _JoinOrOpenButtonFDState extends State<_JoinOrOpenButtonFD> {
             ),
             child: _busy
                 ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation(_darkGreen),
-                    ),
-                  )
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation(_darkGreen),
+              ),
+            )
                 : Text(
-                    label,
-                    style: const TextStyle(fontWeight: FontWeight.w800),
-                  ),
+              label,
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
           ),
         );
       },
