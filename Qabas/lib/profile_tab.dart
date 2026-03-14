@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'my_stats_page.dart';
 
 import 'edit_profile_page.dart';
 import 'main.dart'; // Return to HomePage after logout
@@ -221,7 +222,17 @@ class ProfileTab extends StatelessWidget {
                               );
                             },
                           ),
-
+                          _ProfileButton(
+                            title: 'إحصائياتي',
+                            icon: Icons.bar_chart_rounded,
+                            onTap: () {
+                              Navigator.of(context, rootNavigator: true).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const MyStatsPage(),
+                                ),
+                              );
+                            },
+                          ),
                           _ProfileButton(
                             title: 'هدف الاستماع الأسبوعي',
                             icon: Icons.track_changes_outlined,

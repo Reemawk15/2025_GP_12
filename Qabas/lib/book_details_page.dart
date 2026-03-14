@@ -13,6 +13,7 @@ import 'marks_notes_page.dart';
 import 'Book_chatbot.dart';
 import 'dart:async';
 import 'package:confetti/confetti.dart';
+import 'user_stats_service.dart';
 
 // Theme colors
 const _primary = Color(0xFF0E3A2C); // Dark text/icons
@@ -1830,6 +1831,7 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
   late final ConfettiController _confettiController;
 
   bool _loading = true;
+  bool _streakSentThisSession = false;
 
   double _speed = 1.0;
   final List<double> _speeds = const [0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
@@ -1902,7 +1904,6 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
       });
     } catch (_) {}
   }
-
   @override
   void initState() {
     super.initState();
@@ -1914,13 +1915,21 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
 
     _player.playingStream.listen((isPlaying) async {
       if (isPlaying) {
+        // أول تشغيل حقيقي في هذه الجلسة
+        if (!_streakSentThisSession) {
+          final user = FirebaseAuth.instance.currentUser;
+          if (user != null) {
+            await UserStatsService.updateUserStreak(user.uid);
+          }
+          _streakSentThisSession = true;
+        }
+
         if (!_listenWatch.isRunning) _listenWatch.start();
 
         _statsTimer ??= Timer.periodic(const Duration(seconds: 25), (_) async {
           await _flushListeningTick();
         });
 
-        // ✅ NEW: حفظ مكان الاستماع تلقائيًا
         _resumeTimer ??= Timer.periodic(const Duration(seconds: 8), (_) async {
           await _autoSaveResume();
         });
@@ -1928,7 +1937,6 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
         _statsTimer?.cancel();
         _statsTimer = null;
 
-        // ✅ NEW: أول ما يوقف احفظ مرة
         _resumeTimer?.cancel();
         _resumeTimer = null;
         await _autoSaveResume();

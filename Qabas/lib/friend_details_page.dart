@@ -400,7 +400,7 @@ class _TabsOnly extends StatelessWidget {
       unselectedLabelColor: Colors.black54,
       indicator: UnderlineTabIndicator(
         borderSide: BorderSide(width: 4, color: _darkGreen),
-        insets: EdgeInsets.symmetric(horizontal: 24),
+        insets: EdgeInsets.symmetric(horizontal: 1),
       ),
       labelStyle: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
       unselectedLabelStyle: TextStyle(
@@ -737,8 +737,6 @@ class _StatsTab extends StatelessWidget {
   final String friendUid;
   const _StatsTab({required this.friendUid});
 
-  static const Color _card = Color(0xFFE6F0E0);
-
   @override
   Widget build(BuildContext context) {
     final statsRef = FirebaseFirestore.instance
@@ -750,19 +748,24 @@ class _StatsTab extends StatelessWidget {
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: statsRef.snapshots(),
       builder: (context, snap) {
-        final data = snap.data?.data();
-        final best = data?['bestStreak'] ?? 0;
-        final current = data?['currentStreak'] ?? 0;
+        final data = snap.data?.data() ?? {};
+
+        final best = (data['bestStreak'] ?? 0) as int;
+        final current = (data['currentStreak'] ?? 0) as int;
+        final completed = (data['completedBooksCount'] ?? 0) as int;
 
         final items = <Widget>[
-          _StatCard(icon: '🏅', text: 'أفضل مداومة: $best يوم'),
-          _StatCard(icon: '🔥', text: 'المداومة الحالية: $current يوم'),
-          FutureBuilder<int>(
-            future: _getCompletedBooksCount(friendUid),
-            builder: (context, s) {
-              final count = s.data ?? 0;
-              return _StatCard(icon: '📚', text: 'الكتب المنجزة: $count كتاب');
-            },
+          _StatCard(
+            icon: '🏅',
+            text: 'أفضل مداومة: ${_formatArabicCount(best, "يوم", "أيام")}',
+          ),
+          _StatCard(
+            icon: '🔥',
+            text: 'المداومة الحالية: ${_formatArabicCount(current, "يوم", "أيام")}',
+          ),
+          _StatCard(
+            icon: '📚',
+            text: 'الكتب المنجزة: ${_formatArabicCount(completed, "كتاب", "كتب")}',
           ),
         ];
 
@@ -776,6 +779,27 @@ class _StatsTab extends StatelessWidget {
     );
   }
 }
+String _toArabicDigits(int number) {
+  const western = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+  const eastern = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+
+  var text = number.toString();
+  for (int i = 0; i < western.length; i++) {
+    text = text.replaceAll(western[i], eastern[i]);
+  }
+  return text;
+}
+
+String _arabicWord(int count, String singular, String plural) {
+  return count == 1 ? singular : plural;
+}
+
+String _formatArabicCount(int count, String singular, String plural) {
+  final numText = _toArabicDigits(count);
+  final word = _arabicWord(count, singular, plural);
+  return '$numText $word';
+}
+
 
 Future<int> _getCompletedBooksCount(String friendUid) async {
   final snap = await FirebaseFirestore.instance
@@ -793,7 +817,7 @@ class _StatCard extends StatelessWidget {
   final String text;
   const _StatCard({required this.icon, required this.text});
 
-  static const Color _card = Color(0xFFE6F0E0);
+  static const Color _card = Color(0xFFC9DABF);
 
   @override
   Widget build(BuildContext context) {

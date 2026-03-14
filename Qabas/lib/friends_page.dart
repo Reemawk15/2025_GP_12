@@ -834,17 +834,16 @@ class _SearchResultRow extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    width: 36,
+                    height: 34,
                     decoration: BoxDecoration(
                       color: Colors.black.withOpacity(0.06),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Text(
-                      'خاص',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF0E3A2C),
-                      ),
+                    child: const Icon(
+                      Icons.lock_outline_rounded,
+                      size: 18,
+                      color: Color(0xFF0E3A2C),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -855,7 +854,8 @@ class _SearchResultRow extends StatelessWidget {
                   ),
                 ],
               );
-            } else {
+            }
+            else {
               trailing = _TinyActionButton(
                 label: 'إضافة',
                 color: const Color(0xFF6F8E63),
