@@ -166,7 +166,7 @@ class ProfileTab extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 120),
               child: Column(
                 children: [
-                  const SizedBox(height: 200),
+                  const SizedBox(height: 170),
 
                   // White rounded container
                   Container(
@@ -347,7 +347,7 @@ class _ProfileButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         onTap: onTap,
         child: Container(
-          height: 64,
+          height: 54,
           decoration: BoxDecoration(
             color: _tileBg,
             borderRadius: BorderRadius.circular(18),
@@ -364,7 +364,7 @@ class _ProfileButton extends StatelessWidget {
                   title,
                   textAlign: TextAlign.right,
                   style: const TextStyle(
-                    fontSize: 16.5,
+                    fontSize: 16,
                     fontWeight: FontWeight.w600,
                     color: _darkGreen,
                   ),
