@@ -349,74 +349,44 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
   }
 
   Future<void> _startOrGenerateSummaryAudio(
-    BuildContext context, {
-    required Map<String, dynamic> data,
-    required String title,
-    required String author,
-    required String cover,
-  }) async {
+      BuildContext context, {
+        required Map<String, dynamic> data,
+        required String title,
+        required String author,
+        required String cover,
+      }) async {
     await _trackUserAction(
       bookId: widget.bookId,
       bookData: data,
       action: 'press_summary',
     );
-    final status = (data['summaryAudioStatus'] ?? 'idle').toString();
+
     final partsRaw = data['summaryAudioParts'];
     final bool hasParts = partsRaw is List && partsRaw.isNotEmpty;
 
-    // ✅ لو فيه أجزاء: افتحي مشغل الملخص مباشرة
-    if (hasParts) {
-      final urls = partsRaw.map((e) => e.toString()).toList();
-
-      if (!context.mounted) return;
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => SummaryAudioPlayerPage(
-            bookId: widget.bookId,
-            bookTitle: title,
-            bookAuthor: author,
-            coverUrl: cover,
-            audioUrls: urls,
-          ),
-        ),
+    if (!hasParts) {
+      _showSnack(
+        context,
+        'الملخص الصوتي غير متوفر حالياً',
+        icon: Icons.info_outline,
       );
       return;
     }
 
-    // ✅ ما فيه أجزاء: نولّد الملخص الصوتي
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        _showSnack(context, 'لازم تسجلين دخول أولاً', icon: Icons.info_outline);
-        return;
-      }
+    final urls = partsRaw.map((e) => e.toString()).toList();
 
-      _showSnack(
-        context,
-        'جاري توليد الملخص الصوتي…',
-        icon: Icons.settings_rounded,
-      );
-
-      final functions = FirebaseFunctions.instanceFor(region: 'us-central1');
-      final callable = functions.httpsCallable(
-        'generateSummaryAudio',
-        options: HttpsCallableOptions(timeout: const Duration(minutes: 9)),
-      );
-
-      await callable.call({'bookId': widget.bookId});
-
-      // ✅ ننتظر لين يصير فيه أول جزء ثم نفتح المشغل
-      _pollUntilHasAnySummaryPart(context);
-    } on FirebaseFunctionsException catch (e) {
-      _showSnack(context, 'تعذّر: ${e.code}', icon: Icons.error_outline);
-      _pollUntilHasAnySummaryPart(context);
-    } catch (_) {
-      _showSnack(
-        context,
-        'تعذّر توليد الملخص الصوتي',
-        icon: Icons.error_outline,
-      );
-    }
+    if (!context.mounted) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SummaryAudioPlayerPage(
+          bookId: widget.bookId,
+          bookTitle: title,
+          bookAuthor: author,
+          coverUrl: cover,
+          audioUrls: urls,
+        ),
+      ),
+    );
   }
 
   void _pollUntilHasAnySummaryPart(BuildContext context) {
@@ -580,6 +550,7 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
                 final bool hasSummaryParts =
                     summaryPartsRaw is List && summaryPartsRaw.isNotEmpty;
 
+
                 final bool summaryProcessing =
                     summaryStatus == 'processing' && !hasSummaryParts;
 
@@ -597,6 +568,7 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
                     : isGenerating
                     ? 'جاري توليد الصوت...'
                     : 'بدء الاستماع';
+
 
                 return SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(16, 60, 16, 24),
@@ -686,6 +658,7 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
                       ),
                       const SizedBox(height: 12),
 
+
                       SizedBox(
                         height: 56,
                         child: ElevatedButton(
@@ -697,26 +670,47 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
                               borderRadius: BorderRadius.circular(30),
                             ),
                           ),
-                          onPressed: summaryProcessing
+                          onPressed: (summaryProcessing || !hasSummaryParts)
                               ? null
                               : () => _startOrGenerateSummaryAudio(
-                                  context,
-                                  data: data,
-                                  title: title,
-                                  author: author,
-                                  cover: cover,
-                                ),
+                            context,
+                            data: data,
+                            title: title,
+                            author: author,
+                            cover: cover,
+                          ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(
-                                Icons.record_voice_over_rounded,
-                                size: 20,
+                              Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.record_voice_over_rounded,
+                                    size: 20,
+                                    color: hasSummaryParts ? _darkGreen : Colors.grey,
+                                  ),
+
+                                  // 🔒 خط فوق الأيقونة إذا غير متوفر
+                                  if (!hasSummaryParts)
+                                    Positioned(
+                                      child: Transform.rotate(
+                                        angle: -0.6, // زاوية الخط
+                                        child: Container(
+                                          width: 22,
+                                          height: 2,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
                               const SizedBox(width: 12),
                               Text(
-                                summaryLabel,
+                                hasSummaryParts
+                                    ? summaryLabel
+                                    : 'الملخص غير متوفر',
                                 style: const TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w800,
