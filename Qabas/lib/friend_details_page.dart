@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'club_chat_page.dart';
+import 'book_details_page.dart';
+import 'podcast_details_page.dart';
 
 /// =====================
 /// Brand colors
@@ -559,7 +561,7 @@ class _HeaderAndTabs {
                   width: double.infinity,
                   child: FilledButton(
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFFF2F2F2),
+                      backgroundColor: Color(0xFFF2F2F2),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -678,7 +680,7 @@ class _HeaderAndTabs {
                   width: double.infinity,
                   child: FilledButton(
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFFF2F2F2),
+                      backgroundColor: Color(0xFFF2F2F2),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -767,6 +769,7 @@ class _StatsTab extends StatelessWidget {
             icon: '📚',
             text: 'الكتب المنجزة: ${_formatArabicCount(completed, "كتاب", "كتب")}',
           ),
+          _OpenCompletedLibraryCard(friendUid: friendUid),
         ];
 
         return ListView.separated(
@@ -779,6 +782,7 @@ class _StatsTab extends StatelessWidget {
     );
   }
 }
+
 String _toArabicDigits(int number) {
   const western = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
   const eastern = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
@@ -799,7 +803,6 @@ String _formatArabicCount(int count, String singular, String plural) {
   final word = _arabicWord(count, singular, plural);
   return '$numText $word';
 }
-
 
 Future<int> _getCompletedBooksCount(String friendUid) async {
   final snap = await FirebaseFirestore.instance
@@ -851,10 +854,488 @@ class _StatCard extends StatelessWidget {
   }
 }
 
+class _OpenCompletedLibraryCard extends StatelessWidget {
+  final String friendUid;
+  const _OpenCompletedLibraryCard({required this.friendUid});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => FriendCompletedLibraryPage(friendUid: friendUid),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+        decoration: BoxDecoration(
+          color: const Color(0xFFC9DABF),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black12,
+              blurRadius: 8,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              '📖', // أيقونة مختلفة عن اللي فوق
+              style: TextStyle(fontSize: 22),
+            ),
+            Expanded(
+              child: Text(
+                'عرض الكتب المنجزة',
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w700,
+                  color: _darkGreen,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _StatRow {
   final String icon;
   final String text;
   const _StatRow({required this.icon, required this.text});
+}
+
+/// ===============================
+/// Friend completed library page
+/// ===============================
+class FriendCompletedLibraryPage extends StatelessWidget {
+  final String friendUid;
+  const FriendCompletedLibraryPage({super.key, required this.friendUid});
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/backttt.png',
+              fit: BoxFit.cover,
+            ),
+          ),
+          Scaffold(
+            backgroundColor: Colors.transparent,
+            appBar: AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              toolbarHeight: 130,
+              leading: Padding(
+                padding: const EdgeInsets.only(top: 30, right: 8),
+                child: IconButton(
+                  tooltip: 'رجوع',
+                  onPressed: () => Navigator.of(context).maybePop(),
+                  icon: const Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    color: _midGreen,
+                    size: 20,
+                  ),
+                ),
+              ),
+              centerTitle: true,
+              title: const Padding(
+                padding: EdgeInsets.only(top: 30),
+                child: Text(
+                  'مكتبة الشخص المنجزة',
+                  style: TextStyle(
+                    color: _darkGreen,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 18,
+                  ),
+                ),
+              ),
+            ),
+            body: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 38),
+                child: _FriendCompletedShelf(uid: friendUid),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FriendLibraryBook {
+  final String id;
+  final String title;
+  final ImageProvider? cover;
+  final String type;
+  final bool isCompleted;
+
+  const _FriendLibraryBook({
+    required this.id,
+    required this.title,
+    this.cover,
+    this.type = 'book',
+    this.isCompleted = false,
+  });
+}
+
+class _FriendCompletedShelf extends StatefulWidget {
+  final String uid;
+  const _FriendCompletedShelf({required this.uid});
+
+  @override
+  State<_FriendCompletedShelf> createState() => _FriendCompletedShelfState();
+}
+
+class _FriendCompletedShelfState extends State<_FriendCompletedShelf> {
+  List<_FriendLibraryBook> _lastNonEmpty = const [];
+
+  @override
+  Widget build(BuildContext context) {
+    final q = FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.uid)
+        .collection('library')
+        .where('isCompleted', isEqualTo: true)
+        .orderBy('addedAt', descending: true);
+
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: q.snapshots(),
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          if (_lastNonEmpty.isNotEmpty) {
+            return _FriendShelfView(books: _lastNonEmpty);
+          }
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snap.hasError) {
+          if (_lastNonEmpty.isNotEmpty) {
+            return _FriendShelfView(books: _lastNonEmpty);
+          }
+          return const Center(
+            child: Text(
+              'لا توجد كتب مكتملة بعد',
+              style: TextStyle(color: _darkGreen, fontWeight: FontWeight.w700),
+            ),
+          );
+        }
+
+        final docs = snap.data?.docs ?? const [];
+        final books = docs.map((d) {
+          final m = d.data();
+          final title = (m['title'] ?? '') as String;
+          final cover = (m['coverUrl'] ?? '') as String;
+          final type = (m['type'] ?? 'book') as String;
+          final isCompleted = (m['isCompleted'] ?? false) as bool;
+
+          return _FriendLibraryBook(
+            id: d.id,
+            title: title.isEmpty ? 'كتاب' : title,
+            cover: cover.isNotEmpty ? NetworkImage(cover) : null,
+            type: type,
+            isCompleted: isCompleted,
+          );
+        }).toList();
+
+        if (books.isNotEmpty) {
+          _lastNonEmpty = books;
+          return _FriendShelfView(books: books);
+        }
+
+        return const Center(
+          child: Text(
+            'لا توجد كتب مكتملة بعد',
+            style: TextStyle(color: _darkGreen, fontWeight: FontWeight.w700),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _FriendShelfRect {
+  final double leftFrac, rightFrac, topFrac, heightFrac;
+  const _FriendShelfRect({
+    required this.leftFrac,
+    required this.rightFrac,
+    required this.topFrac,
+    required this.heightFrac,
+  });
+}
+
+class _FriendShelfView extends StatefulWidget {
+  final List<_FriendLibraryBook> books;
+  const _FriendShelfView({required this.books});
+
+  @override
+  State<_FriendShelfView> createState() => _FriendShelfViewState();
+}
+
+class _FriendShelfViewState extends State<_FriendShelfView> {
+  static const List<_FriendShelfRect> _shelfRects = [
+    _FriendShelfRect(
+      leftFrac: 0.18,
+      rightFrac: 0.18,
+      topFrac: 0.00,
+      heightFrac: 0.11,
+    ),
+    _FriendShelfRect(
+      leftFrac: 0.18,
+      rightFrac: 0.18,
+      topFrac: 0.20,
+      heightFrac: 0.11,
+    ),
+    _FriendShelfRect(
+      leftFrac: 0.18,
+      rightFrac: 0.18,
+      topFrac: 0.40,
+      heightFrac: 0.11,
+    ),
+    _FriendShelfRect(
+      leftFrac: 0.18,
+      rightFrac: 0.18,
+      topFrac: 0.60,
+      heightFrac: 0.11,
+    ),
+  ];
+
+  static const int _perShelf = 4;
+  static const int _shelvesPerPage = 4;
+  static const int _booksPerPage = _perShelf * _shelvesPerPage;
+  static const double _spacing = 1;
+  static const double _bookAspect = .25;
+  static const double _bookStretch = 1.2;
+
+  final PageController _pageController = PageController();
+  late List<List<_FriendLibraryBook>> _pages;
+
+  @override
+  void initState() {
+    super.initState();
+    _pages = _paginate(widget.books, _booksPerPage);
+  }
+
+  @override
+  void didUpdateWidget(covariant _FriendShelfView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.books.length != widget.books.length) {
+      _pages = _paginate(widget.books, _booksPerPage);
+    }
+  }
+
+  List<List<_FriendLibraryBook>> _paginate(
+      List<_FriendLibraryBook> list,
+      int size,
+      ) {
+    final pages = <List<_FriendLibraryBook>>[];
+    for (var i = 0; i < list.length; i += size) {
+      pages.add(
+        list.sublist(i, i + size > list.length ? list.length : i + size),
+      );
+    }
+    if (pages.isEmpty) pages.add(const []);
+    return pages;
+  }
+
+  List<List<_FriendLibraryBook>> _chunk(
+      List<_FriendLibraryBook> list,
+      int size,
+      ) {
+    final chunks = <List<_FriendLibraryBook>>[];
+    for (var i = 0; i < list.length; i += size) {
+      chunks.add(
+        list.sublist(i, i + size > list.length ? list.length : i + size),
+      );
+    }
+    return chunks;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pages = _pages;
+
+    return Stack(
+      children: [
+        PageView.builder(
+          controller: _pageController,
+          physics: const BouncingScrollPhysics(),
+          itemCount: pages.length,
+          itemBuilder: (context, pageIndex) {
+            final pageBooks = pages[pageIndex];
+            final groups = _chunk(pageBooks, _perShelf);
+
+            return LayoutBuilder(
+              builder: (context, c) {
+                final W = c.maxWidth;
+                final H = c.maxHeight;
+
+                return Stack(
+                  children: List.generate(_shelfRects.length, (i) {
+                    final rect = _shelfRects[i];
+                    final shelfBooks = i < groups.length
+                        ? groups[i]
+                        : const <_FriendLibraryBook>[];
+
+                    final left = rect.leftFrac * W;
+                    final right = rect.rightFrac * W;
+                    final top = rect.topFrac * H;
+                    final height = rect.heightFrac * H;
+                    final width = W - left - right;
+
+                    final slots = _perShelf;
+                    final totalSpacing = _spacing * (slots - 1);
+                    final bookWidth = ((width - totalSpacing) / slots * 0.80)
+                        .clamp(40.0, 140.0);
+                    final bookHeight = (bookWidth / _bookAspect * _bookStretch);
+
+                    return Positioned(
+                      left: left,
+                      right: right,
+                      top: top,
+                      height: height,
+                      child: SizedBox(
+                        width: width,
+                        height: height,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: List.generate(slots, (slot) {
+                            final book = slot < shelfBooks.length
+                                ? shelfBooks[slot]
+                                : null;
+
+                            return SizedBox(
+                              width: bookWidth,
+                              height: bookHeight,
+                              child: book == null
+                                  ? const SizedBox.shrink()
+                                  : Align(
+                                alignment: const Alignment(0, -2.5),
+                                child: _FriendLibraryBookCard(book: book),
+                              ),
+                            );
+                          }),
+                        ),
+                      ),
+                    );
+                  }),
+                );
+              },
+            );
+          },
+        ),
+        Positioned(
+          bottom: 25,
+          right: 0,
+          left: 0,
+          child: Center(
+            child: AnimatedBuilder(
+              animation: _pageController,
+              builder: (context, child) {
+                final current = _pageController.hasClients
+                    ? (_pageController.page ?? 0).round()
+                    : 0;
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: List.generate(pages.length, (i) {
+                    final active = i == current;
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      margin: const EdgeInsets.symmetric(horizontal: 3),
+                      width: active ? 18 : 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: active
+                            ? const Color(0xFFE26AA2)
+                            : Colors.black26,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    );
+                  }),
+                );
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FriendLibraryBookCard extends StatelessWidget {
+  final _FriendLibraryBook book;
+  const _FriendLibraryBookCard({required this.book});
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(8);
+
+    return InkWell(
+      onTap: () {
+        final isPodcast = book.type == 'podcast';
+
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => isPodcast
+                ? PodcastDetailsPage(podcastId: book.id)
+                : BookDetailsPage(bookId: book.id),
+          ),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(top: 2),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: radius,
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x33000000),
+              blurRadius: 6,
+              offset: Offset(0, 3),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: radius,
+          child: book.cover != null
+              ? Image(
+            image: book.cover!,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+          )
+              : Container(
+            width: double.infinity,
+            height: double.infinity,
+            color: const Color(0xFFF6F2F7),
+            padding: const EdgeInsets.all(8),
+            alignment: Alignment.center,
+            child: Text(
+              book.title,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 12, height: 1.2),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// ===============================
