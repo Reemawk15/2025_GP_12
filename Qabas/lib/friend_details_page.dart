@@ -951,15 +951,26 @@ class FriendCompletedLibraryPage extends StatelessWidget {
                 ),
               ),
               centerTitle: true,
-              title: const Padding(
-                padding: EdgeInsets.only(top: 30),
-                child: Text(
-                  'مكتبة الشخص المنجزة',
-                  style: TextStyle(
-                    color: _darkGreen,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 18,
-                  ),
+              title: Padding(
+                padding: const EdgeInsets.only(top: 30),
+                child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                  stream: FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(friendUid)
+                      .snapshots(),
+                  builder: (context, snap) {
+                    final data = snap.data?.data() ?? {};
+                    final name = (data['name'] ?? 'المستخدم') as String;
+
+                    return Text(
+                      'مكتبة $name المنجزة',
+                      style: const TextStyle(
+                        color: _darkGreen,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 18,
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
