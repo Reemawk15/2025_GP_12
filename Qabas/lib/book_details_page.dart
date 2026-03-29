@@ -791,6 +791,12 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
                         isDownloading: _isDownloading,
                         isDownloaded: _isDownloaded,
                         onDownload: _isDownloaded ? null : _onDownloadPressed,
+                        onReview: () => _showAddReviewSheet(
+                          context,
+                          widget.bookId,
+                          title,
+                          cover,
+                        ),
                         onMarks: () async {
                           final result = await Navigator.of(context).push(
                             MaterialPageRoute(
