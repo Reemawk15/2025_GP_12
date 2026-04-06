@@ -285,6 +285,7 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
       }
 
       if (!context.mounted) return;
+
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => BookAudioPlayerPage(
@@ -298,7 +299,17 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
           ),
         ),
       );
+      return;
+    }
 
+    // ✅ إذا الصوت قيد التوليد أصلًا، لا تعيدي الطلب
+    if (status == 'processing') {
+      _showSnack(
+        context,
+        'الصوت قيد التوليد الآن…',
+        icon: Icons.hourglass_top_rounded,
+      );
+      _pollUntilHasAnyPart(context);
       return;
     }
 
@@ -332,7 +343,7 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
 
       await callable.call({
         'bookId': widget.bookId,
-        'voiceId': selectedVoiceId,
+        'voiceId': pickedVoiceId,
       });
 
       _pollUntilHasAnyPart(context);
@@ -342,9 +353,10 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
         'تعذّر: ${e.code}${e.message != null ? ' - ${e.message}' : ''}',
         icon: Icons.error_outline,
       );
-      _pollUntilHasAnyPart(context);
+      return;
     } catch (_) {
       _showSnack(context, 'تعذّر توليد الصوت', icon: Icons.error_outline);
+      return;
     }
   }
 
