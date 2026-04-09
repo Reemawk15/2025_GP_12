@@ -710,7 +710,7 @@ class _PodcastDetailsPageState extends State<PodcastDetailsPage> {
       if (audioUrl.trim().isEmpty) {
         _showSnack(
           context,
-          'لا يوجد ملف صوت مرفوع لهذا البودكاست',
+          'لا يوجد ملف صوت مرفوع لهذا الكتاب',
           icon: Icons.info_outline,
         );
         setState(() => _isDownloading = false);
