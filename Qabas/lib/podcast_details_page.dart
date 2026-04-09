@@ -736,7 +736,7 @@ class _PodcastDetailsPageState extends State<PodcastDetailsPage> {
         _isDownloading = false;
       });
 
-      _showSnack(context, 'تم تحميل البودكاست ', icon: Icons.check_circle);
+      _showSnack(context, 'تم تحميل الكتاب ', icon: Icons.check_circle);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -744,7 +744,7 @@ class _PodcastDetailsPageState extends State<PodcastDetailsPage> {
         _isDownloaded = false;
       });
 
-      _showSnack(context, 'فشل تحميل البودكاست', icon: Icons.error_outline);
+      _showSnack(context, 'فشل تحميل الكتاب', icon: Icons.error_outline);
     }
   }
 }
@@ -824,9 +824,8 @@ class _InlineActionsRow extends StatelessWidget {
           Icons.download_rounded,
           isDownloading ? 'جاري' : (isDownloaded ? 'تم' : 'تحميل'),
           isDownloading
-              ? 'تحميل'
-                    '\nالبودكاست'
-              : (isDownloaded ? 'التحميل' : 'البودكاست'),
+              ? 'تحميل الكتاب'
+              : (isDownloaded ? 'التحميل' : 'الكتاب'),
           onDownload,
         ),
         const _DividerV(),

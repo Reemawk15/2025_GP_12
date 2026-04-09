@@ -233,14 +233,14 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
   }
 
   Future<void> _startOrGenerateAudio(
-      BuildContext context, {
-        required Map<String, dynamic> data,
-        required String title,
-        required String author,
-        required String cover,
-        int? overridePartIndex,
-        int? overridePositionMs,
-      }) async {
+    BuildContext context, {
+    required Map<String, dynamic> data,
+    required String title,
+    required String author,
+    required String cover,
+    int? overridePartIndex,
+    int? overridePositionMs,
+  }) async {
     await _trackUserAction(
       bookId: widget.bookId,
       bookData: data,
@@ -251,8 +251,7 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
     final partsRaw = data['audioParts'];
     final audioUrl = (data['audioUrl'] ?? '').toString().trim();
 
-    final List<String> urls =
-    (partsRaw is List && partsRaw.isNotEmpty)
+    final List<String> urls = (partsRaw is List && partsRaw.isNotEmpty)
         ? partsRaw.map((e) => e.toString()).toList()
         : (audioUrl.isNotEmpty ? [audioUrl] : []);
 
@@ -332,19 +331,13 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
 
       _showSnack(context, 'جاري توليد الصوت…', icon: Icons.settings_rounded);
 
-      final callable = FirebaseFunctions.instanceFor(
-        region: 'us-central1',
-      ).httpsCallable(
-        'generateBookAudioV2',
-        options: HttpsCallableOptions(
-          timeout: const Duration(minutes: 9),
-        ),
-      );
+      final callable = FirebaseFunctions.instanceFor(region: 'us-central1')
+          .httpsCallable(
+            'generateBookAudioV2',
+            options: HttpsCallableOptions(timeout: const Duration(minutes: 9)),
+          );
 
-      await callable.call({
-        'bookId': widget.bookId,
-        'voiceId': pickedVoiceId,
-      });
+      await callable.call({'bookId': widget.bookId, 'voiceId': pickedVoiceId});
 
       _pollUntilHasAnyPart(context);
     } on FirebaseFunctionsException catch (e) {
@@ -361,12 +354,12 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
   }
 
   Future<void> _startOrGenerateSummaryAudio(
-      BuildContext context, {
-        required Map<String, dynamic> data,
-        required String title,
-        required String author,
-        required String cover,
-      }) async {
+    BuildContext context, {
+    required Map<String, dynamic> data,
+    required String title,
+    required String author,
+    required String cover,
+  }) async {
     await _trackUserAction(
       bookId: widget.bookId,
       bookData: data,
@@ -562,7 +555,6 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
                 final bool hasSummaryParts =
                     summaryPartsRaw is List && summaryPartsRaw.isNotEmpty;
 
-
                 final bool summaryProcessing =
                     summaryStatus == 'processing' && !hasSummaryParts;
 
@@ -580,7 +572,6 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
                     : isGenerating
                     ? 'جاري توليد الصوت...'
                     : 'بدء الاستماع';
-
 
                 return SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(16, 60, 16, 24),
@@ -670,7 +661,6 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
                       ),
                       const SizedBox(height: 12),
 
-
                       SizedBox(
                         height: 56,
                         child: ElevatedButton(
@@ -685,12 +675,12 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
                           onPressed: (summaryProcessing || !hasSummaryParts)
                               ? null
                               : () => _startOrGenerateSummaryAudio(
-                            context,
-                            data: data,
-                            title: title,
-                            author: author,
-                            cover: cover,
-                          ),
+                                  context,
+                                  data: data,
+                                  title: title,
+                                  author: author,
+                                  cover: cover,
+                                ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -701,7 +691,9 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
                                   Icon(
                                     Icons.record_voice_over_rounded,
                                     size: 20,
-                                    color: hasSummaryParts ? _darkGreen : Colors.grey,
+                                    color: hasSummaryParts
+                                        ? _darkGreen
+                                        : Colors.grey,
                                   ),
 
                                   // 🔒 خط فوق الأيقونة إذا غير متوفر
@@ -1916,6 +1908,7 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
       });
     } catch (_) {}
   }
+
   @override
   void initState() {
     super.initState();
