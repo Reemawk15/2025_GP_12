@@ -30,6 +30,32 @@ async function uploadWithToken(bucket: any, destPath: string): Promise<string> {
   )}?alt=media&token=${token}`;
 }
 
+function splitTextIntoChunks(text: string, maxLength = 3000): string[] {
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (!clean) return [];
+
+  const chunks: string[] = [];
+  let start = 0;
+
+  while (start < clean.length) {
+    let end = Math.min(start + maxLength, clean.length);
+
+    if (end < clean.length) {
+      const lastSpace = clean.lastIndexOf(" ", end);
+      if (lastSpace > start + 500) {
+        end = lastSpace;
+      }
+    }
+
+    const chunk = clean.slice(start, end).trim();
+    if (chunk) chunks.push(chunk);
+
+    start = end;
+  }
+
+  return chunks;
+}
+
 export const generateBookAudioV2 = onCall(
   {
     region: "us-central1",
@@ -71,8 +97,6 @@ export const generateBookAudioV2 = onCall(
     }
 
     const tmpTxt = path.join("/tmp", `${bookId}.txt`);
-    const wavPath = path.join("/tmp", `${bookId}.wav`);
-    const destPath = `audiobooks/${bookId}/audio/full.wav`;
 
     try {
       await bookRef.set(
@@ -87,9 +111,9 @@ export const generateBookAudioV2 = onCall(
       await textFile.download({ destination: tmpTxt });
 
       const rawText = fs.readFileSync(tmpTxt, "utf8");
-      const text = rawText.replace(/\s+/g, " ").trim().slice(0, 500);
+      const textParts = splitTextIntoChunks(rawText, 3000);
 
-      if (!text) {
+      if (!textParts.length) {
         throw new HttpsError(
           "failed-precondition",
           "book.txt is empty after cleanup"
@@ -101,98 +125,121 @@ export const generateBookAudioV2 = onCall(
         throw new HttpsError("failed-precondition", "Missing TTS_API_TOKEN");
       }
 
-      logger.info("Sending request to TTS API", {
-        textLength: text.length,
+      logger.info("Sending chunked requests to TTS API", {
+        partsCount: textParts.length,
         voiceId,
-        endpoint: "http://188.248.250.168:1205/v1/tts",
+        endpoint: "http://8.213.24.61:1205/v1/tts",
       });
 
-      const res = await axios.post(
-        "http://188.248.250.168:1205/v1/tts",
-        {
-          text,
-          chunk_length: 200,
-          format: "wav",
-          references: [],
-          reference_id: voiceId,
-          seed: null,
-          use_memory_cache: "off",
-          normalize: true,
-          streaming: false,
-          max_new_tokens: 1024,
-          top_p: 0.8,
-          repetition_penalty: 1.1,
-          temperature: 0.8,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
+      const audioUrls: string[] = [];
+
+      for (let i = 0; i < textParts.length; i++) {
+        const text = textParts[i];
+        const wavPath = path.join("/tmp", `${bookId}_part_${i}.wav`);
+        const destPath = `audiobooks/${bookId}/audio/part_${i}.wav`;
+
+        logger.info("Sending request to TTS API for part", {
+          partIndex: i,
+          totalParts: textParts.length,
+          textLength: text.length,
+          endpoint: "http://8.213.24.61:1205/v1/tts",
+        });
+
+        const res = await axios.post(
+          "http://8.213.24.61:1205/v1/tts",
+          {
+            text,
+            chunk_length: 200,
+            format: "wav",
+            references: [],
+            reference_id: voiceId,
+            seed: null,
+            use_memory_cache: "off",
+            normalize: true,
+            streaming: false,
+            max_new_tokens: 1024,
+            top_p: 0.8,
+            repetition_penalty: 1.1,
+            temperature: 0.8,
           },
-          responseType: "arraybuffer",
-          timeout: 300000,
-          maxBodyLength: Infinity,
-          maxContentLength: Infinity,
-          validateStatus: () => true,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            responseType: "arraybuffer",
+            timeout: 300000,
+            maxBodyLength: Infinity,
+            maxContentLength: Infinity,
+            validateStatus: () => true,
+          }
+        );
+
+        logger.info("TTS API response", {
+          partIndex: i,
+          status: res.status,
+          contentType: res.headers["content-type"] || null,
+          bytes: res.data ? Buffer.byteLength(res.data) : 0,
+        });
+
+        if (res.status < 200 || res.status >= 300) {
+          const preview = Buffer.from(res.data).toString("utf8").slice(0, 2000);
+
+          await bookRef.set(
+            {
+              audioStatus: "failed",
+              audioError: `TTS failed at part ${i}: status=${res.status} body=${preview}`,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            },
+            { merge: true }
+          );
+
+          throw new HttpsError(
+            "internal",
+            `TTS failed at part ${i}: status=${res.status} body=${preview}`
+          );
         }
-      );
 
-      logger.info("TTS API response", {
-        status: res.status,
-        contentType: res.headers["content-type"] || null,
-        bytes: res.data ? Buffer.byteLength(res.data) : 0,
-      });
+        fs.writeFileSync(wavPath, Buffer.from(res.data));
 
-      if (res.status < 200 || res.status >= 300) {
-        const preview = Buffer.from(res.data).toString("utf8").slice(0, 2000);
+        const stats = fs.statSync(wavPath);
+        logger.info("Saved WAV locally", {
+          partIndex: i,
+          wavPath,
+          size: stats.size,
+        });
 
-        await bookRef.set(
-          {
-            audioStatus: "failed",
-            audioError: `TTS failed: status=${res.status} body=${preview}`,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          },
-          { merge: true }
-        );
+        if (!stats.size || stats.size === 0) {
+          await bookRef.set(
+            {
+              audioStatus: "failed",
+              audioError: `Generated WAV file is empty at part ${i}`,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            },
+            { merge: true }
+          );
 
-        throw new HttpsError(
-          "internal",
-          `TTS failed: status=${res.status} body=${preview}`
-        );
+          throw new HttpsError(
+            "internal",
+            `Generated WAV file is empty at part ${i}`
+          );
+        }
+
+        await bucket.upload(wavPath, {
+          destination: destPath,
+          contentType: "audio/wav",
+        });
+
+        const url = await uploadWithToken(bucket, destPath);
+        audioUrls.push(url);
+
+        safeDelete(wavPath);
       }
-
-      fs.writeFileSync(wavPath, Buffer.from(res.data));
-
-      const stats = fs.statSync(wavPath);
-      logger.info("Saved WAV locally", {
-        wavPath,
-        size: stats.size,
-      });
-
-      if (!stats.size || stats.size === 0) {
-        await bookRef.set(
-          {
-            audioStatus: "failed",
-            audioError: "Generated WAV file is empty",
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          },
-          { merge: true }
-        );
-
-        throw new HttpsError("internal", "Generated WAV file is empty");
-      }
-
-      await bucket.upload(wavPath, {
-        destination: destPath,
-        contentType: "audio/wav",
-      });
-
-      const url = await uploadWithToken(bucket, destPath);
 
       await bookRef.set(
         {
-          audioUrl: url,
-          audioParts: [url],
+          audioParts: audioUrls,
+          audioUrl: audioUrls[0] || null,
           audioStatus: "completed",
           voiceId: voiceId,
           audioFormat: "wav",
@@ -203,8 +250,8 @@ export const generateBookAudioV2 = onCall(
 
       return {
         success: true,
-        audioUrl: url,
-        audioParts: [url],
+        audioUrl: audioUrls[0] || null,
+        audioParts: audioUrls,
         format: "wav",
       };
     } catch (err: any) {
@@ -263,7 +310,6 @@ export const generateBookAudioV2 = onCall(
       throw new HttpsError("internal", finalError);
     } finally {
       safeDelete(tmpTxt);
-      safeDelete(wavPath);
     }
   }
 );
