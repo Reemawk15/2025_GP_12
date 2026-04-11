@@ -11,6 +11,7 @@ import 'firebase_options.dart';
 import 'sign_up_page.dart';
 import 'sign_in_page.dart';
 import 'goal_notifications.dart';
+import 'app_message_service.dart';
 
 /// Qabas color palette
 class QabasColors {
@@ -71,13 +72,14 @@ class QabasApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = ThemeData(
       useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: QabasColors.primary,
-        brightness: Brightness.light,
-      ).copyWith(
-        primary: QabasColors.primary,
-        background: QabasColors.background,
-      ),
+      colorScheme:
+          ColorScheme.fromSeed(
+            seedColor: QabasColors.primary,
+            brightness: Brightness.light,
+          ).copyWith(
+            primary: QabasColors.primary,
+            background: QabasColors.background,
+          ),
       scaffoldBackgroundColor: QabasColors.background,
       appBarTheme: const AppBarTheme(
         centerTitle: true,
@@ -119,7 +121,7 @@ class QabasApp extends StatelessWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       theme: theme,
-
+      scaffoldMessengerKey: rootScaffoldMessengerKey,
       // ✅ بدل SplashLogoPage: خلي أول صفحة مباشرة بعد الـ native splash
       home: const HomePage(),
     );

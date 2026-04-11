@@ -25,6 +25,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:dio/dio.dart';
 import 'dart:io';
+import 'offline_podcast_download_service.dart';
+import 'podcast_download_task_manager.dart';
 
 // Theme colors
 const _primary = Color(0xFF0E3A2C); // Dark text/icons
@@ -605,6 +607,10 @@ class _PodcastDetailsPageState extends State<PodcastDetailsPage> {
   void initState() {
     super.initState();
     _loadDownloadState();
+
+    if (PodcastDownloadTaskManager.instance.isDownloading(widget.podcastId)) {
+      _isDownloading = true;
+    }
   }
 
   Future<void> _loadDownloadState() async {
@@ -623,9 +629,11 @@ class _PodcastDetailsPageState extends State<PodcastDetailsPage> {
     setState(() {
       _isDownloaded = savedDownloaded && exists;
       downloadedPath = exists ? savedPath : null;
+      _isDownloading = PodcastDownloadTaskManager.instance.isDownloading(
+        widget.podcastId,
+      );
     });
 
-    // تنظيف لو كانت القيم قديمة والملف مو موجود
     if (!exists) {
       await prefs.remove('downloaded_${widget.podcastId}');
       await prefs.remove('downloadPath_${widget.podcastId}');
@@ -710,34 +718,30 @@ class _PodcastDetailsPageState extends State<PodcastDetailsPage> {
       if (audioUrl.trim().isEmpty) {
         _showSnack(
           context,
-          'لا يوجد ملف صوت مرفوع لهذا الكتاب',
+          'لا يوجد ملف صوت مرفوع لهذا البودكاست',
           icon: Icons.info_outline,
         );
         setState(() => _isDownloading = false);
         return;
       }
 
-      final filePath = await _downloadPodcastToDevice(
+      await PodcastDownloadTaskManager.instance.startDownload(
+        podcastId: widget.podcastId,
         audioUrl: audioUrl,
         title: title,
-      );
-
-      await _markPodcastAsDownloaded(filePath);
-
-      await _saveOfflinePodcastInfo(
-        podcastId: widget.podcastId,
-        title: title,
         coverUrl: cover,
-        audioPath: filePath,
       );
+
+      await _loadDownloadState();
 
       if (!mounted) return;
       setState(() {
         _isDownloading = false;
+        _isDownloaded = true;
       });
 
-      _showSnack(context, 'تم تحميل الكتاب ', icon: Icons.check_circle);
-    } catch (e) {
+      _showSnack(context, 'تم تحميل الكتاب', icon: Icons.check_circle);
+    } catch (_) {
       if (!mounted) return;
       setState(() {
         _isDownloading = false;

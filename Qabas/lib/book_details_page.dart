@@ -14,6 +14,8 @@ import 'Book_chatbot.dart';
 import 'dart:async';
 import 'package:confetti/confetti.dart';
 import 'user_stats_service.dart';
+import 'offline_download_service.dart';
+import 'download_task_manager.dart';
 
 // Theme colors
 const _primary = Color(0xFF0E3A2C); // Dark text/icons
@@ -892,7 +894,7 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
     if (_isDownloading) return;
 
     setState(() {
-      _isDownloading = true; // ✅ هنا الزر يتحول مباشرة "جاري تحميل الكتاب"
+      _isDownloading = true;
       _isDownloaded = false;
     });
 
@@ -912,47 +914,27 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
             toFirestore: (m, _) => m,
           );
 
-      // 1) اقرأ الوثيقة: هل الصوت جاهز؟
+      // 1) اقرأ البيانات الحالية للكتاب فقط
       final snap = await docRef.get();
       final data = snap.data();
       final title = (data?['title'] ?? 'book') as String;
+      final author = (data?['author'] ?? '') as String;
+      final coverUrl = (data?['coverUrl'] ?? '') as String;
 
-      List<String> parts;
-
-      if (_audioReady(data)) {
-        // ✅ موجودة: خذي الروابط مباشرة
-        parts = List<String>.from(data!['audioParts'] ?? []);
-      } else {
-        // ❌ مو جاهزة: استدعي Cloud Function ثم انتظري لين تجهز
-        final functions = FirebaseFunctions.instanceFor(region: 'us-central1');
-        final callable = functions.httpsCallable(
-          'generateBookAudio',
-          options: HttpsCallableOptions(timeout: const Duration(minutes: 9)),
-        );
-
-        await callable.call({'bookId': widget.bookId, 'maxParts': 30});
-
-        // انتظري لين تجهز روابط audioParts
-        parts = await _waitForAudioParts(docRef: docRef);
-      }
-
-      if (parts.isEmpty) throw Exception('audioParts empty');
-
-      // 2) نزّليها للجهاز
-      final folderPath = await _downloadPartsToDevice(parts, title);
-
-      await _saveOfflineBookInfo(
+      // 2) ابدأ التحميل من الـ manager
+      await DownloadTaskManager.instance.startDownload(
         bookId: widget.bookId,
         title: title,
-        author: (data?['author'] ?? '') as String,
-        coverUrl: (data?['coverUrl'] ?? '') as String,
-        folderPath: folderPath,
+        author: author,
+        coverUrl: coverUrl,
       );
 
-      // 3) خلص ✅
+      // 3) بعد ما يخلص، حملي الحالة من SharedPreferences مثل نظامك الحالي
+      await _loadDownloadState();
+
       setState(() {
         _isDownloading = false;
-        _isDownloaded = true; // ✅ يصير "تم التحميل"
+        _isDownloaded = true;
       });
 
       _showSnack(context, 'تم تحميل الكتاب', icon: Icons.check_circle);
@@ -1084,13 +1066,23 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
   void initState() {
     super.initState();
     _loadDownloadState();
+
+    if (DownloadTaskManager.instance.isDownloading(widget.bookId)) {
+      _isDownloading = true;
+    }
   }
 
   Future<void> _loadDownloadState() async {
     final prefs = await SharedPreferences.getInstance();
+
+    if (!mounted) return;
+
     setState(() {
       _isDownloaded = prefs.getBool('downloaded_${widget.bookId}') ?? false;
       downloadedPath = prefs.getString('downloadPath_${widget.bookId}');
+      _isDownloading = DownloadTaskManager.instance.isDownloading(
+        widget.bookId,
+      );
     });
   }
 }
