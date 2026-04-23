@@ -165,91 +165,21 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
     });
   }
 
-  String selectedVoiceId = 'ar_male_common_002';
-
-  final List<Map<String, String>> arabicVoices = [
-    {'label': 'صوت رجل', 'id': 'ar_male_common_002'},
-    {'label': 'صوت امرأة', 'id': 'ar_female_common_002'},
-    {'label': 'صوت طفلة', 'id': 'ar_female_child_001'},
-    {'label': 'صوت كرتوني', 'id': 'ar_male_cartoon_001'},
-  ];
-
-  Future<String?> _showVoicePicker(BuildContext context) async {
-    String tempVoiceId = selectedVoiceId;
-
-    return showModalBottomSheet<String>(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'اختاري الصوت',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    ...arabicVoices.map((voice) {
-                      final isSelected = tempVoiceId == voice['id'];
-                      return ListTile(
-                        title: Text(voice['label']!),
-                        trailing: Icon(
-                          isSelected
-                              ? Icons.radio_button_checked
-                              : Icons.radio_button_off,
-                        ),
-                        onTap: () {
-                          setModalState(() {
-                            tempVoiceId = voice['id']!;
-                          });
-                        },
-                      );
-                    }),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () => Navigator.pop(context, tempVoiceId),
-                        child: const Text('متابعة'),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
   Future<void> _startOrGenerateAudio(
-    BuildContext context, {
-    required Map<String, dynamic> data,
-    required String title,
-    required String author,
-    required String cover,
-    int? overridePartIndex,
-    int? overridePositionMs,
-  }) async {
+      BuildContext context, {
+        required Map<String, dynamic> data,
+        required String title,
+        required String author,
+        required String cover,
+        int? overridePartIndex,
+        int? overridePositionMs,
+      }) async {
     await _trackUserAction(
       bookId: widget.bookId,
       bookData: data,
       action: 'press_listen',
     );
 
-    final status = (data['audioStatus'] ?? 'idle').toString();
     final partsRaw = data['audioParts'];
     final audioUrl = (data['audioUrl'] ?? '').toString().trim();
 
@@ -259,100 +189,52 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
 
     final bool hasAudio = urls.isNotEmpty;
 
+    // ❌ إذا ما فيه صوت → لا تسوي شيء
+    if (!hasAudio) {
+      return;
+    }
+
     // ✅ إذا فيه صوت جاهز افتحي المشغل مباشرة
-    if (hasAudio) {
-      int lastPartIndex = 0;
-      int lastPositionMs = 0;
+    int lastPartIndex = 0;
+    int lastPositionMs = 0;
 
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        try {
-          final progSnap = await FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .collection('library')
-              .doc(widget.bookId)
-              .get();
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        final progSnap = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('library')
+            .doc(widget.bookId)
+            .get();
 
-          final p = progSnap.data() ?? {};
-          lastPartIndex = _asInt(p['lastPartIndex'], fallback: 0);
-          lastPositionMs = _asInt(p['lastPositionMs'], fallback: 0);
-        } catch (_) {}
-      }
+        final p = progSnap.data() ?? {};
+        lastPartIndex = _asInt(p['lastPartIndex'], fallback: 0);
+        lastPositionMs = _asInt(p['lastPositionMs'], fallback: 0);
+      } catch (_) {}
+    }
 
-      if (overridePartIndex != null && overridePositionMs != null) {
-        lastPartIndex = overridePartIndex;
-        lastPositionMs = overridePositionMs;
-      }
+    if (overridePartIndex != null && overridePositionMs != null) {
+      lastPartIndex = overridePartIndex;
+      lastPositionMs = overridePositionMs;
+    }
 
-      if (!context.mounted) return;
+    if (!context.mounted) return;
 
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => BookAudioPlayerPage(
-            bookId: widget.bookId,
-            bookTitle: title,
-            bookAuthor: author,
-            coverUrl: cover,
-            audioUrls: urls,
-            initialPartIndex: (lastPartIndex < urls.length) ? lastPartIndex : 0,
-            initialPositionMs: lastPositionMs,
-          ),
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BookAudioPlayerPage(
+          bookId: widget.bookId,
+          bookTitle: title,
+          bookAuthor: author,
+          coverUrl: cover,
+          audioUrls: urls,
+          initialPartIndex:
+          (lastPartIndex < urls.length) ? lastPartIndex : 0,
+          initialPositionMs: lastPositionMs,
         ),
-      );
-      return;
-    }
-
-    // ✅ إذا الصوت قيد التوليد أصلًا، لا تعيدي الطلب
-    if (status == 'processing') {
-      _showSnack(
-        context,
-        'الصوت قيد التوليد الآن…',
-        icon: Icons.hourglass_top_rounded,
-      );
-      _pollUntilHasAnyPart(context);
-      return;
-    }
-
-    // ✅ إذا ما فيه صوت: خلي المستخدم يختار الصوت ثم ابدأي التوليد
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        _showSnack(context, 'لازم تسجلين دخول أولاً', icon: Icons.info_outline);
-        return;
-      }
-
-      final pickedVoiceId = await _showVoicePicker(context);
-      if (pickedVoiceId == null || pickedVoiceId.isEmpty) {
-        return;
-      }
-
-      setState(() {
-        selectedVoiceId = pickedVoiceId;
-      });
-
-      _showSnack(context, 'جاري توليد الصوت…', icon: Icons.settings_rounded);
-
-      final callable = FirebaseFunctions.instanceFor(region: 'us-central1')
-          .httpsCallable(
-            'generateBookAudioV2',
-            options: HttpsCallableOptions(timeout: const Duration(minutes: 9)),
-          );
-
-      await callable.call({'bookId': widget.bookId, 'voiceId': pickedVoiceId});
-
-      _pollUntilHasAnyPart(context);
-    } on FirebaseFunctionsException catch (e) {
-      _showSnack(
-        context,
-        'تعذّر: ${e.code}${e.message != null ? ' - ${e.message}' : ''}',
-        icon: Icons.error_outline,
-      );
-      return;
-    } catch (_) {
-      _showSnack(context, 'تعذّر توليد الصوت', icon: Icons.error_outline);
-      return;
-    }
+      ),
+    );
   }
 
   Future<void> _startOrGenerateSummaryAudio(
@@ -740,15 +622,15 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
                               borderRadius: BorderRadius.circular(30),
                             ),
                           ),
-                          onPressed: isGenerating
-                              ? null
-                              : () => _startOrGenerateAudio(
-                                  context,
-                                  data: data,
-                                  title: title,
-                                  author: author,
-                                  cover: cover,
-                                ),
+                          onPressed: hasAudioParts
+                              ? () => _startOrGenerateAudio(
+                            context,
+                            data: data,
+                            title: title,
+                            author: author,
+                            cover: cover,
+                          )
+                              : null,
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -756,9 +638,7 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
                               const Icon(Icons.headphones_rounded, size: 20),
                               const SizedBox(width: 12),
                               Text(
-                                listenLabel == 'بدء الاستماع'
-                                    ? 'استمع'
-                                    : listenLabel,
+                                hasAudioParts ? 'استمع' : 'الصوت غير متوفر',
                                 style: const TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w800,
