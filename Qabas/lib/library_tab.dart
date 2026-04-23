@@ -687,6 +687,13 @@ class _BookCard extends StatelessWidget {
         'inLibrary': true,
         'status': newStatus,
         'addedAt': FieldValue.serverTimestamp(),
+
+        // ✅ تصفير البار عند النقل اليدوي
+        if (newStatus != 'listened') ...{
+          'contentMs': 0,
+          'lastPositionMs': 0,
+          'lastPartIndex': 0,
+        },
       }, SetOptions(merge: true));
       onMoved(book.id);
       Navigator.pop(sheetContext);
@@ -703,7 +710,6 @@ class _BookCard extends StatelessWidget {
       );
     }
   }
-
 
   void _showOptionsMenu(BuildContext context) {
     showModalBottomSheet(
@@ -842,7 +848,6 @@ class _BookCard extends StatelessWidget {
                             ),
                           ),
                   ),
-
                 ],
               ),
             ),
@@ -1354,9 +1359,7 @@ class _MyBookCard extends StatelessWidget {
     return InkWell(
       onTap: () {
         Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => MyBookDetailsPage(bookId: book.id),
-          ),
+          MaterialPageRoute(builder: (_) => MyBookDetailsPage(bookId: book.id)),
         );
       },
       child: Stack(

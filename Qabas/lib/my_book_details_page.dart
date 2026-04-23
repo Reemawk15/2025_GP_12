@@ -19,12 +19,11 @@ const _midPillGreen = Color(0xFFBFD6B5);
 const _midDarkGreen2 = Color(0xFF2A5C4C);
 const Color _darkGreen = Color(0xFF0E3A2C);
 
-
 void _showSnack(
-    BuildContext context,
-    String message, {
-      IconData icon = Icons.check_circle,
-    }) {
+  BuildContext context,
+  String message, {
+  IconData icon = Icons.check_circle,
+}) {
   final messenger = ScaffoldMessenger.of(context);
   messenger.hideCurrentSnackBar();
   messenger.showSnackBar(
@@ -110,21 +109,29 @@ class MyBookDetailsPage extends StatelessWidget {
     final normalized = await _normalizeUrl(rawUrl);
     if (normalized == null) {
       if (context.mounted) {
-        _showSnack(context, 'الرابط غير صالح أو الملف غير متاح',
-            icon: Icons.error_outline);
+        _showSnack(
+          context,
+          'الرابط غير صالح أو الملف غير متاح',
+          icon: Icons.error_outline,
+        );
       }
       return;
     }
 
     final uri = Uri.parse(normalized);
     try {
-      final okExternal =
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      final okExternal = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
       if (!okExternal) {
         final okInApp = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
         if (!okInApp && context.mounted) {
-          _showSnack(context, 'تعذّر فتح ملف الـ PDF',
-              icon: Icons.error_outline);
+          _showSnack(
+            context,
+            'تعذّر فتح ملف الـ PDF',
+            icon: Icons.error_outline,
+          );
         }
       }
     } catch (_) {
@@ -136,11 +143,11 @@ class MyBookDetailsPage extends StatelessWidget {
 
   /// ===== ✅ نفس منطق كتابك: توليد -> Polling فقط (بدون انتقال تلقائي) =====
   Future<void> _startOrGenerateMyBookAudio(
-      BuildContext context, {
-        required Map<String, dynamic> myBookData,
-        required String title,
-        required String cover,
-      }) async {
+    BuildContext context, {
+    required Map<String, dynamic> myBookData,
+    required String title,
+    required String cover,
+  }) async {
     final audioStatus = (myBookData['audioStatus'] ?? 'idle').toString();
     final audioUrl = (myBookData['audioUrl'] ?? '').toString();
 
@@ -193,10 +200,7 @@ class MyBookDetailsPage extends StatelessWidget {
         options: HttpsCallableOptions(timeout: const Duration(minutes: 9)),
       );
 
-      await callable.call({
-        'uid': user.uid,
-        'bookId': bookId,
-      });
+      await callable.call({'uid': user.uid, 'bookId': bookId});
 
       _pollUntilHasMyBookAudio(context);
     } on FirebaseFunctionsException catch (e) {
@@ -259,8 +263,11 @@ class MyBookDetailsPage extends StatelessWidget {
       }
 
       if (tries >= 45) {
-        _showSnack(context, 'التوليد يأخذ وقت… جربي بعد شوي',
-            icon: Icons.info_outline);
+        _showSnack(
+          context,
+          'التوليد يأخذ وقت… جربي بعد شوي',
+          icon: Icons.info_outline,
+        );
         return false;
       }
 
@@ -268,14 +275,15 @@ class MyBookDetailsPage extends StatelessWidget {
     });
   }
 
-  void _openMarks(BuildContext context, {required String title, required String cover}) {
+  void _openMarks(
+    BuildContext context, {
+    required String title,
+    required String cover,
+  }) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => MyBookMarksPage(
-          bookId: bookId,
-          bookTitle: title,
-          coverUrl: cover,
-        ),
+        builder: (_) =>
+            MyBookMarksPage(bookId: bookId, bookTitle: title, coverUrl: cover),
       ),
     );
   }
@@ -319,183 +327,215 @@ class MyBookDetailsPage extends StatelessWidget {
             body: (user == null)
                 ? const Center(child: Text('الرجاء تسجيل الدخول'))
                 : StreamBuilder<DocumentSnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('users')
-                  .doc(user.uid)
-                  .collection('mybooks')
-                  .doc(bookId)
-                  .snapshots(),
-              builder: (context, snap) {
-                if (snap.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (!snap.hasData || !snap.data!.exists) {
-                  return const Center(child: Text('تعذّر تحميل تفاصيل الكتاب'));
-                }
+                    stream: FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(user.uid)
+                        .collection('mybooks')
+                        .doc(bookId)
+                        .snapshots(),
+                    builder: (context, snap) {
+                      if (snap.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      if (!snap.hasData || !snap.data!.exists) {
+                        return const Center(
+                          child: Text('تعذّر تحميل تفاصيل الكتاب'),
+                        );
+                      }
 
-                final data = (snap.data!.data() as Map<String, dynamic>? ?? {});
-                final title = (data['title'] ?? '') as String;
-                final cover = (data['coverUrl'] ?? '') as String;
-                final pdfUrl = (data['pdfUrl'] ?? '') as String;
+                      final data =
+                          (snap.data!.data() as Map<String, dynamic>? ?? {});
+                      final title = (data['title'] ?? '') as String;
+                      final cover = (data['coverUrl'] ?? '') as String;
+                      final pdfUrl = (data['pdfUrl'] ?? '') as String;
 
-                final audioStatus = (data['audioStatus'] ?? 'idle').toString();
-                final audioUrl = (data['audioUrl'] ?? '').toString();
-                final partsRaw = data['audioParts'];
-                final hasAudio =
-                    (partsRaw is List && partsRaw.isNotEmpty) || audioUrl.trim().isNotEmpty;
+                      final audioStatus = (data['audioStatus'] ?? 'idle')
+                          .toString();
+                      final audioUrl = (data['audioUrl'] ?? '').toString();
+                      final partsRaw = data['audioParts'];
+                      final hasAudio =
+                          (partsRaw is List && partsRaw.isNotEmpty) ||
+                          audioUrl.trim().isNotEmpty;
 
-                final bool isGenerating = audioStatus == 'processing' && !hasAudio;
+                      final bool isGenerating =
+                          audioStatus == 'processing' && !hasAudio;
 
-                // ✅ نفس تسمية زر العادي: "استمع" + حالة توليد
-                final listenLabel = hasAudio
-                    ? 'استمع'
-                    : (isGenerating ? 'جاري توليد الصوت...' : 'استمع');
+                      // ✅ نفس تسمية زر العادي: "استمع" + حالة توليد
+                      final listenLabel = hasAudio
+                          ? 'استمع'
+                          : (isGenerating ? 'جاري توليد الصوت...' : 'استمع');
 
-                return SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(16, 60, 16, 24), // ✅ نفس العادي تقريبًا
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 220,
-                          height: 270,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(20),
-                            color: Colors.white,
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: cover.isNotEmpty
-                              ? Image.network(cover, fit: BoxFit.contain)
-                              : const Icon(Icons.menu_book, size: 80, color: _primary),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      Center(
-                        child: Text(
-                          title.isEmpty ? 'كتاب بدون عنوان' : title,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w800,
-                            color: _primary,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // ✅ PDF pill card بنفس ستايل العادي
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: _pillGreen,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Row(
+                      return SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(
+                          16,
+                          60,
+                          16,
+                          24,
+                        ), // ✅ نفس العادي تقريبًا
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            const Icon(Icons.picture_as_pdf, color: _primary),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: pdfUrl.trim().isEmpty
-                                  ? const Text(
-                                'لا يوجد ملف PDF',
-                                style: TextStyle(fontWeight: FontWeight.w700),
-                              )
-                                  : InkWell(
-                                onTap: () => _openPdf(context, pdfUrl),
-                                child: const Text(
-                                  'ملف الكتاب',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    color: _accent,
-                                    decoration: TextDecoration.underline,
+                            Center(
+                              child: Container(
+                                width: 220,
+                                height: 270,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(20),
+                                  color: Colors.white,
+                                ),
+                                clipBehavior: Clip.antiAlias,
+                                child: cover.isNotEmpty
+                                    ? Image.network(cover, fit: BoxFit.contain)
+                                    : const Icon(
+                                        Icons.menu_book,
+                                        size: 80,
+                                        color: _primary,
+                                      ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            Center(
+                              child: Text(
+                                title.isEmpty ? 'كتاب بدون عنوان' : title,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w800,
+                                  color: _primary,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // ✅ PDF pill card بنفس ستايل العادي
+                            Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: _pillGreen,
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.picture_as_pdf,
+                                    color: _primary,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: pdfUrl.trim().isEmpty
+                                        ? const Text(
+                                            'لا يوجد ملف PDF',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          )
+                                        : InkWell(
+                                            onTap: () =>
+                                                _openPdf(context, pdfUrl),
+                                            child: const Text(
+                                              'ملف الكتاب',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w800,
+                                                color: _accent,
+                                                decoration:
+                                                    TextDecoration.underline,
+                                              ),
+                                            ),
+                                          ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+
+                            // ✅ زر الاستماع (pill) نفس العادي
+                            SizedBox(
+                              height: 56,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: _pillGreen,
+                                  foregroundColor: _primary,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(30),
                                   ),
                                 ),
+                                onPressed: isGenerating
+                                    ? null
+                                    : () => _startOrGenerateMyBookAudio(
+                                        context,
+                                        myBookData: data,
+                                        title: title,
+                                        cover: cover,
+                                      ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(
+                                      Icons.headphones_rounded,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      listenLabel,
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
+
+                            const SizedBox(height: 10),
+
+                            // ✅ زر العلامات والملاحظات (نفس زر استمع تمامًا)
+                            SizedBox(
+                              height: 56,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: _pillGreen,
+                                  foregroundColor: _primary,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(30),
+                                  ),
+                                ),
+                                onPressed: () => _openMarks(
+                                  context,
+                                  title: title,
+                                  cover: cover,
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: const [
+                                    Icon(
+                                      Icons.bookmark_added_rounded,
+                                      size: 20,
+                                    ),
+                                    SizedBox(width: 12),
+                                    Text(
+                                      'العلامات والملاحظات',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 80),
                           ],
                         ),
-                      ),
-                      const SizedBox(height: 14),
-
-                      // ✅ زر الاستماع (pill) نفس العادي
-                      SizedBox(
-                        height: 56,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _pillGreen,
-                            foregroundColor: _primary,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(30),
-                            ),
-                          ),
-                          onPressed: isGenerating
-                              ? null
-                              : () => _startOrGenerateMyBookAudio(
-                            context,
-                            myBookData: data,
-                            title: title,
-                            cover: cover,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.headphones_rounded, size: 20),
-                              const SizedBox(width: 12),
-                              Text(
-                                listenLabel,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 10),
-
-                      // ✅ زر العلامات والملاحظات (نفس زر استمع تمامًا)
-                      SizedBox(
-                        height: 56,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _pillGreen,
-                            foregroundColor: _primary,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(30),
-                            ),
-                          ),
-                          onPressed: () => _openMarks(context, title: title, cover: cover),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
-                              Icon(Icons.bookmark_added_rounded, size: 20),
-                              SizedBox(width: 12),
-                              Text(
-                                'العلامات والملاحظات',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 80),
-                    ],
+                      );
+                    },
                   ),
-                );
-              },
-            ),
           ),
         ],
       ),
@@ -555,7 +595,11 @@ class MyBookMarksPage extends StatelessWidget {
     final urls = await _getAudioUrls(data);
 
     if (urls.isEmpty) {
-      _showSnack(context, 'لا يوجد صوت جاهز لهذا الكتاب', icon: Icons.info_outline);
+      _showSnack(
+        context,
+        'لا يوجد صوت جاهز لهذا الكتاب',
+        icon: Icons.info_outline,
+      );
       return;
     }
 
@@ -716,104 +760,114 @@ class MyBookMarksPage extends StatelessWidget {
             body: (marks == null)
                 ? const Center(child: Text('الرجاء تسجيل الدخول أولاً'))
                 : StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: marks.orderBy('createdAt', descending: true).snapshots(),
-              builder: (context, snap) {
-                if (snap.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+                    stream: marks
+                        .orderBy('createdAt', descending: true)
+                        .snapshots(),
+                    builder: (context, snap) {
+                      if (snap.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
 
-                final docs = snap.data?.docs ?? [];
-                if (docs.isEmpty) {
-                  return const Center(child: Text('لا توجد علامات بعد.'));
-                }
+                      final docs = snap.data?.docs ?? [];
+                      if (docs.isEmpty) {
+                        return const Center(child: Text('لا توجد علامات بعد.'));
+                      }
 
-                return ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                  itemCount: docs.length,
-                  itemBuilder: (context, i) {
-                    final doc = docs[i];
-                    final docId = doc.id;
-                    final m = doc.data();
+                      return ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                        itemCount: docs.length,
+                        itemBuilder: (context, i) {
+                          final doc = docs[i];
+                          final docId = doc.id;
+                          final m = doc.data();
 
-                    final positionMs = _asInt(m['positionMs'], fallback: 0);
-                    final note = (m['note'] ?? '').toString();
+                          final positionMs = _asInt(
+                            m['positionMs'],
+                            fallback: 0,
+                          );
+                          final note = (m['note'] ?? '').toString();
 
-                    // ✅ MyBook ما عنده globalMs/partIndex
-                    // نخليها مثل library: نعرض الوقت من positionMs
-                    final globalMs = positionMs;
+                          // ✅ MyBook ما عنده globalMs/partIndex
+                          // نخليها مثل library: نعرض الوقت من positionMs
+                          final globalMs = positionMs;
 
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: _pillGreen.withOpacity(0.85),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _fmtMs(globalMs),
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w900,
-                              color: _primary,
-                              fontSize: 16,
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: _pillGreen.withOpacity(0.85),
+                              borderRadius: BorderRadius.circular(16),
                             ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            note.trim().isEmpty ? 'بدون ملاحظة' : note,
-                            style: TextStyle(
-                              color: Colors.black.withOpacity(0.65),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-
-                          // ✅ الصف السفلي (تشغيل + حذف) نفس MarksNotesPage
-                          Row(
-                            children: [
-                              ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: _accent,
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                ),
-                                onPressed: () => _openPlayerAt(context, positionMs),
-                                child: const Text(
-                                  'تشغيل من هنا',
-                                  style: TextStyle(
-                                    color: Colors.white,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _fmtMs(globalMs),
+                                  style: const TextStyle(
                                     fontWeight: FontWeight.w900,
+                                    color: _primary,
+                                    fontSize: 16,
                                   ),
                                 ),
-                              ),
-                              const Spacer(),
-                              IconButton(
-                                icon: Icon(
-                                  Icons.delete_outline_rounded,
-                                  color: _primary.withOpacity(0.6),
+                                const SizedBox(height: 6),
+                                Text(
+                                  note.trim().isEmpty ? 'بدون ملاحظة' : note,
+                                  style: TextStyle(
+                                    color: Colors.black.withOpacity(0.65),
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
-                                onPressed: () async {
-                                  final ok = await _confirmDelete(context);
-                                  if (!ok) return;
-                                  await marks.doc(docId).delete();
-                                  if (context.mounted) {
-                                    _showSnack(context, 'تم حذف العلامة');
-                                  }
-                                },
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
+                                const SizedBox(height: 12),
+
+                                // ✅ الصف السفلي (تشغيل + حذف) نفس MarksNotesPage
+                                Row(
+                                  children: [
+                                    ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: _accent,
+                                        elevation: 0,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            14,
+                                          ),
+                                        ),
+                                      ),
+                                      onPressed: () =>
+                                          _openPlayerAt(context, positionMs),
+                                      child: const Text(
+                                        'تشغيل من هنا',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    IconButton(
+                                      icon: Icon(
+                                        Icons.delete_outline_rounded,
+                                        color: _primary.withOpacity(0.6),
+                                      ),
+                                      onPressed: () async {
+                                        final ok = await _confirmDelete(
+                                          context,
+                                        );
+                                        if (!ok) return;
+                                        await marks.doc(docId).delete();
+                                        if (context.mounted) {
+                                          _showSnack(context, 'تم حذف العلامة');
+                                        }
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
           ),
         ],
       ),
@@ -851,6 +905,9 @@ class _MyBookAudioPlayerPageState extends State<MyBookAudioPlayerPage> {
   bool _loading = true;
 
   double _speed = 1.0;
+
+  double? _dragValue;
+  bool _isDragging = false;
   final List<double> _speeds = const [0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
 
   // ✅ حفظ مكان الاستماع
@@ -859,7 +916,7 @@ class _MyBookAudioPlayerPageState extends State<MyBookAudioPlayerPage> {
   // ✅ progress ثابت مثل كتابك العادي
   List<Duration?> _durations = [];
   bool _durationsReady = false;
-  int _maxReachedMs = 0;                 // أعلى نقطة وصلها (global ms)
+  int _maxReachedMs = 0; // أعلى نقطة وصلها (global ms)
   DateTime _lastWrite = DateTime.fromMillisecondsSinceEpoch(0);
 
   // ✅ goal tracking
@@ -1032,9 +1089,9 @@ class _MyBookAudioPlayerPageState extends State<MyBookAudioPlayerPage> {
                             .collection('marks')
                             .doc(markId)
                             .set({
-                          'note': ctrl.text.trim(),
-                          'updatedAt': FieldValue.serverTimestamp(),
-                        }, SetOptions(merge: true));
+                              'note': ctrl.text.trim(),
+                              'updatedAt': FieldValue.serverTimestamp(),
+                            }, SetOptions(merge: true));
 
                         if (ctx.mounted) Navigator.pop(ctx);
                         if (mounted) _showSnack(context, 'تم حفظ الملاحظة');
@@ -1117,7 +1174,9 @@ class _MyBookAudioPlayerPageState extends State<MyBookAudioPlayerPage> {
 
       final doc = await ref.get();
       final data = doc.data() ?? {};
-      final saved = (data['contentMs'] is num) ? (data['contentMs'] as num).toInt() : 0;
+      final saved = (data['contentMs'] is num)
+          ? (data['contentMs'] as num).toInt()
+          : 0;
 
       if (!mounted) return;
       setState(() => _maxReachedMs = saved);
@@ -1193,22 +1252,37 @@ class _MyBookAudioPlayerPageState extends State<MyBookAudioPlayerPage> {
       if (total <= 0) return;
 
       final gpos = _globalPosMs().clamp(0, total);
+
       final currentContent = (_maxReachedMs > gpos) ? _maxReachedMs : gpos;
 
       await FirebaseFirestore.instance.runTransaction((tx) async {
-        final snap = await tx.get(ref);
-        final data = snap.data() as Map<String, dynamic>? ?? {};
+        final snap = await ref.get();
+        final data = snap.data() ?? {};
 
-        final oldContent = (data['contentMs'] is num) ? (data['contentMs'] as num).toInt() : 0;
-        final oldTotal   = (data['totalMs'] is num) ? (data['totalMs'] as num).toInt() : 0;
+        // 🚫 إذا الكتاب مكتمل → لا تحدث البار
+        if ((data['status'] ?? '') == 'listened') {
+          return;
+        }
 
-        final newTotal   = (oldTotal > total) ? oldTotal : total;
-        final newContent = (oldContent > currentContent) ? oldContent : currentContent;
+        final oldContent = (data['contentMs'] is num)
+            ? (data['contentMs'] as num).toInt()
+            : 0;
+        final oldTotal = (data['totalMs'] is num)
+            ? (data['totalMs'] as num).toInt()
+            : 0;
+
+        final newTotal = (oldTotal > total) ? oldTotal : total;
+        final newContent = currentContent;
+        // ✅ تحقق إذا وصل 100%
+        final isCompleted = newContent >= newTotal && newTotal > 0;
 
         tx.set(ref, {
           'totalMs': newTotal,
-          'contentMs': newContent, // ✅ بدون تصفير حتى لو وصل 100
+          'contentMs': newContent,
           'updatedAt': FieldValue.serverTimestamp(),
+
+          // ✅ إذا اكتمل → انقله لـ listened
+          if (isCompleted) 'status': 'listened',
         }, SetOptions(merge: true));
       });
     } catch (_) {}
@@ -1232,7 +1306,10 @@ class _MyBookAudioPlayerPageState extends State<MyBookAudioPlayerPage> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return 60;
 
-    final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
     final data = doc.data() ?? {};
 
     final weeklyGoal = data['weeklyGoal'];
@@ -1347,7 +1424,8 @@ class _MyBookAudioPlayerPageState extends State<MyBookAudioPlayerPage> {
     _showAutoDialogMessage(
       icon: Icons.trending_up_rounded,
       title: 'أحسنت التقدّم 👏🏻',
-      body: 'أنت قريب من تحقيق هدفك الأسبوعي 🎖️\nاستمر… أنت على الطريق الصحيح 💚',
+      body:
+          'أنت قريب من تحقيق هدفك الأسبوعي 🎖️\nاستمر… أنت على الطريق الصحيح 💚',
       seconds: 10,
     );
   }
@@ -1473,7 +1551,7 @@ class _MyBookAudioPlayerPageState extends State<MyBookAudioPlayerPage> {
   Future<void> _showSpeedMenu(BuildContext btnContext) async {
     final RenderBox button = btnContext.findRenderObject() as RenderBox;
     final RenderBox overlay =
-    Overlay.of(btnContext).context.findRenderObject() as RenderBox;
+        Overlay.of(btnContext).context.findRenderObject() as RenderBox;
     final Offset pos = button.localToGlobal(Offset.zero, ancestor: overlay);
 
     const double menuW = 140;
@@ -1534,7 +1612,10 @@ class _MyBookAudioPlayerPageState extends State<MyBookAudioPlayerPage> {
     int target = _globalPosMs() + (seconds * 1000);
     if (target < 0) target = 0;
     if (target > total) target = total;
+
     await _seekGlobalMs(target);
+
+    if (mounted) setState(() {});
   }
 
   // =======================
@@ -1584,8 +1665,9 @@ class _MyBookAudioPlayerPageState extends State<MyBookAudioPlayerPage> {
 
   Future<void> _init() async {
     try {
-      final sources =
-      widget.audioUrls.map((u) => AudioSource.uri(Uri.parse(u))).toList();
+      final sources = widget.audioUrls
+          .map((u) => AudioSource.uri(Uri.parse(u)))
+          .toList();
       final playlist = ConcatenatingAudioSource(children: sources);
 
       await _player.setAudioSource(
@@ -1654,15 +1736,17 @@ class _MyBookAudioPlayerPageState extends State<MyBookAudioPlayerPage> {
       stream: _player.positionStream,
       builder: (context, snap) {
         final total = _totalMs();
-        final current = _globalPosMs();
+        final localPos = snap.data ?? Duration.zero;
+        final idx = _player.currentIndex ?? 0;
 
         if (total <= 0) return const SizedBox.shrink();
 
-        final currentMs = current.clamp(0, total);
-        if (currentMs > _maxReachedMs) _maxReachedMs = currentMs;
+        final currentMs = (_prefixMsBefore(idx) + localPos.inMilliseconds)
+            .clamp(0, total);
 
-        final p = (_maxReachedMs / total).clamp(0.0, 1.0);
-        final percent = (p * 100).round();
+        final liveValue = (currentMs / total).clamp(0.0, 1.0);
+        final shownValue = liveValue;
+        final percent = (shownValue * 100).round();
 
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -1672,10 +1756,12 @@ class _MyBookAudioPlayerPageState extends State<MyBookAudioPlayerPage> {
               alignment: Alignment.center,
               children: [
                 LinearProgressIndicator(
-                  value: p,
+                  value: shownValue,
                   minHeight: 18,
                   backgroundColor: _pillGreen,
-                  valueColor: const AlwaysStoppedAnimation<Color>(_midPillGreen),
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                    _midPillGreen,
+                  ),
                 ),
                 Text(
                   '$percent%',
@@ -1725,222 +1811,292 @@ class _MyBookAudioPlayerPageState extends State<MyBookAudioPlayerPage> {
                 ),
                 onPressed: () => Navigator.of(context).maybePop(),
               ),
-              title: const Text('تشغيل الكتاب', style: TextStyle(color: _primary)),
+              title: const Text(
+                'تشغيل الكتاب',
+                style: TextStyle(color: _primary),
+              ),
             ),
             body: Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
                   : Column(
-                children: [
-                  const SizedBox(height: 15),
-
-                  // ✅ mini bar % (مثل كتابك العادي) - إذا ما تبينه احذفيه
-                  _playerMiniBar(),
-                  const SizedBox(height: 12),
-
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: whiteCard,
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: Column(
                       children: [
+                        const SizedBox(height: 15),
+
+                        // ✅ mini bar % (مثل كتابك العادي) - إذا ما تبينه احذفيه
+                        _playerMiniBar(),
+                        const SizedBox(height: 12),
+
                         Container(
-                          width: 190,
-                          height: 235,
+                          padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: whiteCard,
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: Column(
+                            children: [
+                              Container(
+                                width: 190,
+                                height: 235,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                clipBehavior: Clip.antiAlias,
+                                child: widget.coverUrl.isNotEmpty
+                                    ? Image.network(
+                                        widget.coverUrl,
+                                        fit: BoxFit.contain,
+                                      )
+                                    : const Icon(
+                                        Icons.menu_book,
+                                        size: 70,
+                                        color: _primary,
+                                      ),
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                widget.bookTitle,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w900,
+                                  color: _primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 8),
+
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: whiteCard,
                             borderRadius: BorderRadius.circular(16),
                           ),
-                          clipBehavior: Clip.antiAlias,
-                          child: widget.coverUrl.isNotEmpty
-                              ? Image.network(widget.coverUrl, fit: BoxFit.contain)
-                              : const Icon(Icons.menu_book, size: 70, color: _primary),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          widget.bookTitle,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            color: _primary,
+                          child: StreamBuilder<Duration>(
+                            stream: _player.positionStream,
+                            builder: (context, snap) {
+                              final total = _totalMs();
+                              final localPos = snap.data ?? Duration.zero;
+                              final idx = _player.currentIndex ?? 0;
+
+                              final currentMs =
+                                  (_prefixMsBefore(idx) +
+                                          localPos.inMilliseconds)
+                                      .clamp(0, total > 0 ? total : 0);
+
+                              /*if (currentMs > _maxReachedMs) {
+                                _maxReachedMs = currentMs;
+                              }*/
+
+                              final liveValue = (total > 0)
+                                  ? (currentMs / total)
+                                  : 0.0;
+                              final shownValue = _isDragging
+                                  ? (_dragValue ?? liveValue)
+                                  : liveValue;
+                              final shownMs = (total * shownValue).round();
+
+                              return Column(
+                                children: [
+                                  SliderTheme(
+                                    data: SliderTheme.of(context).copyWith(
+                                      activeTrackColor: _darkGreen,
+                                      inactiveTrackColor: _pillGreen,
+                                      thumbColor: _darkGreen,
+                                      overlayColor: _darkGreen.withOpacity(
+                                        0.15,
+                                      ),
+                                      trackHeight: 4,
+                                    ),
+                                    child: Slider(
+                                      value: shownValue.clamp(0.0, 1.0),
+                                      onChangeStart: total <= 0
+                                          ? null
+                                          : (v) {
+                                              setState(() {
+                                                _isDragging = true;
+                                                _dragValue = v;
+                                              });
+                                            },
+                                      onChanged: total <= 0
+                                          ? null
+                                          : (v) {
+                                              setState(() {
+                                                _isDragging = true;
+                                                _dragValue = v;
+                                              });
+                                            },
+                                      onChangeEnd: total <= 0
+                                          ? null
+                                          : (v) async {
+                                              final target = (total * v)
+                                                  .round();
+                                              await _seekGlobalMs(target);
+
+                                              if (!mounted) return;
+                                              setState(() {
+                                                _isDragging = false;
+                                                _dragValue = null;
+                                              });
+                                            },
+                                    ),
+                                  ),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        _fmtMs(shownMs),
+                                        style: const TextStyle(
+                                          color: Colors.black54,
+                                        ),
+                                      ),
+                                      Text(
+                                        _fmtMs(total > 0 ? total : 0),
+                                        style: const TextStyle(
+                                          color: Colors.black54,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (!_durationsReady)
+                                    const Padding(
+                                      padding: EdgeInsets.only(top: 6),
+                                      child: Text(
+                                        'جاري حساب مدة الكتاب...',
+                                        style: TextStyle(color: Colors.black54),
+                                      ),
+                                    ),
+                                ],
+                              );
+                            },
                           ),
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            IconButton(
+                              iconSize: 42,
+                              onPressed: () => _seekBy(-10),
+                              icon: const Icon(
+                                Icons.replay_10_rounded,
+                                color: _midDarkGreen2,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            StreamBuilder<PlayerState>(
+                              stream: _player.playerStateStream,
+                              builder: (context, s) {
+                                final playing = s.data?.playing ?? false;
+                                return CircleAvatar(
+                                  radius: 34,
+                                  backgroundColor: _midPillGreen,
+                                  child: IconButton(
+                                    iconSize: 40,
+                                    onPressed: () async {
+                                      if (playing) {
+                                        await _saveBarProgress(force: true);
+                                        await _player.pause();
+                                      } else {
+                                        await _player.play();
+                                      }
+                                    },
+                                    icon: Icon(
+                                      playing
+                                          ? Icons.pause_rounded
+                                          : Icons.play_arrow_rounded,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(width: 16),
+                            IconButton(
+                              iconSize: 42,
+                              onPressed: () => _seekBy(10),
+                              icon: const Icon(
+                                Icons.forward_10_rounded,
+                                color: _midDarkGreen2,
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              height: 64,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: whiteCard,
+                                  foregroundColor: _primary,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(24),
+                                  ),
+                                  elevation: 0,
+                                ),
+                                onPressed: _onMarkPressed,
+                                icon: const Icon(
+                                  Icons.bookmark_add_rounded,
+                                  color: _midDarkGreen2,
+                                  size: 26,
+                                ),
+                                label: const Text(
+                                  'علامة',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    color: _midDarkGreen2,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Builder(
+                              builder: (btnContext) {
+                                return SizedBox(
+                                  height: 64,
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: whiteCard,
+                                      foregroundColor: _midDarkGreen2,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(24),
+                                      ),
+                                      elevation: 0,
+                                    ),
+                                    onPressed: () => _showSpeedMenu(btnContext),
+                                    icon: const Icon(
+                                      Icons.speed_rounded,
+                                      size: 26,
+                                    ),
+                                    label: Text(
+                                      '${_speed.toStringAsFixed(2)}x',
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: whiteCard,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: StreamBuilder<Duration>(
-                      stream: _player.positionStream,
-                      builder: (context, snap) {
-                        final total = _totalMs();
-                        final gpos = _globalPosMs();
-                        final currentMs = gpos.clamp(0, total > 0 ? total : 0);
-
-                        if (currentMs > _maxReachedMs) _maxReachedMs = currentMs;
-
-                        final value = (total > 0) ? (currentMs / total) : 0.0;
-
-                        return Column(
-                          children: [
-                            SliderTheme(
-                              data: SliderTheme.of(context).copyWith(
-                                activeTrackColor: _darkGreen,
-                                inactiveTrackColor: _pillGreen,
-                                thumbColor: _darkGreen,
-                                overlayColor: _darkGreen.withOpacity(0.15),
-                                trackHeight: 4,
-                              ),
-                              child: Slider(
-                                value: value.clamp(0.0, 1.0),
-                                onChanged: total <= 0
-                                    ? null
-                                    : (v) async {
-                                  final target = (total * v).round();
-                                  await _seekGlobalMs(target);
-                                },
-                              ),
-                            ),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(_fmtMs(currentMs), style: const TextStyle(color: Colors.black54)),
-                                Text(_fmtMs(total > 0 ? total : 0), style: const TextStyle(color: Colors.black54)),
-                              ],
-                            ),
-                            if (!_durationsReady)
-                              const Padding(
-                                padding: EdgeInsets.only(top: 6),
-                                child: Text(
-                                  'جاري حساب مدة الكتاب...',
-                                  style: TextStyle(color: Colors.black54),
-                                ),
-                              ),
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      IconButton(
-                        iconSize: 42,
-                        onPressed: () => _seekBy(-10),
-                        icon: const Icon(Icons.replay_10_rounded, color: _midDarkGreen2),
-                      ),
-                      const SizedBox(width: 16),
-                      StreamBuilder<PlayerState>(
-                        stream: _player.playerStateStream,
-                        builder: (context, s) {
-                          final playing = s.data?.playing ?? false;
-                          return CircleAvatar(
-                            radius: 34,
-                            backgroundColor: _midPillGreen,
-                            child: IconButton(
-                              iconSize: 40,
-                              onPressed: () async {
-                                if (playing) {
-                                  await _saveBarProgress(force: true);
-                                  await _player.pause();
-                                } else {
-                                  await _player.play();
-                                }
-                              },
-                              icon: Icon(
-                                playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                                color: Colors.white,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(width: 16),
-                      IconButton(
-                        iconSize: 42,
-                        onPressed: () => _seekBy(10),
-                        icon: const Icon(Icons.forward_10_rounded, color: _midDarkGreen2),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SizedBox(
-                        height: 64,
-                        child: ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: whiteCard,
-                            foregroundColor: _primary,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(24),
-                            ),
-                            elevation: 0,
-                          ),
-                          onPressed: _onMarkPressed,
-                          icon: const Icon(
-                            Icons.bookmark_add_rounded,
-                            color: _midDarkGreen2,
-                            size: 26,
-                          ),
-                          label: const Text(
-                            'علامة',
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: _midDarkGreen2,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Builder(
-                        builder: (btnContext) {
-                          return SizedBox(
-                            height: 64,
-                            child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: whiteCard,
-                                foregroundColor: _midDarkGreen2,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(24),
-                                ),
-                                elevation: 0,
-                              ),
-                              onPressed: () => _showSpeedMenu(btnContext),
-                              icon: const Icon(Icons.speed_rounded, size: 26),
-                              label: Text(
-                                '${_speed.toStringAsFixed(2)}x',
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ],
-              ),
             ),
           ),
         ],
