@@ -1736,17 +1736,15 @@ class _MyBookAudioPlayerPageState extends State<MyBookAudioPlayerPage> {
       stream: _player.positionStream,
       builder: (context, snap) {
         final total = _totalMs();
-        final localPos = snap.data ?? Duration.zero;
-        final idx = _player.currentIndex ?? 0;
+        final current = _globalPosMs();
 
         if (total <= 0) return const SizedBox.shrink();
 
-        final currentMs = (_prefixMsBefore(idx) + localPos.inMilliseconds)
-            .clamp(0, total);
+        final currentMs = current.clamp(0, total);
+        //if (currentMs > _maxReachedMs) _maxReachedMs = currentMs;
 
-        final liveValue = (currentMs / total).clamp(0.0, 1.0);
-        final shownValue = liveValue;
-        final percent = (shownValue * 100).round();
+        final p = (currentMs / total).clamp(0.0, 1.0);
+        final percent = (p * 100).round();
 
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -1756,7 +1754,7 @@ class _MyBookAudioPlayerPageState extends State<MyBookAudioPlayerPage> {
               alignment: Alignment.center,
               children: [
                 LinearProgressIndicator(
-                  value: shownValue,
+                  value: p,
                   minHeight: 18,
                   backgroundColor: _pillGreen,
                   valueColor: const AlwaysStoppedAnimation<Color>(
