@@ -53,7 +53,6 @@ class _BookChatPageState extends State<BookChatPage> {
     _scroll.dispose();
     super.dispose();
   }
-
   void _scrollToBottom() {
     if (!_scroll.hasClients) return;
     Future.delayed(const Duration(milliseconds: 80), () {
@@ -65,7 +64,6 @@ class _BookChatPageState extends State<BookChatPage> {
       );
     });
   }
-
   FirebaseFunctions get _functions => FirebaseFunctions.instanceFor(region: _region);
 
   Future<void> _prepareBook() async {

@@ -3148,9 +3148,11 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
 
         final currentMs = current.clamp(0, total);
 
-        if (currentMs > _maxReachedMs) _maxReachedMs = currentMs;
+        //if (currentMs > _maxReachedMs) _maxReachedMs = currentMs;
 
-        final p = (_maxReachedMs / total).clamp(0.0, 1.0);
+       // final p = (_maxReachedMs / total).clamp(0.0, 1.0);
+       // final percent = (p * 100).round();
+        final p = (currentMs / total).clamp(0.0, 1.0);
         final percent = (p * 100).round();
 
         return Padding(

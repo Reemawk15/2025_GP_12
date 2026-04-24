@@ -98,13 +98,13 @@ class LibraryTab extends StatelessWidget {
                             fontWeight: FontWeight.w500,
                           ),
 
-                          // 👈 هذا السطر المهم
+
                           indicatorPadding: const EdgeInsets.only(bottom: 6),
 
                           labelPadding: const EdgeInsets.only(
                             left: 1,
                             right: 1,
-                            bottom: 10, // 👈 هذا يرفع الكلمات
+                            bottom: 10,
                           ),
 
                           tabs: [
@@ -158,7 +158,7 @@ class Book {
   final ImageProvider? cover;
   final String status;
 
-  final String type; // ✅ جديد: 'book' أو 'podcast'
+  final String type;
 
   final int listenedSeconds;
   final int estimatedTotalSeconds;
@@ -171,7 +171,7 @@ class Book {
     required this.title,
     this.cover,
     required this.status,
-    this.type = 'book', // ✅ الافتراضي كتاب
+    this.type = 'book',
     this.listenedSeconds = 0,
     this.estimatedTotalSeconds = 0,
     this.isCompleted = false,
@@ -244,7 +244,7 @@ class _LibraryShelfState extends State<_LibraryShelf> {
           final title = (m['title'] ?? '') as String;
           final cover = (m['coverUrl'] ?? '') as String;
           final status = (m['status'] ?? 'want') as String;
-          final type = (m['type'] ?? 'book') as String; // ✅ جديد
+          final type = (m['type'] ?? 'book') as String;
           final listenedSeconds = (m['listenedSeconds'] as num?)?.toInt() ?? 0;
           final estimatedTotalSeconds =
               (m['estimatedTotalSeconds'] as num?)?.toInt() ?? 0;

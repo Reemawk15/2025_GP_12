@@ -26,7 +26,7 @@ const COLD_START_TOP_RATED_BOOKS = 10;
 const CROSS_TYPE_FILL_MULTIPLIER = 4; // fetch extra candidates = missing * this
 const CROSS_TYPE_SCORE_MULTIPLIER = 0.55; // base cross weight
 
-// ===== Behavior weights (tune later) =====
+// ===== Behavior weights  =====
 const W_COMPLETED = 3.0;
 const W_LISTENED = 2.0;
 const W_LISTEN_NOW = 1.8;
@@ -36,7 +36,7 @@ const W_WANT = 1.4;
 const W_ACTION_LISTEN = 1.6; // press_listen
 const W_ACTION_SUMMARY = 1.1; // press_summary
 const W_ACTION_OPEN = 0.9; // open_details
-const W_ACTION_WANT = 1.3; // add_to_list_want (if you log it)
+const W_ACTION_WANT = 1.3; // add_to_list_want
 
 // Review weight (used as base when status is empty)
 const W_ACTION_REVIEW = 1.7; // add_review
@@ -317,7 +317,7 @@ export const getPersonalizedRecommendations = onCall(
 
       const libSnap = await libRef.orderBy("updatedAt", "desc").limit(60).get();
 
-      // ✅ Cold start ONLY if no interactions at all
+      // Cold start ONLY if no interactions at all
       if (libSnap.empty) {
         if (wantedType === "book") {
           const topN = Math.min(limit, COLD_START_TOP_RATED_BOOKS);

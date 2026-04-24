@@ -404,7 +404,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final functions = FirebaseFunctions.instanceFor(region: 'us-central1');
     final callable = functions.httpsCallable('getPersonalizedRecommendations');
 
-    // نجيب كتب + بودكاست (لو تبين نسب، نتحكم بالlimits هنا)
+
     final bookRes = await callable.call({'limit': 14, 'type': 'book'});
     final podRes  = await callable.call({'limit': 6,  'type': 'podcast'});
 
@@ -420,7 +420,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final books = parse(bookRes.data);
     final pods  = parse(podRes.data);
     print('books=${books.length} pods=${pods.length}');
-    // دمج + إزالة تكرار
+
     final seen = <String>{};
     final merged = <RecommendedItem>[];
     for (final it in [...books, ...pods]) {
@@ -1169,7 +1169,7 @@ class _HomeScreenState extends State<HomeScreen> {
           currentIndex: _index,
           onTap: (i) {
             setState(() => _index = i);
-            // ✅ optional extra: refresh when user comes back to home tab
+            //  optional extra: refresh when user comes back to home tab
             if (i == 0) _refreshRecs();
           },
         ),

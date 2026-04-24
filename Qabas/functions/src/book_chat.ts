@@ -194,7 +194,6 @@ export const askBookChat = onCall(
     const term = extractMeaningTerm(message);
 
     // System prompt that forces structured output (answer + quotes).
-    // This is the most reliable way to always get quotes like your old version.
     const systemBookOnly = [
       "You are Qabas Book Assistant.",
       "You must answer in Arabic.",
@@ -250,7 +249,7 @@ export const askBookChat = onCall(
           rawTextPreview: rawText.slice(0, 300),
         });
 
-        // Fallback: return plain text as answer, no quotes.
+        // Fallback: return plain text as answer
         const fallbackAnswer = rawText.length ? rawText : "غير مذكور في هذا الكتاب.";
         return { answer: fallbackAnswer, quotes: [] };
       }

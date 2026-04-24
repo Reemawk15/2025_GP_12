@@ -208,7 +208,6 @@ export const generateBookSummary = onCall(
     }
 
     const target = chooseTargetWordsByChars(fullText.length);
-
     if (fullText.length < 1200) {
       target.min = 80;
       target.max = 140;
@@ -229,8 +228,6 @@ export const generateBookSummary = onCall(
       `Generating summary for bookId=${bookId}, textLen=${fullText.length}, chunkSize=${chunkSize}, overlap=${overlap}, chunks=${chunks.length}, targetWords=${target.min}-${target.max}`
     );
 
-    // حماية إضافية: لو طلع chunks كثير جدًا، نكبر chunkSize مرة ثانية
-    // (يصير نادر، لكن يفيد لو النص فيه فواصل/مسافات كثيرة)
     if (chunks.length > 28) {
       logger.warn(`Too many chunks (${chunks.length}). Re-chunking with larger size...`);
       const bigger = chunkText(fullText, Math.min(chunkSize + 6000, 26000), overlap);
@@ -250,7 +247,7 @@ export const generateBookSummary = onCall(
           openai.chat.completions.create({
             model: MODEL,
             temperature: 0.2,
-            // تحديد max_tokens يسرّع ويقلل احتمالية بطء/تكلفة
+
             max_tokens: 420,
             messages: [
               {
