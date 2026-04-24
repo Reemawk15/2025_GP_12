@@ -98,7 +98,6 @@ class LibraryTab extends StatelessWidget {
                             fontWeight: FontWeight.w500,
                           ),
 
-
                           indicatorPadding: const EdgeInsets.only(bottom: 6),
 
                           labelPadding: const EdgeInsets.only(
@@ -657,7 +656,7 @@ class _BookCard extends StatelessWidget {
 
     try {
       await ref.set({
-        'inLibrary': false, // ✅ نخفيه فقط
+        'status': 'removed', // ✅ قيمة ما تطابق أي رف
         'removedAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -682,6 +681,7 @@ class _BookCard extends StatelessWidget {
         .doc(uid)
         .collection('library')
         .doc(book.id);
+
     try {
       await ref.set({
         'inLibrary': true,
@@ -693,6 +693,7 @@ class _BookCard extends StatelessWidget {
           'contentMs': 0,
           'lastPositionMs': 0,
           'lastPartIndex': 0,
+          '_maxReachedMs': 0,
         },
       }, SetOptions(merge: true));
       onMoved(book.id);

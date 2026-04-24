@@ -1259,11 +1259,6 @@ class _MyBookAudioPlayerPageState extends State<MyBookAudioPlayerPage> {
         final snap = await ref.get();
         final data = snap.data() ?? {};
 
-        // 🚫 إذا الكتاب مكتمل → لا تحدث البار
-        if ((data['status'] ?? '') == 'listened') {
-          return;
-        }
-
         final oldContent = (data['contentMs'] is num)
             ? (data['contentMs'] as num).toInt()
             : 0;
@@ -1273,16 +1268,11 @@ class _MyBookAudioPlayerPageState extends State<MyBookAudioPlayerPage> {
 
         final newTotal = (oldTotal > total) ? oldTotal : total;
         final newContent = currentContent;
-        // ✅ تحقق إذا وصل 100%
-        final isCompleted = newContent >= newTotal && newTotal > 0;
 
         tx.set(ref, {
           'totalMs': newTotal,
           'contentMs': newContent,
           'updatedAt': FieldValue.serverTimestamp(),
-
-          // ✅ إذا اكتمل → انقله لـ listened
-          if (isCompleted) 'status': 'listened',
         }, SetOptions(merge: true));
       });
     } catch (_) {}

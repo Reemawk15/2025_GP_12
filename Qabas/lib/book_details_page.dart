@@ -166,14 +166,14 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
   }
 
   Future<void> _startOrGenerateAudio(
-      BuildContext context, {
-        required Map<String, dynamic> data,
-        required String title,
-        required String author,
-        required String cover,
-        int? overridePartIndex,
-        int? overridePositionMs,
-      }) async {
+    BuildContext context, {
+    required Map<String, dynamic> data,
+    required String title,
+    required String author,
+    required String cover,
+    int? overridePartIndex,
+    int? overridePositionMs,
+  }) async {
     await _trackUserAction(
       bookId: widget.bookId,
       bookData: data,
@@ -229,8 +229,7 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
           bookAuthor: author,
           coverUrl: cover,
           audioUrls: urls,
-          initialPartIndex:
-          (lastPartIndex < urls.length) ? lastPartIndex : 0,
+          initialPartIndex: (lastPartIndex < urls.length) ? lastPartIndex : 0,
           initialPositionMs: lastPositionMs,
         ),
       ),
@@ -624,12 +623,12 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
                           ),
                           onPressed: hasAudioParts
                               ? () => _startOrGenerateAudio(
-                            context,
-                            data: data,
-                            title: title,
-                            author: author,
-                            cover: cover,
-                          )
+                                  context,
+                                  data: data,
+                                  title: title,
+                                  author: author,
+                                  cover: cover,
+                                )
                               : null,
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -1375,6 +1374,10 @@ class _AddToListSheet extends StatelessWidget {
       'lastActionAt': FieldValue.serverTimestamp(),
       'lastSeenAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
+
+      'contentMs': 0,
+      'lastPositionMs': 0,
+      'lastPartIndex': 0,
     }, SetOptions(merge: true));
 
     if (context.mounted) {
@@ -1767,17 +1770,17 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
           .doc(user.uid)
           .collection('library')
           .doc(widget.bookId)
-          .get();
+          .snapshots()
+          .listen((snap) {
+            final data = snap.data() ?? {};
+            final savedContent = (data['contentMs'] is num)
+                ? (data['contentMs'] as num).toInt()
+                : 0;
 
-      final data = doc.data() ?? {};
-      final savedContent = (data['contentMs'] is num)
-          ? (data['contentMs'] as num).toInt()
-          : 0;
-
-      if (!mounted) return;
-      setState(() {
-        _maxReachedMs = savedContent; // ✅ هذا اللي يخلي البار الأخضر ما يتصفر
-      });
+            if (savedContent == 0 && _maxReachedMs > 0) {
+              if (mounted) setState(() => _maxReachedMs = 0);
+            }
+          });
     } catch (_) {}
   }
 
@@ -1882,23 +1885,6 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
           'completedAt': FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
-
-        // ✅ صفّري التقدم فقط (بدون isCompleted:false)
-        await ref.set({
-          'contentMs': 0,
-          'lastPartIndex': 0,
-          'lastPositionMs': 0,
-          'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-
-        if (!mounted) return;
-
-        // ✅ صفّري البار محليًا
-        setState(() => _maxReachedMs = 0);
-
-        // ✅ رجعي المشغل للبداية
-        await _player.seek(Duration.zero, index: 0);
-        await _player.pause();
       });
 
       await _loadAllDurationsFromUrls();
@@ -2214,7 +2200,8 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
       if (total <= 0) return;
 
       final gpos = _globalPosMs().clamp(0, total);
-      final currentContent = (_maxReachedMs > gpos ? _maxReachedMs : gpos);
+
+      //final currentContent = (_maxReachedMs > gpos ? _maxReachedMs : gpos);
 
       final ref = FirebaseFirestore.instance
           .collection('users')
@@ -2226,6 +2213,23 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
         final snap = await tx.get(ref);
         final data = snap.data() as Map<String, dynamic>? ?? {};
 
+        // ✅ إذا الكتاب مكتمل → لا تحدث البار
+        if ((data['status'] ?? '') == 'listened') {
+          return;
+        }
+
+        if ((data['status'] ?? '') == 'want' ||
+            (data['status'] ?? '') == 'listen_now') {
+          tx.set(ref, {
+            'contentMs': 0, // 🔥 ابدأ من جديد
+            'lastPositionMs': 0,
+            'lastPartIndex': 0,
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+
+          return; // وقف بعد التصفير
+        }
+
         final oldContent = (data['contentMs'] is num)
             ? (data['contentMs'] as num).toInt()
             : 0;
@@ -2233,15 +2237,26 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
             ? (data['totalMs'] as num).toInt()
             : 0;
 
+        final status = (data['status'] ?? '');
+
+        final isListened = status == 'listened';
+        // 🔥 الحل
+        final currentContent = isListened
+            ? oldContent // 🔒 خليه ثابت
+            : (_maxReachedMs > gpos ? _maxReachedMs : gpos);
+
         final newTotal = (oldTotal > total) ? oldTotal : total;
-        final newContent = (oldContent > currentContent)
-            ? oldContent
-            : currentContent;
+        final newContent = currentContent;
+
+        final isCompleted = newContent >= newTotal && newTotal > 0;
 
         tx.set(ref, {
           'totalMs': newTotal,
           'contentMs': newContent, // ✅ بدون isCompleted هنا
           'updatedAt': FieldValue.serverTimestamp(),
+
+          // ✅ إذا اكتمل → انقله لـ listened
+          if (isCompleted) 'status': 'listened',
         }, SetOptions(merge: true));
       });
     } catch (_) {}
@@ -2934,8 +2949,12 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
                                     total > 0 ? total : 0,
                                   );
 
-                                  if (currentMs > _maxReachedMs)
-                                    _maxReachedMs = currentMs;
+                                  // 🔥 إذا الكتاب مكتمل → لا تحدث البار
+                                  if (!_movedToListened) {
+                                    if (currentMs > _maxReachedMs) {
+                                      _maxReachedMs = currentMs;
+                                    }
+                                  }
 
                                   final value = (total > 0)
                                       ? (currentMs / total)
@@ -3148,41 +3167,68 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
 
         final currentMs = current.clamp(0, total);
 
-        //if (currentMs > _maxReachedMs) _maxReachedMs = currentMs;
+        return FutureBuilder<DocumentSnapshot>(
+          future: FirebaseFirestore.instance
+              .collection('users')
+              .doc(FirebaseAuth.instance.currentUser!.uid)
+              .collection('library')
+              .doc(widget.bookId)
+              .get(),
 
-       // final p = (_maxReachedMs / total).clamp(0.0, 1.0);
-       // final percent = (p * 100).round();
-        final p = (currentMs / total).clamp(0.0, 1.0);
-        final percent = (p * 100).round();
+          builder: (context, snap2) {
+            final data = snap2.data?.data() as Map<String, dynamic>? ?? {};
+            //final isCompleted = (data['status'] ?? '') == 'listened';
+            final isCompleted = (data['status'] ?? '') == 'listened';
+            // 🔥 لا تحدث البار إذا مكتمل
+            if (!isCompleted) {
+              if (currentMs > _maxReachedMs) {
+                _maxReachedMs = currentMs;
+              }
+            }
+            double p;
+            final percent;
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(24),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                LinearProgressIndicator(
-                  value: p,
-                  minHeight: 18,
-                  backgroundColor: _pillGreen,
-                  valueColor: const AlwaysStoppedAnimation<Color>(
-                    _midPillGreen,
-                  ),
+            if ((data['status'] ?? '') == 'listened') {
+              p = (_maxReachedMs / total).clamp(0.0, 1.0);
+            } else {
+              p = (currentMs / total).clamp(0.0, 1.0);
+            }
+
+            percent = (p * 100).round();
+            //final p = isCompleted
+            //? (_maxReachedMs / total).clamp(0.0, 1.0) // 🔒 ثابت
+            //  : (currentMs / total).clamp(0.0, 1.0); // 🔄 طبيعي
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    LinearProgressIndicator(
+                      value: p,
+                      minHeight: 18,
+                      backgroundColor: _pillGreen,
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        _midPillGreen,
+                      ),
+                    ),
+
+                    Text(
+                      '$percent%',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: _darkGreen,
+                        height: 1.0,
+                      ),
+                    ),
+                  ],
                 ),
-
-                Text(
-                  '$percent%',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: _darkGreen,
-                    height: 1.0,
-                  ),
-                ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );
