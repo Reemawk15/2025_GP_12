@@ -1777,7 +1777,10 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
                 ? (data['contentMs'] as num).toInt()
                 : 0;
 
-            if (savedContent == 0 && _maxReachedMs > 0) {
+            final status = (data['status'] ?? '') as String;
+
+            if ((status == 'want' || status == 'listen_now') &&
+                _maxReachedMs > 0) {
               if (mounted) setState(() => _maxReachedMs = 0);
             }
           });
