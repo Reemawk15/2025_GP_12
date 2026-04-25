@@ -1015,49 +1015,71 @@ class _HomeScreenState extends State<HomeScreen> {
                         },
                       ),
                       const SizedBox(height: 26),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(26),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Colors.black12,
-                              blurRadius: 10,
-                              offset: Offset(0, 6),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.search,
-                                color: _HomeColors.unselected),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: TextField(
-                                textAlign: TextAlign.right,
-                                decoration: const InputDecoration(
-                                  hintText: 'ابحث',
-                                  border: InputBorder.none,
-                                  isDense: true,
-                                  hintStyle:
-                                  TextStyle(color: _HomeColors.unselected),
-                                ),
-                                style:
-                                const TextStyle(color: _HomeColors.selected),
-                                onChanged: (value) {
-                                  setState(() => _searchQuery = value.trim());
-                                },
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(26),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Colors.black12,
+                                    blurRadius: 10,
+                                    offset: Offset(0, 6),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.search, color: _HomeColors.unselected),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: TextField(
+                                      textAlign: TextAlign.right,
+                                      decoration: const InputDecoration(
+                                        hintText: 'ابحث',
+                                        border: InputBorder.none,
+                                        isDense: true,
+                                        hintStyle: TextStyle(color: _HomeColors.unselected),
+                                      ),
+                                      style: const TextStyle(color: _HomeColors.selected),
+                                      onChanged: (value) {
+                                        setState(() => _searchQuery = value.trim());
+                                      },
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            GestureDetector(
-                              onTap: _openFilterSheet,
-                              child: const Icon(Icons.tune,
-                                  color: _HomeColors.unselected),
+                          ),
+
+                          const SizedBox(width: 10),
+
+                          GestureDetector(
+                            onTap: _openFilterSheet,
+                            child: Container(
+                              width: 50,
+                              height: 50,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Colors.black12,
+                                    blurRadius: 10,
+                                    offset: Offset(0, 6),
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.tune,
+                                color: _HomeColors.unselected,
+                              ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 16),
                       InkWell(
