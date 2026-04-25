@@ -675,7 +675,11 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
 
                         isDownloading: _isDownloading,
                         isDownloaded: _isDownloaded,
-                        onDownload: _isDownloaded ? null : _onDownloadPressed,
+                        onDownload:
+                            hasAudioParts && !_isDownloaded && !_isDownloading
+                            ? _onDownloadPressed
+                            : null,
+                        //onDownload: _isDownloaded ? null : _onDownloadPressed,
                         onReview: () => _showAddReviewSheet(
                           context,
                           widget.bookId,
@@ -825,7 +829,7 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
 
       _showSnack(
         context,
-        'فشل التحميل، حاول مرة اخرى',
+        'فشل تحميل الكتاب بسبب عدم الاتصال بالانترنت  ',
         icon: Icons.error_outline,
       );
     }
@@ -2167,7 +2171,6 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
     } catch (_) {}
   }
 
-  // ✅ التعديل: حفظ التقدم لكل يوزر (users/{uid}/library/{bookId})
   Future<void> _saveProgress() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -2204,8 +2207,6 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
 
       final gpos = _globalPosMs().clamp(0, total);
 
-      //final currentContent = (_maxReachedMs > gpos ? _maxReachedMs : gpos);
-
       final ref = FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
@@ -2216,7 +2217,6 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
         final snap = await tx.get(ref);
         final data = snap.data() as Map<String, dynamic>? ?? {};
 
-        // ✅ إذا الكتاب مكتمل → لا تحدث البار
         if ((data['status'] ?? '') == 'listened') {
           return;
         }
@@ -2224,13 +2224,13 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
         if ((data['status'] ?? '') == 'want' ||
             (data['status'] ?? '') == 'listen_now') {
           tx.set(ref, {
-            'contentMs': 0, // 🔥 ابدأ من جديد
+            'contentMs': 0,
             'lastPositionMs': 0,
             'lastPartIndex': 0,
             'updatedAt': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
 
-          return; // وقف بعد التصفير
+          return;
         }
 
         final oldContent = (data['contentMs'] is num)
@@ -2243,9 +2243,8 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
         final status = (data['status'] ?? '');
 
         final isListened = status == 'listened';
-        // 🔥 الحل
         final currentContent = isListened
-            ? oldContent // 🔒 خليه ثابت
+            ? oldContent
             : (_maxReachedMs > gpos ? _maxReachedMs : gpos);
 
         final newTotal = (oldTotal > total) ? oldTotal : total;
@@ -2255,10 +2254,9 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
 
         tx.set(ref, {
           'totalMs': newTotal,
-          'contentMs': newContent, // ✅ بدون isCompleted هنا
+          'contentMs': newContent,
           'updatedAt': FieldValue.serverTimestamp(),
 
-          // ✅ إذا اكتمل → انقله لـ listened
           if (isCompleted) 'status': 'listened',
         }, SetOptions(merge: true));
       });
@@ -2281,16 +2279,13 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
-
       if (_sessionListenedSeconds < 1) return;
-
       final statsRef = FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .collection('stats')
           .doc('main');
 
-      // ✅ تحقق من الأسبوع وصفّر إذا أسبوع جديد
       final now = DateTime.now();
       final wk = _weekKey(now);
 
@@ -2298,7 +2293,6 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
       final stats = statsSnap.data() ?? {};
       final storedWeek = (stats['weeklyKey'] ?? '') as String;
 
-      // ✅ لو أسبوع جديد -> صفّر weeklyListenedSeconds
       if (storedWeek != wk) {
         await statsRef.set({
           'weeklyKey': wk,
@@ -2458,7 +2452,6 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
     final reachedNear = weeklySeconds >= (goalSeconds * nearRatio).floor();
     if (!reachedNear) return;
 
-    // ✅ الجديد: مرة واحدة فقط لكل أسبوع (على أول هدف)
     final notifiedWeek = (stats['nearGoalNotifiedWeek'] ?? '') as String;
     if (notifiedWeek == wk) return;
 
@@ -3180,9 +3173,9 @@ class _BookAudioPlayerPageState extends State<BookAudioPlayerPage> {
 
           builder: (context, snap2) {
             final data = snap2.data?.data() as Map<String, dynamic>? ?? {};
-            //final isCompleted = (data['status'] ?? '') == 'listened';
+
             final isCompleted = (data['status'] ?? '') == 'listened';
-            // 🔥 لا تحدث البار إذا مكتمل
+
             if (!isCompleted) {
               if (currentMs > _maxReachedMs) {
                 _maxReachedMs = currentMs;
