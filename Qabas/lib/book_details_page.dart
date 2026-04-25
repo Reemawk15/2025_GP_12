@@ -1391,40 +1391,92 @@ class _AddToListSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              height: 4,
-              width: 40,
-              decoration: BoxDecoration(
-                color: Colors.black26,
-                borderRadius: BorderRadius.circular(2),
-              ),
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      return const Center(child: Text('يجب تسجيل الدخول'));
+    }
+
+    final libraryQuery = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('library')
+        .where('bookId', isEqualTo: bookId)
+        .limit(1);
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: libraryQuery.snapshots(),
+      builder: (context, snapshot) {
+        String? currentStatus;
+
+        if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+          final data =
+          snapshot.data!.docs.first.data() as Map<String, dynamic>;
+          currentStatus = data['status']?.toString();
+        }
+
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  height: 4,
+                  width: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.black26,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'إضافة إلى أي قائمة؟',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 12),
+
+                ListTile(
+                  leading: Icon(
+                    Icons.play_circle_fill,
+                    color: currentStatus == 'listen_now'
+                        ? Colors.grey
+                        : _primary,
+                  ),
+                  title: Text(
+                    currentStatus == 'listen_now'
+                        ? 'مضاف إلى استمع لها الآن'
+                        : 'استمع لها الآن',
+                  ),
+                  enabled: currentStatus != 'listen_now',
+                  onTap: currentStatus == 'listen_now'
+                      ? null
+                      : () => _setStatus(context, 'listen_now'),
+                ),
+
+                ListTile(
+                  leading: Icon(
+                    Icons.schedule,
+                    color: currentStatus == 'want'
+                        ? Colors.grey
+                        : _primary,
+                  ),
+                  title: Text(
+                    currentStatus == 'want'
+                        ? 'مضاف إلى أرغب بالاستماع لها'
+                        : 'أرغب بالاستماع لها',
+                  ),
+                  enabled: currentStatus != 'want',
+                  onTap: currentStatus == 'want'
+                      ? null
+                      : () => _setStatus(context, 'want'),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            const Text(
-              'إضافة إلى أي قائمة؟',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 12),
-            ListTile(
-              leading: const Icon(Icons.play_circle_fill, color: _primary),
-              title: const Text('استمع لها الآن'),
-              onTap: () => _setStatus(context, 'listen_now'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.schedule, color: _primary),
-              title: const Text('أرغب بالاستماع لها'),
-              onTap: () => _setStatus(context, 'want'),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
