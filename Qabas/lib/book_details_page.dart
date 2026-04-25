@@ -679,7 +679,6 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
                             hasAudioParts && !_isDownloaded && !_isDownloading
                             ? _onDownloadPressed
                             : null,
-                        //onDownload: _isDownloaded ? null : _onDownloadPressed,
                         onReview: () => _showAddReviewSheet(
                           context,
                           widget.bookId,
