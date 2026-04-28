@@ -18,7 +18,6 @@ const _chipRose = Color(0xFFFFEFF0);
 const _midPillGreen = Color(0xFFBFD6B5);
 const _midDarkGreen2 = Color(0xFF2A5C4C);
 const Color _darkGreen = Color(0xFF0E3A2C);
-
 void _showSnack(
   BuildContext context,
   String message, {
@@ -265,7 +264,7 @@ class MyBookDetailsPage extends StatelessWidget {
       if (tries >= 45) {
         _showSnack(
           context,
-          'التوليد يأخذ وقت… جربي بعد شوي',
+          'التوليد يأخذ وقت… جرب بعد قليل',
           icon: Icons.info_outline,
         );
         return false;

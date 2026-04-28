@@ -162,14 +162,19 @@ class _RatingsPageState extends State<RatingsPage> {
             .delete(),
       );
 
-      // 2) Delete review from the book document (if bookId is available)
+      /// 2) Delete review from the item document (book or podcast)
       if (review.bookId != null && review.bookId!.isNotEmpty) {
-        final bookReviewsCol =
-        firestore.collection('audiobooks').doc(review.bookId).collection('reviews');
+        final collectionName =
+        review.type == 'podcast' ? 'podcasts' : 'audiobooks';
 
-        // We delete all docs for this user on that book (safe even if one)
-        final snap =
-        await bookReviewsCol.where('userId', isEqualTo: user.uid).get();
+        final itemReviewsCol = firestore
+            .collection(collectionName)
+            .doc(review.bookId)
+            .collection('reviews');
+
+        final snap = await itemReviewsCol
+            .where('userId', isEqualTo: user.uid)
+            .get();
 
         for (final d in snap.docs) {
           ops.add(d.reference.delete());
@@ -282,25 +287,24 @@ class _RatingsPageState extends State<RatingsPage> {
                                 return _emptyBox();
                               }
 
-                              return ListView.separated(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                itemCount: reviews.length,
-                                separatorBuilder: (_, __) =>
-                                const SizedBox(height: 10),
-                                itemBuilder: (context, i) {
-                                  final r = reviews[i];
-                                  return _ReviewTile(
-                                    title: r.bookTitle ?? 'كتاب بدون عنوان',
-                                    stars: (r.rating >= 0 && r.rating <= 5)
-                                        ? r.rating
-                                        : 0,
-                                    date: r.formattedDate,
-                                    review: r.text,
-                                    coverUrl: r.bookCover,
-                                    onDelete: () => _deleteReview(r),
-                                  );
-                                },
+                              return SizedBox(
+                                height: MediaQuery.of(context).size.height * 0.60,
+                                child: ListView.separated(
+                                  physics: const BouncingScrollPhysics(),
+                                  itemCount: reviews.length,
+                                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                                  itemBuilder: (context, i) {
+                                    final r = reviews[i];
+                                    return _ReviewTile(
+                                      title: r.bookTitle ?? 'كتاب بدون عنوان',
+                                      stars: (r.rating >= 0 && r.rating <= 5) ? r.rating : 0,
+                                      date: r.formattedDate,
+                                      review: r.text,
+                                      coverUrl: r.bookCover,
+                                      onDelete: () => _deleteReview(r),
+                                    );
+                                  },
+                                ),
                               );
                             },
                           ),
@@ -397,9 +401,10 @@ class _Review {
   final String? bookId;
   final String? bookTitle;
   final String? bookCover;
-  final String? text; // Review text
-  final int rating; // 0..5
+  final String? text;
+  final int rating;
   final DateTime? createdAt;
+  final String? type;
 
   _Review({
     required this.id,
@@ -409,27 +414,28 @@ class _Review {
     required this.text,
     required this.rating,
     required this.createdAt,
+    this.type,
   });
 
   factory _Review.fromDoc(String id, Map<String, dynamic> data) {
     DateTime? created;
     final raw = data['createdAt'];
+
     if (raw is Timestamp) {
       created = raw.toDate();
     } else if (raw is String) {
-      try {
-        created = DateTime.tryParse(raw);
-      } catch (_) {}
+      created = DateTime.tryParse(raw);
     }
 
     return _Review(
       id: id,
-      bookId: (data['bookId'] as String?)?.trim(),
-      bookTitle: (data['bookTitle'] as String?)?.trim(),
-      bookCover: (data['bookCover'] as String?)?.trim(),
+      bookId: (data['bookId'] ?? data['podcastId'])?.toString().trim(),
+      bookTitle: (data['bookTitle'] ?? data['podcastTitle'])?.toString().trim(),
+      bookCover: (data['bookCover'] ?? data['podcastCover'])?.toString().trim(),
       text: (data['text'] as String?)?.trim(),
       rating: (data['rating'] is num) ? (data['rating'] as num).toInt() : 0,
       createdAt: created,
+      type: (data['type'] as String?)?.trim(),
     );
   }
 

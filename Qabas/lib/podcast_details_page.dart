@@ -1255,24 +1255,16 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
   final _ctrl = TextEditingController();
   bool _saving = false;
 
+  bool get _canSave => _rating > 0 && _ctrl.text.trim().isNotEmpty && !_saving;
+
   Future<void> _save() async {
+    if (!_canSave) return;
+
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       _showSnack(
         context,
         'الرجاء تسجيل الدخول أولاً',
-        icon: Icons.info_outline,
-      );
-      return;
-    }
-    if (_rating == 0) {
-      _showSnack(context, 'اختاري عدد النجوم أولاً', icon: Icons.info_outline);
-      return;
-    }
-    if (_ctrl.text.trim().isEmpty) {
-      _showSnack(
-        context,
-        'فضلاً اكتبي تعليقاً مختصراً',
         icon: Icons.info_outline,
       );
       return;
@@ -1288,11 +1280,13 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
           .collection('users')
           .doc(user.uid)
           .get();
+
       if (u.exists) {
         final data = u.data() ?? {};
         final candidateName =
-            (data['name'] ?? data['fullName'] ?? data['displayName'] ?? '')
-                .toString();
+        (data['name'] ?? data['fullName'] ?? data['displayName'] ?? '')
+            .toString();
+
         if (candidateName.trim().isNotEmpty) userName = candidateName;
 
         final candidateImage = (data['photoUrl'] ?? '').toString();
@@ -1331,7 +1325,6 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
       batch.set(podcastReviewRef, payload);
       batch.set(userReviewRef, payload);
 
-      // ✅ كمان نخزن تأثير التقييم في library (عشان الريكمنيدر يشوفه بسهولة)
       final libRef = FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
@@ -1353,7 +1346,6 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
 
       await batch.commit();
 
-      // ✅ بدل events.add: aggregated event
       await _upsertUserEventAgg(
         uid: user.uid,
         bookId: widget.podcastId,
@@ -1410,49 +1402,72 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
                 ),
               ),
               const SizedBox(height: 14),
+
               const Text(
                 'إضافة تعليق',
                 style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
               ),
               const SizedBox(height: 10),
+
               Center(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(5, (i) {
-                    final filled = i < _rating;
-                    return IconButton(
-                      onPressed: _saving
-                          ? null
-                          : () => setState(() => _rating = i + 1),
-                      icon: Icon(
-                        filled ? Icons.star : Icons.star_border,
-                        color: Colors.amber[700],
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(5, (i) {
+                        final filled = i < _rating;
+                        return IconButton(
+                          onPressed: _saving
+                              ? null
+                              : () => setState(() => _rating = i + 1),
+                          icon: Icon(
+                            filled ? Icons.star : Icons.star_border,
+                            color: Colors.amber[700],
+                          ),
+                        );
+                      }),
+                    ),
+                    if (_rating == 0 || _ctrl.text.trim().isEmpty)
+                      const Text(
+                        'يرجى اختيار تقييم وكتابة تعليق قبل الحفظ',
+                        style: TextStyle(
+                          color: Colors.black45,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    );
-                  }),
+                  ],
                 ),
               ),
+
+              const SizedBox(height: 8),
+
               TextField(
                 controller: _ctrl,
+                onChanged: (_) => setState(() {}),
                 maxLines: 4,
                 decoration: const InputDecoration(
                   hintText: 'اكتب رأيك حول البودكاست...',
                   border: OutlineInputBorder(),
                 ),
               ),
+
               const SizedBox(height: 10),
+
               SizedBox(
                 width: double.infinity,
                 height: 46,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _accent,
+                    backgroundColor: _canSave ? _accent : Colors.grey.shade300,
+                    disabledBackgroundColor: Colors.grey.shade300,
+                    disabledForegroundColor: Colors.white,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
                   ),
-                  onPressed: _saving ? null : _save,
+                  onPressed: _canSave ? _save : null,
                   child: Text(
                     _saving ? 'جارٍ الحفظ...' : 'حفظ التعليق',
                     style: const TextStyle(
@@ -1467,9 +1482,7 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
         ),
       ),
     );
-  }
-}
-
+  }}
 /// AUDIO PLAYER PAGE (بودكاست) — ✅ ملف واحد فقط
 class PodcastAudioPlayerPage extends StatefulWidget {
   final String podcastId;
@@ -1480,12 +1493,12 @@ class PodcastAudioPlayerPage extends StatefulWidget {
   final int initialPositionMs;
 
   const PodcastAudioPlayerPage({
-    super.key,
-    required this.podcastId,
-    required this.podcastTitle,
-    required this.coverUrl,
-    required this.audioUrl,
-    required this.initialPositionMs,
+  super.key,
+  required this.podcastId,
+  required this.podcastTitle,
+  required this.coverUrl,
+  required this.audioUrl,
+  required this.initialPositionMs,
   });
 
   @override

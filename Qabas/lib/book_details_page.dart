@@ -699,7 +699,6 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
                             final partIndex = result['partIndex'] as int;
                             final positionMs = result['positionMs'] as int;
 
-                            // ✅ افتحي المشغل مباشرة عند الموضع
                             await _startOrGenerateAudio(
                               context,
                               data: data,
@@ -1549,18 +1548,8 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
       );
       return;
     }
-    if (_rating == 0) {
-      _showSnack(context, 'اختاري عدد النجوم أولاً', icon: Icons.info_outline);
-      return;
-    }
-    if (_ctrl.text.trim().isEmpty) {
-      _showSnack(
-        context,
-        'فضلاً اكتبي تعليقاً مختصراً',
-        icon: Icons.info_outline,
-      );
-      return;
-    }
+
+
 
     setState(() => _saving = true);
 
@@ -1673,32 +1662,44 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
 
               // ⭐ النجوم
               Center(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(5, (i) {
-                    final filled = i < _rating;
-                    return IconButton(
-                      onPressed: _saving
-                          ? null
-                          : () => setState(() => _rating = i + 1),
-                      icon: Icon(
-                        filled ? Icons.star : Icons.star_border,
-                        color: Colors.amber[700],
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(5, (i) {
+                        final filled = i < _rating;
+                        return IconButton(
+                          onPressed: _saving
+                              ? null
+                              : () => setState(() => _rating = i + 1),
+                          icon: Icon(
+                            filled ? Icons.star : Icons.star_border,
+                            color: Colors.amber[700],
+                          ),
+                        );
+                      }),
+                    ),
+                    if (_rating == 0 || _ctrl.text.trim().isEmpty)
+                      const Text(
+                        'يرجى اختيار تقييم وكتابة تعليق قبل الحفظ',
+                        style: TextStyle(
+                          color: Colors.black45,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    );
-                  }),
+                  ],
                 ),
               ),
-
               TextField(
                 controller: _ctrl,
+                onChanged: (_) => setState(() {}), // 🔥 مهم
                 maxLines: 4,
                 decoration: const InputDecoration(
                   hintText: 'اكتب رأيك حول الكتاب...',
                   border: OutlineInputBorder(),
                 ),
               ),
-
               const SizedBox(height: 10),
 
               SizedBox(
@@ -1706,14 +1707,19 @@ class _AddReviewSheetState extends State<_AddReviewSheet> {
                 height: 46,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _accent, // ✅ نفس زر الملاحظة الأخضر
+                    backgroundColor:
+                    (_rating == 0 || _ctrl.text.trim().isEmpty)
+                        ? Colors.grey.shade300
+                        : _accent,                    disabledBackgroundColor: Colors.grey.shade300,
+                    disabledForegroundColor: Colors.white,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
                   ),
-                  onPressed: _saving ? null : _save,
-                  child: Text(
+                  onPressed: (_saving || _rating == 0 || _ctrl.text.trim().isEmpty)
+                      ? null
+                      : _save,                  child: Text(
                     _saving ? 'جارٍ الحفظ...' : 'حفظ التعليق',
                     style: const TextStyle(
                       color: Colors.white,

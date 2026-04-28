@@ -45,9 +45,46 @@ class _SignInPageState extends State<SignInPage> {
   }
 
   // Quick toast message
-  void _toast(String msg, {Color? color}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg, textDirection: TextDirection.rtl), backgroundColor: color),
+  void _toast(String msg, {Color? color, IconData? icon}) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+
+    final isError = color == Colors.red;
+
+    messenger.showSnackBar(
+      SnackBar(
+        backgroundColor: isError
+            ? Colors.red
+            : const Color(0xFF6F8E63),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
+        content: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isError ? Icons.error_outline : Icons.check_circle,
+              color: const Color(0xFFE7C4DA),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                msg,
+                textAlign: TextAlign.center,
+                textDirection: TextDirection.rtl,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          ],
+        ),
+        duration: const Duration(seconds: 3),
+      ),
     );
   }
 

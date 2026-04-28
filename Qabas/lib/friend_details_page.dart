@@ -1393,20 +1393,32 @@ class _FriendReviewsTab extends StatelessWidget {
           return _friendEmptyBox();
         }
 
-        return ListView.separated(
+        return Padding(
           padding: const EdgeInsets.fromLTRB(16, 280, 16, 24),
-          itemCount: reviews.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 10),
-          itemBuilder: (context, i) {
-            final r = reviews[i];
-            return _FriendReviewTile(
-              title: r.bookTitle ?? 'كتاب بدون عنوان',
-              stars: (r.rating >= 0 && r.rating <= 5) ? r.rating : 0,
-              date: r.formattedDate,
-              review: r.text,
-              coverUrl: r.bookCover,
-            );
-          },
+          child: SizedBox(
+            height: double.infinity,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: ListView.separated(
+                padding: const EdgeInsets.all(12),
+                itemCount: reviews.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (context, i) {
+                  final r = reviews[i];
+                  return _FriendReviewTile(
+                    title: r.bookTitle ?? 'كتاب بدون عنوان',
+                    stars: (r.rating >= 0 && r.rating <= 5) ? r.rating : 0,
+                    date: r.formattedDate,
+                    review: r.text,
+                    coverUrl: r.bookCover,
+                  );
+                },
+              ),
+            ),
+          ),
         );
       },
     );
@@ -1756,7 +1768,6 @@ class _ClubsTab extends StatelessWidget {
             if (visibleClubs.isEmpty) {
               return _clubsEmptyBox();
             }
-
             return Padding(
               padding: const EdgeInsets.fromLTRB(16, 280, 16, 24),
               child: ListView.separated(
@@ -1773,10 +1784,7 @@ class _ClubsTab extends StatelessWidget {
                   final cat = (data['category'] ?? '') as String?;
 
                   return Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     decoration: BoxDecoration(
                       color: _card,
                       borderRadius: BorderRadius.circular(16),

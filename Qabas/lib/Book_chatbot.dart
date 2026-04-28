@@ -302,30 +302,39 @@ class _BookChatPageState extends State<BookChatPage> {
               children: [
                 const SizedBox(height: _chatStartTop),
                 Expanded(
-                  child: ListView.builder(
-                    controller: _scroll,
+                  child: Padding(
                     padding: const EdgeInsets.fromLTRB(12, 20, 12, 12),
-                    itemCount: _messages.length + (_sending ? 1 : 0),
-                    itemBuilder: (context, i) {
-                      if (_sending && i == _messages.length) {
-                        return const _TypingRow();
-                      }
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.85),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: ListView.builder(
+                        controller: _scroll,
+                        padding: const EdgeInsets.all(12),
+                        itemCount: _messages.length + (_sending ? 1 : 0),
+                        itemBuilder: (context, i) {
+                          if (_sending && i == _messages.length) {
+                            return const _TypingRow();
+                          }
 
-                      final m = _messages[i];
-                      final role = (m['role'] ?? '').toString();
-                      final mine = role == 'user';
-                      final text = (m['text'] ?? '').toString();
-                      final quotes = (m['quotes'] is List)
-                          ? (m['quotes'] as List).map((e) => e.toString()).toList()
-                          : <String>[];
+                          final m = _messages[i];
+                          final role = (m['role'] ?? '').toString();
+                          final mine = role == 'user';
+                          final text = (m['text'] ?? '').toString();
+                          final quotes = (m['quotes'] is List)
+                              ? (m['quotes'] as List).map((e) => e.toString()).toList()
+                              : <String>[];
 
-                      return _ChatRow(
-                        mine: mine,
-                        text: text,
-                        quotes: mine ? const [] : quotes,
-                        bubbleColor: mine ? _bubbleUser : _bubbleBot,
-                      );
-                    },
+                          return _ChatRow(
+                            mine: mine,
+                            text: text,
+                            quotes: mine ? const [] : quotes,
+                            bubbleColor: mine ? _bubbleUser : _bubbleBot,
+                          );
+                        },
+                      ),
+                    ),
                   ),
                 ),
                 SafeArea(

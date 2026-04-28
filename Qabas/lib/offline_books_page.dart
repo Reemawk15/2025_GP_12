@@ -9,6 +9,7 @@ class OfflineBooksPage extends StatefulWidget {
 
   @override
   State<OfflineBooksPage> createState() => _OfflineBooksPageState();
+
 }
 
 class _OfflineBooksPageState extends State<OfflineBooksPage> {
@@ -62,40 +63,127 @@ class _OfflineBooksPageState extends State<OfflineBooksPage> {
       _loading = false;
     });
   }
+  Future<bool> _confirmDelete() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+          child: Directionality(
+            textDirection: TextDirection.rtl,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'حذف التحميل',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0E3A2C),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'هل أنت متأكد من حذف هذا الصوت؟',
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
 
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Color(0xFF6F8E63),
+                    ),
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: const Text('تأكيد'),
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.grey,
+                    ),
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('إلغاء'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    return confirm == true;
+  }
+  void _showSnack(String msg, {IconData icon = Icons.check_circle}) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+
+    messenger.showSnackBar(
+      SnackBar(
+        backgroundColor: const Color(0xFF6F8E63),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
+        content: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: const Color(0xFFE7C4DA)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                msg,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          ],
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
   Future<void> _deleteOfflineBook(_OfflineBook book) async {
     try {
-      // 1) حذف الملفات من التخزين الداخلي
       final dir = Directory(book.folderPath);
       if (await dir.exists()) {
         await dir.delete(recursive: true);
       }
 
-      // 2) حذف الكتاب من SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       final stored = prefs.getStringList('offline_books') ?? [];
 
       stored.removeWhere((e) => e.startsWith('${book.bookId}|||'));
       await prefs.setStringList('offline_books', stored);
 
-      // 3) تحديث حالة التحميل في صفحة التفاصيل
       await prefs.remove('downloaded_${book.bookId}');
       await prefs.remove('downloadPath_${book.bookId}');
 
-      // 4) تحديث الصفحة الحالية
       setState(() {
         books.removeWhere((b) => b.bookId == book.bookId);
       });
 
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('تم حذف التحميل')));
+      _showSnack('تم حذف التحميل', icon: Icons.check_circle);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('تعذّر حذف التحميل')));
+      _showSnack('تعذّر حذف التحميل', icon: Icons.error_outline);
     }
   }
 
@@ -120,17 +208,12 @@ class _OfflineBooksPageState extends State<OfflineBooksPage> {
       });
 
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('تم حذف التحميل')));
+      _showSnack('تم حذف التحميل', icon: Icons.check_circle);
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('تعذّر حذف التحميل')));
+      _showSnack('تعذّر حذف التحميل', icon: Icons.error_outline);
     }
   }
-
   Future<void> _openOfflineBook(_OfflineBook book) async {
     final dir = Directory(book.folderPath);
 
@@ -445,8 +528,12 @@ class _OfflineBooksPageState extends State<OfflineBooksPage> {
                                                 ),
                                               ),
                                               IconButton(
-                                                onPressed: () =>
-                                                    _deleteOfflineBook(book),
+                                                onPressed: () async {
+                                                  final ok = await _confirmDelete();
+                                                  if (!ok) return;
+
+                                                  _deleteOfflineBook(book);
+                                                },
                                                 icon: const Icon(
                                                   Icons.delete_outline_rounded,
                                                   color: Colors.red,
@@ -531,10 +618,12 @@ class _OfflineBooksPageState extends State<OfflineBooksPage> {
                                               ),
                                             ),
                                             IconButton(
-                                              onPressed: () =>
-                                                  _deleteOfflinePodcast(
-                                                    podcast,
-                                                  ),
+                                              onPressed: () async {
+                                                final ok = await _confirmDelete();
+                                                if (!ok) return;
+
+                                                _deleteOfflinePodcast(podcast);
+                                              },
                                               icon: const Icon(
                                                 Icons.delete_outline_rounded,
                                                 color: Colors.red,
